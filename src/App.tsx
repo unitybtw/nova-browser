@@ -24,6 +24,7 @@ import type {
   Workspace,
   ShortcutConfig,
   BrowserDesignProfile,
+  NewTabLayoutConfig,
   ToolbarItemKind,
   ToolbarSlotItem,
 } from './types/browser';
@@ -201,6 +202,41 @@ function updateWorkspaceAwareLayout(
         ...baseProfile.layout,
         ...nextPatch,
       },
+    },
+  };
+}
+
+function updateWorkspaceAwareNewTabLayout(
+  prev: UserSettings,
+  activeWorkspaceId: string,
+  nextNewTabLayout: NewTabLayoutConfig
+): UserSettings {
+  const baseProfile = sanitizeDesignProfile(prev.designProfile, createDefaultDesignProfile());
+  const sanitizedLayout = sanitizeDesignProfile(
+    { ...baseProfile, newTabLayout: nextNewTabLayout },
+    baseProfile
+  ).newTabLayout;
+
+  if (hasWorkspaceDesignOverride(prev, activeWorkspaceId)) {
+    const existingOverride = prev.workspaceDesigns![activeWorkspaceId]!;
+    return {
+      ...prev,
+      workspaceDesigns: {
+        ...prev.workspaceDesigns,
+        [activeWorkspaceId]: {
+          ...existingOverride,
+          newTabLayout: sanitizedLayout,
+        },
+      },
+    };
+  }
+
+  return {
+    ...prev,
+    showTasksWidget: sanitizedLayout.tasksWidget.visible,
+    designProfile: {
+      ...baseProfile,
+      newTabLayout: sanitizedLayout,
     },
   };
 }
@@ -1101,6 +1137,36 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }));
   }, [setSettings, activeWorkspaceIdRef]);
 
+  const handleUpdateNewTabLayout = useCallback((nextLayout: NewTabLayoutConfig) => {
+    if (isWebsiteDemo) return;
+    const activeWsId = activeWorkspaceIdRef.current || 'default';
+    setSettings(prev => updateWorkspaceAwareNewTabLayout(prev, activeWsId, nextLayout));
+  }, [isWebsiteDemo, setSettings, activeWorkspaceIdRef]);
+
+  const handleUpdateSettingsWithDesignSync = useCallback((updates: Partial<UserSettings>) => {
+    if (typeof updates.showTasksWidget === 'boolean' && !updates.designProfile) {
+      setSettings(prev => {
+        const base = sanitizeDesignProfile(prev.designProfile, createDefaultDesignProfile());
+        return {
+          ...prev,
+          ...updates,
+          designProfile: {
+            ...base,
+            newTabLayout: {
+              ...base.newTabLayout,
+              tasksWidget: {
+                ...base.newTabLayout.tasksWidget,
+                visible: updates.showTasksWidget!,
+              },
+            },
+          },
+        };
+      });
+      return;
+    }
+    handleUpdateSettings(updates);
+  }, [handleUpdateSettings, setSettings]);
+
   const mutateToolbarItems = useCallback(
     (updater: (items: ToolbarSlotItem[]) => ToolbarSlotItem[]) => {
       const activeWsId = activeWorkspaceIdRef.current || 'default';
@@ -1712,6 +1778,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     ...settings,
     showTasksWidget: isWebsiteDemo ? false : settings.showTasksWidget,
   }), [settings, isWebsiteDemo]);
+
+  const browserNewTabLayout = useMemo(() => {
+    if (isWebsiteDemo) return undefined;
+    if (demoParams.isDemo && typeof demoParams.showTasksWidget === 'boolean') {
+      return {
+        ...effectiveDesign.newTabLayout,
+        tasksWidget: {
+          ...effectiveDesign.newTabLayout.tasksWidget,
+          visible: demoParams.showTasksWidget,
+        },
+      };
+    }
+    return effectiveDesign.newTabLayout;
+  }, [isWebsiteDemo, demoParams.isDemo, demoParams.showTasksWidget, effectiveDesign.newTabLayout]);
 
   // Compute stable primary (left) and secondary (right) tabs for split view.
   // Their physical positions remain stable based on tab order, even when activeTabId changes upon focus.
@@ -2355,7 +2435,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     newTabBackground={settings.newTabBackground}
                     disableTasksWidget={demoParams.feature === 'website'}
                     settings={browserViewSettings}
-                    onUpdateSettings={handleUpdateSettings}
+                    onUpdateSettings={handleUpdateSettingsWithDesignSync}
                     onExportData={handleExportData}
                     onImportData={handleImportData}
                     isActive={tab.id === activeTabId || tab.id === splitTabId}
@@ -2370,6 +2450,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     onPurgeMemory={handlePurgeMemory}
                     onPerformSync={handlePerformSync}
                     isDemo={demoParams.isDemo}
+                    newTabLayout={browserNewTabLayout}
+                    isCustomizeMode={isWebsiteDemo ? false : isCustomizeMode}
+                    onUpdateNewTabLayout={handleUpdateNewTabLayout}
                   />
                 </div>
               </div>

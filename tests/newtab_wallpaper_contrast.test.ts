@@ -1,3 +1,25 @@
+import {
+  resolveNewTabLayout,
+  formatClockTime,
+  resolveGreetingText,
+  getClockClasses,
+  getSearchBoxClasses,
+  getShortcutsContainerWidthClass,
+  getShortcutCardClasses,
+  clampShortcutColumns,
+  cycleWidgetOption,
+  SHORTCUT_COLUMN_CLASSES,
+  SEARCH_WIDTH_CLASSES,
+  TASKS_PLACEMENT_CLASSES,
+  CLOCK_STYLES,
+  SEARCH_STYLES,
+  SEARCH_WIDTHS,
+  SHORTCUT_CARD_STYLES,
+  SHORTCUT_COLUMN_OPTIONS,
+  TASKS_PLACEMENTS,
+} from '../src/components/NewTabPage';
+import { DEFAULT_DESIGN_PROFILE } from '../src/utils/designDefaults';
+
 console.log('--- New Tab Wallpaper Contrast & Light Mode Clock Styling Suite ---');
 
 function assert(condition: boolean, message: string) {
@@ -94,5 +116,81 @@ for (let h = 0; h < 24; h++) {
   }
 }
 console.log('[PASS] [NewTab-Contrast-4] Greeting key calculation verified across all 24 hours.');
+
+// 5. Modular New Tab Widget Layout Helpers & Static Tailwind Maps
+const fallbackHidden = resolveNewTabLayout(undefined, false);
+assert(fallbackHidden.tasksWidget.visible === false, 'Omitted layout with showTasksWidget=false hides tasks');
+assert(fallbackHidden.clock.visible === true && fallbackHidden.clock.format === '24h', 'Omitted layout uses default clock config');
+
+const fallbackShown = resolveNewTabLayout(undefined, true);
+assert(fallbackShown.tasksWidget.visible === true, 'Omitted layout with showTasksWidget=true preserves legacy tasks visibility');
+
+// Clamping & sanitization
+assert(clampShortcutColumns(2) === 4, 'Columns below 4 clamp to 4');
+assert(clampShortcutColumns(12) === 8, 'Columns above 8 clamp to 8');
+assert(clampShortcutColumns(Number.NaN) === 4, 'NaN columns fall back to 4');
+const clampedLayout = resolveNewTabLayout({
+  ...DEFAULT_DESIGN_PROFILE.newTabLayout,
+  shortcuts: { visible: true, columns: 99 as any, cardStyle: 'pill' },
+});
+assert(clampedLayout.shortcuts.columns === 8, 'resolveNewTabLayout clamps out-of-range columns to 8');
+
+// Clock 12h vs 24h formatting
+const afternoon = new Date(2026, 0, 1, 14, 5);
+const midnight = new Date(2026, 0, 1, 0, 5);
+assert(formatClockTime(afternoon, 'en-US', '24h') === '14:05', '24h clock renders 14:05');
+assert(formatClockTime(midnight, 'en-US', '24h') === '00:05', '24h clock renders 00:05 at midnight');
+assert(formatClockTime(afternoon, 'en-US', '12h').includes('2:05'), '12h clock renders 2:05');
+assert(/AM|PM/i.test(formatClockTime(afternoon, 'en-US', '12h')), '12h clock includes AM/PM meridiem');
+
+// Clock styles & alignment contrast
+for (const style of CLOCK_STYLES) {
+  const darkAlignLeft = getClockClasses(style, 'left', true);
+  assert(darkAlignLeft.containerClass.includes('items-start') && darkAlignLeft.containerClass.includes('text-left'), `Clock style ${style} supports left alignment`);
+  assert(darkAlignLeft.timeClass.includes('text-white'), `Clock style ${style} keeps text-white on dark/wallpaper canvas`);
+  const lightAlignCenter = getClockClasses(style, 'center', false);
+  assert(lightAlignCenter.containerClass.includes('items-center') && lightAlignCenter.containerClass.includes('text-center'), `Clock style ${style} supports center alignment`);
+  assert(lightAlignCenter.timeClass.includes('text-slate-900'), `Clock style ${style} keeps dark slate text on plain light canvas`);
+}
+assert(getClockClasses('editorial', 'center', true).timeClass.includes('font-serif'), 'Editorial clock uses serif font');
+assert(getClockClasses('mono', 'center', true).timeClass.includes('font-mono'), 'Mono clock uses monospace font');
+assert(getClockClasses('pill', 'center', true).timeWrapperClass.includes('rounded-full'), 'Pill clock wraps time in pill capsule');
+
+// Custom greeting resolution
+const fakeT = (k: string) => (k === 'newtab.goodMorning' ? 'Good Morning' : k === 'newtab.goodAfternoon' ? 'Good Afternoon' : 'Good Evening');
+assert(resolveGreetingText('  Focus Mode  ', 9, fakeT) === 'Focus Mode', 'Custom greeting trims whitespace and overrides time greeting');
+assert(resolveGreetingText('   ', 9, fakeT) === 'Good Morning', 'Whitespace-only custom greeting falls back to translated greeting');
+assert(resolveGreetingText(undefined, 20, fakeT) === 'Good Evening', 'Undefined custom greeting uses evening greeting at 20:00');
+
+// Search box widths & styles
+assert(SEARCH_WIDTH_CLASSES.narrow === 'max-w-[440px]', 'Narrow search width is max-w-[440px]');
+assert(SEARCH_WIDTH_CLASSES.medium === 'max-w-[560px]', 'Medium search width is max-w-[560px]');
+assert(SEARCH_WIDTH_CLASSES.wide === 'max-w-[740px]', 'Wide search width is max-w-[740px]');
+assert(getSearchBoxClasses('glass', true).formClass.includes('nova-newtab-glass'), 'Glass search uses nova-newtab-glass');
+assert(!getSearchBoxClasses('solid', true).formClass.includes('nova-newtab-glass'), 'Solid search omits clean transparent override');
+assert(getSearchBoxClasses('minimal', false).inputClass.includes('border-b-2'), 'Minimal search uses bottom border underline');
+assert(getSearchBoxClasses('pill', true).inputClass.includes('rounded-full'), 'Pill search uses rounded-full input');
+
+// Static Tailwind grid column classes & card styles
+for (const col of SHORTCUT_COLUMN_OPTIONS) {
+  assert(SHORTCUT_COLUMN_CLASSES[col].includes(`grid-cols-${col}`), `Static map includes literal grid-cols-${col}`);
+  assert(Boolean(getShortcutsContainerWidthClass(col, 'tile')), `Width class exists for ${col} tile columns`);
+  assert(Boolean(getShortcutsContainerWidthClass(col, 'pill')), `Width class exists for ${col} pill columns`);
+}
+assert(getShortcutCardClasses('tile', false).showLabel === true, 'Tile cards show labels');
+assert(getShortcutCardClasses('pill', false).buttonClass.includes('rounded-full'), 'Pill cards use rounded-full');
+assert(getShortcutCardClasses('icon-only', false).showLabel === false, 'Icon-only cards hide labels');
+assert(getShortcutCardClasses('compact', false).iconWrapClass.includes('w-8'), 'Compact cards use smaller icon wrap');
+
+// Tasks widget placements & option cycler
+for (const placement of TASKS_PLACEMENTS) {
+  assert(Boolean(TASKS_PLACEMENT_CLASSES[placement]), `Placement class defined for ${placement}`);
+}
+assert(cycleWidgetOption('minimal', CLOCK_STYLES) === 'editorial', 'Option cycler advances cleanly');
+assert(cycleWidgetOption('pill', CLOCK_STYLES) === 'minimal', 'Option cycler wraps cleanly');
+assert(cycleWidgetOption('wide', SEARCH_WIDTHS) === 'narrow', 'Search width cycler wraps cleanly');
+assert(cycleWidgetOption('compact', SHORTCUT_CARD_STYLES) === 'tile', 'Shortcut card style cycler wraps cleanly');
+assert(cycleWidgetOption('glass', SEARCH_STYLES) === 'solid', 'Search style cycler advances cleanly');
+console.log('[PASS] [NewTab-Layout-5] Modular New Tab widget helpers, static Tailwind maps, and fallbacks verified.');
 
 console.log('[PASS] ALL New Tab Wallpaper Contrast tests passed with 100% success.');

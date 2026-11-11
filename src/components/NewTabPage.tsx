@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Compass } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Compass, Eye, EyeOff } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName, getSearchLocale, getSearchLanguage } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
-import { UserSettings } from '../types/browser';
+import { NewTabLayoutConfig, UserSettings } from '../types/browser';
+import { DEFAULT_DESIGN_PROFILE } from '../utils/designDefaults';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { generateId } from '../utils/idGenerator';
 import { useTranslation, getLocale } from '../services/i18n';
@@ -33,7 +34,7 @@ export function parseTodos(raw: string): Todo[] | null {
   });
 }
 
-interface NewTabPageProps {
+export interface NewTabPageProps {
   onNavigate: (url: string) => void;
   onNewTab?: (url?: string) => void;
   searchEngine?: UserSettings['searchEngine'];
@@ -49,6 +50,308 @@ interface NewTabPageProps {
   customBrowserColor?: string;
   isDemo?: boolean;
   onExitIncognito?: () => void;
+  newTabLayout?: NewTabLayoutConfig;
+  isCustomizeMode?: boolean;
+  onUpdateNewTabLayout?: (next: NewTabLayoutConfig) => void;
+}
+
+export const CLOCK_STYLES = ['minimal', 'editorial', 'mono', 'pill'] as const;
+export const SEARCH_STYLES = ['glass', 'solid', 'minimal', 'pill'] as const;
+export const SEARCH_WIDTHS = ['narrow', 'medium', 'wide'] as const;
+export const SHORTCUT_CARD_STYLES = ['tile', 'pill', 'icon-only', 'compact'] as const;
+export const SHORTCUT_COLUMN_OPTIONS = [4, 5, 6, 7, 8] as const;
+export const TASKS_PLACEMENTS = ['bottom', 'left', 'right', 'floating'] as const;
+
+export const SEARCH_WIDTH_CLASSES: Record<NewTabLayoutConfig['searchBox']['width'], string> = {
+  narrow: 'max-w-[440px]',
+  medium: 'max-w-[560px]',
+  wide: 'max-w-[740px]',
+};
+
+// Explicit static Tailwind grid-cols-* mappings so Tailwind v4 static extraction preserves every column count.
+export const SHORTCUT_COLUMN_CLASSES: Record<4 | 5 | 6 | 7 | 8, string> = {
+  4: 'grid-cols-4',
+  5: 'grid-cols-3 sm:grid-cols-5',
+  6: 'grid-cols-3 sm:grid-cols-6',
+  7: 'grid-cols-4 sm:grid-cols-7',
+  8: 'grid-cols-4 sm:grid-cols-8',
+};
+
+export const SHORTCUT_CONTAINER_WIDTH_CLASSES: Record<4 | 5 | 6 | 7 | 8, string> = {
+  4: 'max-w-[460px]',
+  5: 'max-w-[560px]',
+  6: 'max-w-[660px]',
+  7: 'max-w-[760px]',
+  8: 'max-w-[840px]',
+};
+
+export const SHORTCUT_PILL_WIDTH_CLASSES: Record<4 | 5 | 6 | 7 | 8, string> = {
+  4: 'max-w-[620px]',
+  5: 'max-w-[700px]',
+  6: 'max-w-[780px]',
+  7: 'max-w-[860px]',
+  8: 'max-w-[920px]',
+};
+
+export const TASKS_PLACEMENT_CLASSES: Record<NewTabLayoutConfig['tasksWidget']['placement'], string> = {
+  bottom: 'nova-tasks-bottom mt-8 mx-auto',
+  left: 'nova-tasks-left mt-8 mx-auto',
+  right: 'nova-tasks-right mt-8 mx-auto',
+  floating: 'nova-tasks-floating mt-8 mx-auto shadow-xl',
+};
+
+export function cycleWidgetOption<T extends string | number>(current: T, options: readonly T[]): T {
+  const index = options.indexOf(current);
+  if (index === -1) return options[0];
+  return options[(index + 1) % options.length];
+}
+
+export function clampShortcutColumns(columns: unknown, fallback: 4 | 5 | 6 | 7 | 8 = 4): 4 | 5 | 6 | 7 | 8 {
+  if (typeof columns !== 'number' || !Number.isFinite(columns)) return fallback;
+  const clamped = Math.min(8, Math.max(4, Math.round(columns)));
+  return clamped as 4 | 5 | 6 | 7 | 8;
+}
+
+/**
+ * Resolves the effective modular New Tab widget layout.
+ * When `newTabLayout` is omitted, defaults to `DEFAULT_DESIGN_PROFILE.newTabLayout`
+ * while preserving the legacy `showTasksWidget` visibility flag.
+ */
+export function resolveNewTabLayout(
+  newTabLayout?: Partial<NewTabLayoutConfig> | NewTabLayoutConfig,
+  showTasksWidget = false
+): NewTabLayoutConfig {
+  const base = DEFAULT_DESIGN_PROFILE.newTabLayout;
+  if (!newTabLayout) {
+    return {
+      clock: { ...base.clock },
+      greeting: { ...base.greeting },
+      searchBox: { ...base.searchBox },
+      shortcuts: { ...base.shortcuts },
+      tasksWidget: {
+        ...base.tasksWidget,
+        visible: Boolean(showTasksWidget),
+      },
+    };
+  }
+
+  const clock = newTabLayout.clock;
+  const greeting = newTabLayout.greeting;
+  const searchBox = newTabLayout.searchBox;
+  const shortcuts = newTabLayout.shortcuts;
+  const tasksWidget = newTabLayout.tasksWidget;
+
+  return {
+    clock: {
+      visible: typeof clock?.visible === 'boolean' ? clock.visible : base.clock.visible,
+      format: clock?.format === '12h' || clock?.format === '24h' ? clock.format : base.clock.format,
+      style: clock?.style && (CLOCK_STYLES as readonly string[]).includes(clock.style)
+        ? clock.style
+        : base.clock.style,
+      align: clock?.align === 'left' || clock?.align === 'center' ? clock.align : base.clock.align,
+    },
+    greeting: {
+      visible: typeof greeting?.visible === 'boolean' ? greeting.visible : base.greeting.visible,
+      customText: typeof greeting?.customText === 'string' ? greeting.customText.slice(0, 80) : base.greeting.customText,
+    },
+    searchBox: {
+      visible: typeof searchBox?.visible === 'boolean' ? searchBox.visible : base.searchBox.visible,
+      style: searchBox?.style && (SEARCH_STYLES as readonly string[]).includes(searchBox.style)
+        ? searchBox.style
+        : base.searchBox.style,
+      width: searchBox?.width && (SEARCH_WIDTHS as readonly string[]).includes(searchBox.width)
+        ? searchBox.width
+        : base.searchBox.width,
+    },
+    shortcuts: {
+      visible: typeof shortcuts?.visible === 'boolean' ? shortcuts.visible : base.shortcuts.visible,
+      columns: clampShortcutColumns(shortcuts?.columns, base.shortcuts.columns),
+      cardStyle: shortcuts?.cardStyle && (SHORTCUT_CARD_STYLES as readonly string[]).includes(shortcuts.cardStyle)
+        ? shortcuts.cardStyle
+        : base.shortcuts.cardStyle,
+    },
+    tasksWidget: {
+      visible: typeof tasksWidget?.visible === 'boolean' ? tasksWidget.visible : Boolean(showTasksWidget),
+      placement: tasksWidget?.placement && (TASKS_PLACEMENTS as readonly string[]).includes(tasksWidget.placement)
+        ? tasksWidget.placement
+        : base.tasksWidget.placement,
+    },
+  };
+}
+
+export function formatClockTime(date: Date, locale: string, format: '12h' | '24h'): string {
+  if (format === '12h') {
+    return date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23' });
+}
+
+export function resolveGreetingText(
+  customText: string | undefined,
+  hour: number,
+  t: (key: string) => string
+): string {
+  const trimmed = typeof customText === 'string' ? customText.trim().slice(0, 80) : '';
+  return trimmed || t(getGreetingKey(hour));
+}
+
+export function getClockClasses(
+  style: NewTabLayoutConfig['clock']['style'],
+  align: NewTabLayoutConfig['clock']['align'],
+  useDarkCanvasStyle: boolean
+) {
+  const alignClass = align === 'left' ? 'items-start text-left' : 'items-center text-center';
+  const textTone = useDarkCanvasStyle ? 'text-white' : 'text-slate-900';
+  const dateTone = useDarkCanvasStyle ? 'text-white/75' : 'text-slate-500';
+
+  switch (style) {
+    case 'editorial':
+      return {
+        containerClass: `nova-clock w-full flex flex-col justify-center select-none ${alignClass}`,
+        dateClass: `mb-3 text-xs uppercase tracking-[0.22em] font-medium ${dateTone}`,
+        timeWrapperClass: '',
+        timeClass: `text-7xl md:text-8xl font-serif font-normal tracking-tight transition-colors duration-300 ${textTone}`,
+      };
+    case 'mono':
+      return {
+        containerClass: `nova-clock w-full flex flex-col justify-center select-none ${alignClass}`,
+        dateClass: `mb-2.5 text-xs font-mono uppercase tracking-widest ${dateTone}`,
+        timeWrapperClass: '',
+        timeClass: `text-6xl md:text-7xl font-mono font-semibold tracking-tight tabular-nums transition-colors duration-300 ${textTone}`,
+      };
+    case 'pill':
+      return {
+        containerClass: `nova-clock w-full flex flex-col justify-center select-none ${alignClass}`,
+        dateClass: `mb-3 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide border transition-colors ${
+          useDarkCanvasStyle
+            ? 'bg-black/30 text-white/90 border-white/15 backdrop-blur-md'
+            : 'bg-slate-900/5 text-slate-700 border-slate-900/10 backdrop-blur-sm'
+        }`,
+        timeWrapperClass: `inline-flex items-center justify-center px-8 py-3.5 rounded-full border backdrop-blur-xl shadow-lg transition-colors duration-300 ${
+          useDarkCanvasStyle
+            ? 'bg-black/35 border-white/20'
+            : 'bg-white/80 border-slate-200/90'
+        }`,
+        timeClass: `text-5xl md:text-6xl font-medium tracking-tight font-sans tabular-nums transition-colors duration-300 ${textTone}`,
+      };
+    case 'minimal':
+    default:
+      return {
+        containerClass: `nova-clock w-full flex flex-col justify-center select-none ${alignClass}`,
+        dateClass: `mb-2.5 text-sm ${dateTone}`,
+        timeWrapperClass: '',
+        timeClass: `text-7xl md:text-8xl font-light tracking-tight font-sans tabular-nums transition-colors duration-300 ${textTone}`,
+      };
+  }
+}
+
+export function getSearchBoxClasses(
+  style: NewTabLayoutConfig['searchBox']['style'],
+  useDarkCanvasStyle: boolean
+) {
+  switch (style) {
+    case 'solid':
+      return {
+        formClass: 'w-full relative group rounded-xl',
+        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-md border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25',
+        submitBtnClass: 'p-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer',
+      };
+    case 'minimal':
+      return {
+        formClass: 'w-full relative group rounded-none',
+        inputClass: `w-full py-3.5 ps-11 pe-22 text-base rounded-none outline-none transition-colors duration-200 border-0 border-b-2 bg-transparent focus:ring-0 ${
+          useDarkCanvasStyle
+            ? 'border-white/30 text-white placeholder-white/55 focus:border-white'
+            : 'border-slate-300 text-slate-900 placeholder-slate-400 focus:border-slate-900'
+        }`,
+        submitBtnClass: `p-2 rounded-lg bg-transparent transition-colors cursor-pointer ${
+          useDarkCanvasStyle
+            ? 'text-white/85 hover:text-white hover:bg-white/10'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-900/5'
+        }`,
+      };
+    case 'pill':
+      return {
+        formClass: 'nova-newtab-glass w-full relative group rounded-full',
+        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-full outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25',
+        submitBtnClass: 'p-2 rounded-full bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer',
+      };
+    case 'glass':
+    default:
+      return {
+        formClass: 'nova-newtab-glass w-full relative group rounded-xl',
+        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25',
+        submitBtnClass: 'p-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer',
+      };
+  }
+}
+
+export function getShortcutsContainerWidthClass(
+  columns: 4 | 5 | 6 | 7 | 8,
+  cardStyle: NewTabLayoutConfig['shortcuts']['cardStyle']
+): string {
+  const safeCols = clampShortcutColumns(columns);
+  return cardStyle === 'pill'
+    ? SHORTCUT_PILL_WIDTH_CLASSES[safeCols]
+    : SHORTCUT_CONTAINER_WIDTH_CLASSES[safeCols];
+}
+
+export function getShortcutCardClasses(
+  cardStyle: NewTabLayoutConfig['shortcuts']['cardStyle'],
+  hasWallpaper: boolean
+) {
+  const surfaceClass = hasWallpaper ? 'nova-wallpaper-surface' : 'hover:bg-slate-100 dark:hover:bg-white/5';
+  const addSurfaceClass = hasWallpaper
+    ? 'nova-wallpaper-surface text-white'
+    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-accent';
+
+  switch (cardStyle) {
+    case 'pill':
+      return {
+        buttonClass: `nova-shortcut w-full h-12 rounded-full flex flex-row items-center justify-start px-3 py-2 gap-2.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${surfaceClass}`,
+        addButtonClass: `nova-shortcut w-full h-12 rounded-full flex flex-row items-center justify-start px-3 py-2 gap-2.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${addSurfaceClass}`,
+        iconWrapClass: 'w-7 h-7 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-1.5 shrink-0 border border-slate-200 dark:border-white/10',
+        labelClass: `text-xs font-medium truncate flex-1 text-left ${hasWallpaper ? 'text-white [text-shadow:0_1px_4px_#000]' : 'text-slate-700 dark:text-slate-300'}`,
+        addLabelClass: 'text-xs font-semibold truncate',
+        addIconClass: 'w-4 h-4 shrink-0',
+        actionsPosClass: 'top-1/2 -translate-y-1/2 right-1.5',
+        showLabel: true,
+      };
+    case 'icon-only':
+      return {
+        buttonClass: `nova-shortcut w-full aspect-square rounded-2xl flex items-center justify-center p-2.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${surfaceClass}`,
+        addButtonClass: `nova-shortcut w-full aspect-square rounded-2xl flex items-center justify-center p-2.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${addSurfaceClass}`,
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-2 shrink-0 border border-slate-200 dark:border-white/10',
+        labelClass: '',
+        addLabelClass: '',
+        addIconClass: 'w-6 h-6',
+        actionsPosClass: 'top-1.5 right-1.5',
+        showLabel: false,
+      };
+    case 'compact':
+      return {
+        buttonClass: `nova-shortcut w-full rounded-xl flex flex-col items-center justify-center px-2 py-2.5 gap-1.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${surfaceClass}`,
+        addButtonClass: `nova-shortcut w-full rounded-xl flex flex-col items-center justify-center px-2 py-2.5 gap-1.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${addSurfaceClass}`,
+        iconWrapClass: 'w-8 h-8 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-1.5 shrink-0 border border-slate-200 dark:border-white/10',
+        labelClass: `text-[11px] font-medium truncate max-w-full ${hasWallpaper ? 'text-white [text-shadow:0_1px_4px_#000]' : 'text-slate-700 dark:text-slate-300'}`,
+        addLabelClass: 'text-[11px] font-semibold truncate max-w-full',
+        addIconClass: 'w-4 h-4',
+        actionsPosClass: 'top-1 right-1',
+        showLabel: true,
+      };
+    case 'tile':
+    default:
+      return {
+        buttonClass: `nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-2.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${surfaceClass}`,
+        addButtonClass: `nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-2.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${addSurfaceClass}`,
+        iconWrapClass: 'w-11 h-11 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-2 shrink-0 border border-slate-200 dark:border-white/10',
+        labelClass: `text-xs font-medium truncate max-w-full ${hasWallpaper ? 'text-white [text-shadow:0_1px_4px_#000]' : 'text-slate-700 dark:text-slate-300'}`,
+        addLabelClass: 'text-xs font-semibold truncate max-w-full',
+        addIconClass: 'w-6 h-6',
+        actionsPosClass: 'top-1.5 right-1.5',
+        showLabel: true,
+      };
+  }
 }
 
 interface ClockProps {
@@ -56,6 +359,9 @@ interface ClockProps {
   isActive?: boolean;
   hasWallpaper?: boolean;
   isDarkTheme?: boolean;
+  format?: NewTabLayoutConfig['clock']['format'];
+  style?: NewTabLayoutConfig['clock']['style'];
+  align?: NewTabLayoutConfig['clock']['align'];
 }
 
 const getGreetingKey = (hour: number): string => {
@@ -64,23 +370,14 @@ const getGreetingKey = (hour: number): string => {
   return 'newtab.goodEvening';
 };
 
-export const Clock: React.FC<ClockProps> = React.memo(({
-  variants,
-  isActive = true,
-  hasWallpaper = false,
-  isDarkTheme = true
-}) => {
-  const { t, language } = useTranslation();
+function useMinuteClock(enabled: boolean): Date {
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
-    if (!isActive) return;
-    const updateTime = () => {
-      setCurrentTime(new Date());
-    };
+    if (!enabled) return;
+    const updateTime = () => setCurrentTime(new Date());
     updateTime();
-    // The UI displays minute precision; polling once per second only caused
-    // unnecessary React renders and locale formatting work.
+    // Minute precision avoids unnecessary 1s re-renders and locale formatting work.
     const now = new Date();
     const delayToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -92,62 +389,218 @@ export const Clock: React.FC<ClockProps> = React.memo(({
       clearTimeout(firstTick);
       if (interval) clearInterval(interval);
     };
-  }, [isActive]);
+  }, [enabled]);
+
+  return currentTime;
+}
+
+export const Clock: React.FC<ClockProps> = React.memo(({
+  variants,
+  isActive = true,
+  hasWallpaper = false,
+  isDarkTheme = true,
+  format = '24h',
+  style = 'minimal',
+  align = 'center',
+}) => {
+  const { language } = useTranslation();
+  const currentTime = useMinuteClock(isActive);
 
   const locale = getLocale(language);
-  const timeStr = useMemo(() => {
-    return currentTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-  }, [currentTime, locale]);
+  const timeStr = useMemo(() => formatClockTime(currentTime, locale, format), [currentTime, locale, format]);
 
   const dateStr = useMemo(() => {
     return currentTime.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' });
   }, [currentTime, locale]);
 
-  const greeting = useMemo(() => {
-    return t(getGreetingKey(currentTime.getHours()));
-  }, [currentTime, t, language]);
-
   // When a wallpaper is active or dark theme is enabled, use light text for contrast
   const useDarkCanvasStyle = hasWallpaper || isDarkTheme;
+  const classes = getClockClasses(style, align, useDarkCanvasStyle);
+  const timeEl = (
+    <h1
+      className={classes.timeClass}
+      style={hasWallpaper ? { textShadow: '0 2px 12px rgba(0, 0, 0, 0.4)' } : undefined}
+    >
+      {timeStr}
+    </h1>
+  );
 
   return (
     <motion.div
       variants={variants}
-      className="nova-clock flex flex-col items-center justify-center text-center mb-2 select-none"
+      data-widget="clock"
+      data-clock-style={style}
+      data-clock-format={format}
+      data-clock-align={align}
+      className={classes.containerClass}
     >
       <p
-        className={`mb-3 text-sm ${useDarkCanvasStyle ? 'text-white/75' : 'text-slate-500'}`}
+        className={classes.dateClass}
         style={hasWallpaper ? { textShadow: '0 1px 6px rgba(0, 0, 0, 0.4)' } : undefined}
       >
         {dateStr}
       </p>
 
-      {/* Time display */}
-      <h1
-        className={`text-7xl md:text-8xl font-light tracking-tight font-sans tabular-nums transition-colors duration-300 ${
-          useDarkCanvasStyle
-            ? 'text-white'
-            : 'text-slate-900'
-        }`}
-        style={hasWallpaper ? { textShadow: '0 2px 12px rgba(0, 0, 0, 0.4)' } : undefined}
-      >
-        {timeStr}
-      </h1>
-
-      {/* Greeting Subtitle */}
-      <p
-        className={`text-base font-normal mt-3 transition-colors duration-300 ${
-          useDarkCanvasStyle
-            ? 'text-white/80'
-            : 'text-slate-600'
-        }`}
-        style={hasWallpaper ? { textShadow: '0 1px 6px rgba(0, 0, 0, 0.4)' } : undefined}
-      >
-        {greeting}
-      </p>
+      {classes.timeWrapperClass ? (
+        <div className={classes.timeWrapperClass}>{timeEl}</div>
+      ) : (
+        timeEl
+      )}
     </motion.div>
   );
 });
+
+interface GreetingWidgetProps {
+  variants?: any;
+  isActive?: boolean;
+  hasWallpaper?: boolean;
+  isDarkTheme?: boolean;
+  customText?: string;
+  align?: NewTabLayoutConfig['clock']['align'];
+  clockStyle?: NewTabLayoutConfig['clock']['style'];
+}
+
+const GreetingWidget: React.FC<GreetingWidgetProps> = React.memo(({
+  variants,
+  isActive = true,
+  hasWallpaper = false,
+  isDarkTheme = true,
+  customText,
+  align = 'center',
+  clockStyle = 'minimal',
+}) => {
+  const { t, language } = useTranslation();
+  const hasCustom = Boolean(typeof customText === 'string' && customText.trim());
+  const currentTime = useMinuteClock(isActive && !hasCustom);
+  const hour = currentTime.getHours();
+
+  const greetingText = useMemo(
+    () => resolveGreetingText(customText, hour, t),
+    [customText, hour, t, language]
+  );
+
+  const useDarkCanvasStyle = hasWallpaper || isDarkTheme;
+  const styleTypography =
+    clockStyle === 'editorial'
+      ? 'font-serif italic text-lg'
+      : clockStyle === 'mono'
+        ? 'font-mono text-sm tracking-wide'
+        : 'text-base font-normal';
+
+  return (
+    <motion.p
+      variants={variants}
+      data-widget="greeting"
+      data-greeting-custom={hasCustom ? 'true' : 'false'}
+      className={`w-full transition-colors duration-300 select-none ${styleTypography} ${
+        align === 'left' ? 'text-left' : 'text-center'
+      } ${useDarkCanvasStyle ? 'text-white/80' : 'text-slate-600'}`}
+      style={hasWallpaper ? { textShadow: '0 1px 6px rgba(0, 0, 0, 0.4)' } : undefined}
+    >
+      {greetingText}
+    </motion.p>
+  );
+});
+
+interface CustomizePillButtonProps {
+  ariaLabel: string;
+  useDarkCanvasStyle: boolean;
+  onClick: () => void;
+  capitalize?: boolean;
+  children: React.ReactNode;
+}
+
+const CustomizePillButton: React.FC<CustomizePillButtonProps> = ({
+  ariaLabel,
+  useDarkCanvasStyle,
+  onClick,
+  capitalize = false,
+  children,
+}) => (
+  <button
+    type="button"
+    aria-label={ariaLabel}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full transition-colors cursor-pointer ${
+      capitalize ? 'capitalize' : ''
+    } ${
+      useDarkCanvasStyle
+        ? 'bg-slate-900/85 hover:bg-slate-800 text-white/90 border border-white/15'
+        : 'bg-white/95 hover:bg-slate-100 text-slate-800 border border-slate-300/80 shadow-xs'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+interface WidgetCustomizeFrameProps {
+  widgetId: keyof NewTabLayoutConfig;
+  label: string;
+  isCustomizeMode: boolean;
+  useDarkCanvasStyle: boolean;
+  controls?: React.ReactNode;
+  onHide: () => void;
+  hideAriaLabel: string;
+  className?: string;
+  children: React.ReactNode;
+}
+
+const WidgetCustomizeFrame: React.FC<WidgetCustomizeFrameProps> = ({
+  widgetId,
+  label,
+  isCustomizeMode,
+  useDarkCanvasStyle,
+  controls,
+  onHide,
+  hideAriaLabel,
+  className = '',
+  children,
+}) => {
+  if (!isCustomizeMode) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div
+      data-customize-widget={widgetId}
+      className={`relative group/widget rounded-2xl p-2.5 transition-colors ring-1 ring-dashed ${
+        useDarkCanvasStyle
+          ? 'ring-cyan-400/60 hover:ring-cyan-300 bg-slate-950/20'
+          : 'ring-accent/60 hover:ring-accent bg-white/45'
+      } ${className}`}
+    >
+      <div
+        data-widget-controls={widgetId}
+        className="flex flex-wrap items-center justify-between gap-1.5 mb-2 text-[10px] font-medium"
+      >
+        <span
+          className={`px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold ${
+            useDarkCanvasStyle
+              ? 'bg-slate-900/80 text-cyan-300 border border-white/15'
+              : 'bg-white/95 text-slate-700 border border-slate-300/80 shadow-xs'
+          }`}
+        >
+          {label}
+        </span>
+        <div className="flex flex-wrap items-center gap-1">
+          {controls}
+          <CustomizePillButton
+            ariaLabel={hideAriaLabel}
+            useDarkCanvasStyle={useDarkCanvasStyle}
+            onClick={onHide}
+          >
+            <EyeOff className="w-3 h-3" />
+            <span>Hide</span>
+          </CustomizePillButton>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+};
 
 const DEFAULT_SPEED_DIALS: SpeedDial[] = [
   { id: 'dial_google', name: 'Google', url: 'https://www.google.com', domain: 'google.com' },
@@ -363,6 +816,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   customBrowserColor = '',
   isDemo = false,
   onExitIncognito,
+  newTabLayout,
+  isCustomizeMode = false,
+  onUpdateNewTabLayout,
 }) => {
   const { t, language } = useTranslation();
   // Only animate on the first app launch, all subsequent new tabs open instantly
@@ -752,6 +1208,52 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const isVideoBg = newTabBackground === 'custom_url' && isSafeBgUrl && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
 
+  const layout = useMemo(
+    () => resolveNewTabLayout(newTabLayout, showTasksWidget),
+    [newTabLayout, showTasksWidget]
+  );
+
+  const [isEditingGreeting, setIsEditingGreeting] = useState(false);
+  useEffect(() => {
+    if (!isCustomizeMode) setIsEditingGreeting(false);
+  }, [isCustomizeMode]);
+
+  const emitLayoutUpdate = useCallback(
+    (patch: Partial<NewTabLayoutConfig>) => {
+      if (!onUpdateNewTabLayout) return;
+      onUpdateNewTabLayout({
+        ...layout,
+        ...patch,
+      });
+    },
+    [layout, onUpdateNewTabLayout]
+  );
+
+  const hiddenWidgets = useMemo(() => {
+    const items: Array<{ key: keyof NewTabLayoutConfig; label: string }> = [];
+    if (!layout.clock.visible) items.push({ key: 'clock', label: 'Clock' });
+    if (!layout.greeting.visible) items.push({ key: 'greeting', label: 'Greeting' });
+    if (!layout.searchBox.visible) items.push({ key: 'searchBox', label: 'Search' });
+    if (!layout.shortcuts.visible) items.push({ key: 'shortcuts', label: 'Shortcuts' });
+    if (!layout.tasksWidget.visible) items.push({ key: 'tasksWidget', label: 'Tasks' });
+    return items;
+  }, [layout]);
+
+  const useDarkCanvasStyle = hasWallpaper || isDarkTheme;
+  const searchBoxClasses = useMemo(
+    () => getSearchBoxClasses(layout.searchBox.style, useDarkCanvasStyle),
+    [layout.searchBox.style, useDarkCanvasStyle]
+  );
+  const shortcutCardClasses = useMemo(
+    () => getShortcutCardClasses(layout.shortcuts.cardStyle, hasWallpaper),
+    [layout.shortcuts.cardStyle, hasWallpaper]
+  );
+  const shortcutsGridColsClass = SHORTCUT_COLUMN_CLASSES[layout.shortcuts.columns];
+  const shortcutsContainerWidthClass = getShortcutsContainerWidthClass(
+    layout.shortcuts.columns,
+    layout.shortcuts.cardStyle
+  );
+
   if (isIncognito) {
     return (
       <div className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100">
@@ -1117,25 +1619,239 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </div>
       )}
 
-      <div className="nova-newtab-layout">
+      <div
+        className="nova-newtab-layout"
+        data-tasks-visible={layout.tasksWidget.visible ? 'true' : 'false'}
+        data-tasks-placement={layout.tasksWidget.placement}
+      >
+      {/* Hidden Widgets Restore Bar (Customize Mode) */}
+      {isCustomizeMode && hiddenWidgets.length > 0 && (
+        <div
+          data-customize-hidden-widgets="true"
+          className={`mb-6 z-40 flex flex-wrap items-center justify-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-md shadow-lg ${
+            useDarkCanvasStyle
+              ? 'bg-slate-900/85 border-white/15 text-white'
+              : 'bg-white/95 border-slate-300/80 text-slate-800'
+          }`}
+        >
+          <span className="text-[11px] font-semibold uppercase tracking-wider opacity-70 mr-1">
+            Hidden:
+          </span>
+          {hiddenWidgets.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-label={`Show ${item.label}`}
+              onClick={() => {
+                emitLayoutUpdate({
+                  [item.key]: {
+                    ...layout[item.key],
+                    visible: true,
+                  },
+                } as Partial<NewTabLayoutConfig>);
+              }}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                useDarkCanvasStyle
+                  ? 'bg-white/10 hover:bg-white/20 text-white'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+              }`}
+            >
+              <Eye className="w-3 h-3 text-accent" />
+              <span>+ {item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Main Content Area */}
       <motion.div
         variants={shouldAnimate ? containerVariants : undefined}
         initial={shouldAnimate ? "hidden" : false}
         animate="visible"
-        className="w-full max-w-[560px] my-auto flex flex-col items-center gap-8 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="w-full max-w-[920px] my-auto flex flex-col items-center gap-8 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
       >
-        {/* Clock & Greeting */}
-        <Clock
-          variants={shouldAnimate ? itemVariants : undefined}
-          isActive={isActive}
-          hasWallpaper={hasWallpaper}
-          isDarkTheme={isDarkTheme}
-        />
+        {/* Clock & Greeting Hero Block */}
+        {(layout.clock.visible || layout.greeting.visible) && (
+          <div
+            className={`w-full max-w-[680px] mx-auto flex flex-col gap-3 ${
+              layout.clock.align === 'left' ? 'items-start text-left' : 'items-center text-center'
+            }`}
+          >
+            {layout.clock.visible && (
+              <WidgetCustomizeFrame
+                widgetId="clock"
+                label="Clock"
+                isCustomizeMode={isCustomizeMode}
+                useDarkCanvasStyle={useDarkCanvasStyle}
+                className="w-full"
+                hideAriaLabel="Hide clock"
+                onHide={() => emitLayoutUpdate({ clock: { ...layout.clock, visible: false } })}
+                controls={
+                  <>
+                    <CustomizePillButton
+                      ariaLabel="Cycle clock style"
+                      useDarkCanvasStyle={useDarkCanvasStyle}
+                      capitalize
+                      onClick={() =>
+                        emitLayoutUpdate({
+                          clock: { ...layout.clock, style: cycleWidgetOption(layout.clock.style, CLOCK_STYLES) },
+                        })
+                      }
+                    >
+                      {layout.clock.style}
+                    </CustomizePillButton>
+                    <CustomizePillButton
+                      ariaLabel="Toggle clock format"
+                      useDarkCanvasStyle={useDarkCanvasStyle}
+                      onClick={() =>
+                        emitLayoutUpdate({
+                          clock: { ...layout.clock, format: layout.clock.format === '24h' ? '12h' : '24h' },
+                        })
+                      }
+                    >
+                      {layout.clock.format}
+                    </CustomizePillButton>
+                    <CustomizePillButton
+                      ariaLabel="Toggle clock alignment"
+                      useDarkCanvasStyle={useDarkCanvasStyle}
+                      capitalize
+                      onClick={() =>
+                        emitLayoutUpdate({
+                          clock: { ...layout.clock, align: layout.clock.align === 'center' ? 'left' : 'center' },
+                        })
+                      }
+                    >
+                      {layout.clock.align}
+                    </CustomizePillButton>
+                  </>
+                }
+              >
+                <Clock
+                  variants={shouldAnimate ? itemVariants : undefined}
+                  isActive={isActive}
+                  hasWallpaper={hasWallpaper}
+                  isDarkTheme={isDarkTheme}
+                  format={layout.clock.format}
+                  style={layout.clock.style}
+                  align={layout.clock.align}
+                />
+              </WidgetCustomizeFrame>
+            )}
+
+            {layout.greeting.visible && (
+              <WidgetCustomizeFrame
+                widgetId="greeting"
+                label="Greeting"
+                isCustomizeMode={isCustomizeMode}
+                useDarkCanvasStyle={useDarkCanvasStyle}
+                className="w-full"
+                hideAriaLabel="Hide greeting"
+                onHide={() => emitLayoutUpdate({ greeting: { ...layout.greeting, visible: false } })}
+                controls={
+                  <CustomizePillButton
+                    ariaLabel="Edit greeting text"
+                    useDarkCanvasStyle={useDarkCanvasStyle}
+                    onClick={() => setIsEditingGreeting((prev) => !prev)}
+                  >
+                    {isEditingGreeting ? 'Done' : 'Edit'}
+                  </CustomizePillButton>
+                }
+              >
+                {isCustomizeMode && isEditingGreeting ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <input
+                      type="text"
+                      maxLength={80}
+                      value={layout.greeting.customText ?? ''}
+                      onChange={(e) =>
+                        emitLayoutUpdate({
+                          greeting: { ...layout.greeting, customText: e.target.value.slice(0, 80) },
+                        })
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === 'Escape') {
+                          e.preventDefault();
+                          setIsEditingGreeting(false);
+                        }
+                      }}
+                      placeholder="Auto time-of-day greeting..."
+                      aria-label="Custom greeting text"
+                      className={`w-full px-3 py-1.5 rounded-lg text-sm outline-none border ${
+                        useDarkCanvasStyle
+                          ? 'bg-slate-900/80 border-white/20 text-white placeholder-white/50'
+                          : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+                ) : (
+                  <GreetingWidget
+                    variants={shouldAnimate ? itemVariants : undefined}
+                    isActive={isActive}
+                    hasWallpaper={hasWallpaper}
+                    isDarkTheme={isDarkTheme}
+                    customText={layout.greeting.customText}
+                    align={layout.clock.align}
+                    clockStyle={layout.clock.style}
+                  />
+                )}
+              </WidgetCustomizeFrame>
+            )}
+          </div>
+        )}
 
         {/* Omnibox / Search Form */}
-        <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
-          <form onSubmit={handleSearch} className="nova-newtab-glass w-full relative group rounded-xl">
+        {layout.searchBox.visible && (
+        <motion.div
+          variants={shouldAnimate ? itemVariants : undefined}
+          data-widget="searchBox"
+          data-search-style={layout.searchBox.style}
+          data-search-width={layout.searchBox.width}
+          className={`w-full ${SEARCH_WIDTH_CLASSES[layout.searchBox.width]} mx-auto relative z-30 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]`}
+          ref={searchContainerRef}
+        >
+          <WidgetCustomizeFrame
+            widgetId="searchBox"
+            label="Search"
+            isCustomizeMode={isCustomizeMode}
+            useDarkCanvasStyle={useDarkCanvasStyle}
+            hideAriaLabel="Hide search box"
+            onHide={() => emitLayoutUpdate({ searchBox: { ...layout.searchBox, visible: false } })}
+            controls={
+              <>
+                <CustomizePillButton
+                  ariaLabel="Cycle search style"
+                  useDarkCanvasStyle={useDarkCanvasStyle}
+                  capitalize
+                  onClick={() =>
+                    emitLayoutUpdate({
+                      searchBox: {
+                        ...layout.searchBox,
+                        style: cycleWidgetOption(layout.searchBox.style, SEARCH_STYLES),
+                      },
+                    })
+                  }
+                >
+                  {layout.searchBox.style}
+                </CustomizePillButton>
+                <CustomizePillButton
+                  ariaLabel="Cycle search width"
+                  useDarkCanvasStyle={useDarkCanvasStyle}
+                  capitalize
+                  onClick={() =>
+                    emitLayoutUpdate({
+                      searchBox: {
+                        ...layout.searchBox,
+                        width: cycleWidgetOption(layout.searchBox.width, SEARCH_WIDTHS),
+                      },
+                    })
+                  }
+                >
+                  {layout.searchBox.width}
+                </CustomizePillButton>
+              </>
+            }
+          >
+          <form onSubmit={handleSearch} className={searchBoxClasses.formClass}>
             <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
@@ -1150,7 +1866,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               onKeyDown={handleKeyDown}
               placeholder={t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
               aria-label={t('nav.newTab')}
-              className="w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25"
+              className={searchBoxClasses.inputClass}
             />
 
             <div className="absolute end-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -1172,7 +1888,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="submit"
                 aria-label={t('newtab.search')}
-                className="p-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer"
+                className={searchBoxClasses.submitBtnClass}
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -1237,32 +1953,88 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             </div>
             <span>{t('newtab.searchEngine', { engine: getSearchEngineName(searchEngine) })}</span>
           </div>
+          </WidgetCustomizeFrame>
         </motion.div>
+        )}
 
         {/* Speed Dials */}
-        <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full">
-          <div className="flex flex-wrap justify-center gap-2.5 sm:gap-3 px-1">
+        {layout.shortcuts.visible && (
+        <motion.div
+          variants={shouldAnimate ? itemVariants : undefined}
+          data-widget="shortcuts"
+          className={`w-full ${shortcutsContainerWidthClass} mx-auto transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]`}
+        >
+          <WidgetCustomizeFrame
+            widgetId="shortcuts"
+            label="Shortcuts"
+            isCustomizeMode={isCustomizeMode}
+            useDarkCanvasStyle={useDarkCanvasStyle}
+            hideAriaLabel="Hide shortcuts"
+            onHide={() => emitLayoutUpdate({ shortcuts: { ...layout.shortcuts, visible: false } })}
+            controls={
+              <>
+                <CustomizePillButton
+                  ariaLabel="Cycle shortcuts style"
+                  useDarkCanvasStyle={useDarkCanvasStyle}
+                  capitalize
+                  onClick={() =>
+                    emitLayoutUpdate({
+                      shortcuts: {
+                        ...layout.shortcuts,
+                        cardStyle: cycleWidgetOption(layout.shortcuts.cardStyle, SHORTCUT_CARD_STYLES),
+                      },
+                    })
+                  }
+                >
+                  {layout.shortcuts.cardStyle}
+                </CustomizePillButton>
+                <CustomizePillButton
+                  ariaLabel="Cycle shortcuts columns"
+                  useDarkCanvasStyle={useDarkCanvasStyle}
+                  onClick={() =>
+                    emitLayoutUpdate({
+                      shortcuts: {
+                        ...layout.shortcuts,
+                        columns: cycleWidgetOption(layout.shortcuts.columns, SHORTCUT_COLUMN_OPTIONS),
+                      },
+                    })
+                  }
+                >
+                  {layout.shortcuts.columns} cols
+                </CustomizePillButton>
+              </>
+            }
+          >
+          <div
+            data-widget="shortcuts-grid"
+            data-columns={layout.shortcuts.columns}
+            data-card-style={layout.shortcuts.cardStyle}
+            className={`grid ${shortcutsGridColsClass} gap-2.5 sm:gap-3 px-1 w-full`}
+          >
             {renderableSpeedDials.map((dial) => (
               <motion.div
                 key={dial.id}
-                className="relative group w-[80px] sm:w-[84px]"
+                className="relative group min-w-0 w-full"
               >
                 <button
                   onClick={(e) => handleSpeedDialClick(e, dial.url)}
                   onAuxClick={(e) => { if (e.button === 1) handleSpeedDialClick(e, dial.url); }}
-                  className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${hasWallpaper ? "nova-wallpaper-surface" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
+                  className={shortcutCardClasses.buttonClass}
                   title={dial.name}
+                  aria-label={dial.name}
                 >
-                  <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-2 shrink-0 border border-slate-200 dark:border-white/10">
+                  <div className={shortcutCardClasses.iconWrapClass}>
                     <SpeedDialIcon name={dial.name} url={dial.url} domain={dial.domain} />
                   </div>
-                  <span className={`text-xs font-medium truncate max-w-full ${hasWallpaper ? "text-white [text-shadow:0_1px_4px_#000]" : "text-slate-700 dark:text-slate-300"}`}>{dial.name}</span>
+                  {shortcutCardClasses.showLabel && (
+                    <span className={shortcutCardClasses.labelClass}>{dial.name}</span>
+                  )}
                 </button>
                 {/* group-hover alone hid these from keyboard users entirely: the
                     buttons were focusable but stayed at opacity 0, so the controls
                     existed and could not be seen. group-focus-within reveals the
                     group as soon as focus lands inside it. */}
-                <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-0.5 bg-slate-900/80 backdrop-blur-xs rounded-md p-0.5 border border-white/10 z-10">
+                <div className={`absolute ${shortcutCardClasses.actionsPosClass} opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-0.5 bg-slate-900/80 backdrop-blur-xs rounded-md p-0.5 border border-white/10 z-10`}>
                   <button
                     type="button"
                     aria-label={t('newtab.editSpeedDial', { name: dial.name })}
@@ -1293,7 +2065,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
             {renderableSpeedDials.length < 10 && (
               <motion.div
-                className="relative group w-[80px] sm:w-[84px]"
+                className="relative group min-w-0 w-full"
               >
                 <button
                   onClick={() => {
@@ -1301,27 +2073,63 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     setUrlError('');
                     setIsEditModalOpen(true);
                   }}
-                  className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${hasWallpaper ? "nova-wallpaper-surface text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-accent"}`}
+                  aria-label={t('nav.addShortcut')}
+                  title={t('nav.addShortcut')}
+                  className={shortcutCardClasses.addButtonClass}
                   style={hasWallpaper ? { color: "white", textShadow: "0 1px 4px #000" } : undefined}
                 >
-                  <Plus className="w-6 h-6" />
-                  <span className="text-xs font-semibold">{t('nav.addShortcut')}</span>
+                  <Plus className={shortcutCardClasses.addIconClass} />
+                  {shortcutCardClasses.showLabel && (
+                    <span className={shortcutCardClasses.addLabelClass}>{t('nav.addShortcut')}</span>
+                  )}
                 </button>
               </motion.div>
             )}
           </div>
+          </WidgetCustomizeFrame>
         </motion.div>
+        )}
       </motion.div>
 
       {/* ToDo / Tasks Widget */}
-      {showTasksWidget && (
+      {layout.tasksWidget.visible && (
       <motion.div
         initial={shouldAnimate ? { opacity: 0, y: 15 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={shouldAnimate ? { duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 } : { duration: 0 }}
-        className="nova-tasks-widget relative z-10 w-full max-w-72 justify-self-center rounded-xl overflow-hidden flex flex-col shadow-sm border bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700/60"
-        style={{ maxHeight: '380px' }}
+        data-widget="tasksWidget"
+        data-placement={layout.tasksWidget.placement}
+        className={`nova-tasks-widget ${TASKS_PLACEMENT_CLASSES[layout.tasksWidget.placement]} relative z-20 w-full max-w-72 justify-self-center`}
       >
+        <WidgetCustomizeFrame
+          widgetId="tasksWidget"
+          label="Tasks"
+          isCustomizeMode={isCustomizeMode}
+          useDarkCanvasStyle={useDarkCanvasStyle}
+          hideAriaLabel="Hide tasks widget"
+          onHide={() => emitLayoutUpdate({ tasksWidget: { ...layout.tasksWidget, visible: false } })}
+          controls={
+            <CustomizePillButton
+              ariaLabel="Cycle tasks placement"
+              useDarkCanvasStyle={useDarkCanvasStyle}
+              capitalize
+              onClick={() =>
+                emitLayoutUpdate({
+                  tasksWidget: {
+                    ...layout.tasksWidget,
+                    placement: cycleWidgetOption(layout.tasksWidget.placement, TASKS_PLACEMENTS),
+                  },
+                })
+              }
+            >
+              {layout.tasksWidget.placement}
+            </CustomizePillButton>
+          }
+        >
+        <div
+          className="w-full rounded-xl overflow-hidden flex flex-col shadow-sm border bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700/60"
+          style={{ maxHeight: '380px' }}
+        >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
           <div className="flex items-center gap-2">
             <ListTodo className="w-4 h-4 text-accent" />
@@ -1423,6 +2231,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             )}
           </div>
         </form>
+        </div>
+        </WidgetCustomizeFrame>
       </motion.div>
       )}
 

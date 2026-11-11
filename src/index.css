@@ -479,12 +479,39 @@ button:active:not(:disabled) {
   justify-content: center;
   padding-block: 40px;
 }
-@container (min-width: 1320px) {
-  .nova-tasks-widget {
+@container (min-width: 1120px) {
+  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="left"] {
+    padding-left: 320px;
+  }
+  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="right"] {
+    padding-right: 320px;
+  }
+  .nova-tasks-widget[data-placement="left"] {
     position: absolute;
-    right: 32px;
+    left: 24px;
     top: 50%;
     transform: translateY(-50%);
+    margin: 0;
+  }
+  .nova-tasks-widget[data-placement="right"] {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+  }
+}
+@container (min-width: 1480px) {
+  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="left"],
+  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="right"] {
+    padding-inline: 320px;
+  }
+}
+@container (min-width: 760px) {
+  .nova-tasks-widget[data-placement="floating"] {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
     margin: 0;
   }
 }

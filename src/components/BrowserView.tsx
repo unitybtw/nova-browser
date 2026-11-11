@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap, Key } from 'lucide-react';
-import { Tab, HistoryItem, UserSettings } from '../types/browser';
+import { Tab, HistoryItem, UserSettings, NewTabLayoutConfig } from '../types/browser';
 import type { DownloadItemPage } from './DownloadsPage';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import {
@@ -91,6 +91,9 @@ export interface BrowserViewProps {
   onPurgeMemory?: () => Promise<void> | void;
   onPerformSync?: (mergedData: any) => Promise<void> | void;
   isDemo?: boolean;
+  newTabLayout?: NewTabLayoutConfig;
+  isCustomizeMode?: boolean;
+  onUpdateNewTabLayout?: (next: NewTabLayoutConfig) => void;
 }
 
 /** Mirrors the `isSettingsTab` / `isHistoryTab` / `isDownloadsTab` predicates in
@@ -161,6 +164,9 @@ export function browserViewPropsEqual(prev: BrowserViewProps, next: BrowserViewP
   if (prev.disableTasksWidget !== next.disableTasksWidget) return false;
   if (prev.isDemo !== next.isDemo) return false;
   if (prev.onExitIncognito !== next.onExitIncognito) return false;
+  if (prev.newTabLayout !== next.newTabLayout) return false;
+  if (prev.isCustomizeMode !== next.isCustomizeMode) return false;
+  if (prev.onUpdateNewTabLayout !== next.onUpdateNewTabLayout) return false;
 
   // Tab properties comparison
   if (prev.tab?.id !== next.tab?.id) return false;
@@ -287,7 +293,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onImportData,
   onPurgeMemory,
   onPerformSync,
-  isDemo = false
+  isDemo = false,
+  newTabLayout,
+  isCustomizeMode = false,
+  onUpdateNewTabLayout,
 }) => {
   const webviewRef = useRef<any>(null);
 
@@ -305,6 +314,18 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   const isNewTab = React.useMemo(() => (
     !tab?.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
   ), [tab?.url]);
+
+  const effectiveNewTabLayout = React.useMemo(() => {
+    if (!newTabLayout) return undefined;
+    if (!disableTasksWidget) return newTabLayout;
+    return {
+      ...newTabLayout,
+      tasksWidget: {
+        ...newTabLayout.tasksWidget,
+        visible: false,
+      },
+    };
+  }, [newTabLayout, disableTasksWidget]);
 
   const [passwordPrompt, setPasswordPrompt] = useState<{
     isOpen: boolean;
@@ -1225,6 +1246,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             energySaverMode={settings.energySaverMode}
             browserColor={settings.browserColor}
             customBrowserColor={settings.customBrowserColor}
+            newTabLayout={effectiveNewTabLayout}
+            isCustomizeMode={isDemo ? false : isCustomizeMode}
+            onUpdateNewTabLayout={onUpdateNewTabLayout}
           />
         </Suspense>
       </div>
