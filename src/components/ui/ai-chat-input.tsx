@@ -1,9 +1,16 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
-import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X } from "lucide-react";
-import { getLocale, useTranslation } from "../../services/i18n";
-import { transcribeAudio } from "../../services/localSpeechRecognition";
+import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X, Globe } from "lucide-react";
+import { useTranslation } from "../../services/i18n";
+import {
+  getPreferredVoiceLanguage,
+  isLocalSttLoaded,
+  preloadLocalStt,
+  setPreferredVoiceLanguage,
+  SUPPORTED_VOICE_LANGUAGES,
+  transcribeAudio
+} from "../../services/localSpeechRecognition";
 
 // ----------------------------------------------------------------------
 // Transition Physics
@@ -367,11 +374,16 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     // Audio/Voice recording states
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
-    /** 0..1 while the on-device model downloads, null once it is ready. */
+    const [recordingSeconds, setRecordingSeconds] = useState(0);
+    const [voiceLang, setVoiceLang] = useState<string>(() => getPreferredVoiceLanguage());
+    const [isVoiceLangOpen, setIsVoiceLangOpen] = useState(false);
+    /** 0..0.99 while the on-device model downloads, null once ready. */
     const [modelProgress, setModelProgress] = useState<number | null>(null);
     const [audioData, setAudioData] = useState<number[]>(new Array(5).fill(0));
     const [voiceError, setVoiceError] = useState<string | null>(null);
     const valueRef = useRef(controlledValue !== undefined ? controlledValue : localValue);
+    const voiceLangRef = useRef(voiceLang);
+    voiceLangRef.current = voiceLang;
 
     // Auto-dismiss voice error after 7 seconds
     useEffect(() => {
@@ -380,19 +392,30 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       return () => clearTimeout(timer);
     }, [voiceError]);
 
+    // Track live recording elapsed seconds
+    useEffect(() => {
+      if (!isRecording) {
+        setRecordingSeconds(0);
+        return;
+      }
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        setRecordingSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      }, 250);
+      return () => clearInterval(timer);
+    }, [isRecording]);
+
     // Refs for Web Audio & MediaRecorder cleanup
     const streamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const rafRef = useRef<number | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const recordedChunksRef = useRef<BlobPart[]>([]);
+    const stopFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const transcribeAbortRef = useRef<AbortController | null>(null);
     const isRecordingRef = useRef(false);
     const isExplicitlyStoppedRef = useRef(false);
-    // True from mount until unmount. The recording path spans several awaits
-    // (OS permission check, requestMicrophonePermission, getUserMedia), and
-    // anything resolved after unmount would otherwise resurrect the stream and
-    // the visualizer rAF loop on a component that no longer exists.
+    const cancelPendingStartRef = useRef(false);
     const isMountedRef = useRef(true);
     const isStartingRecordingRef = useRef(false);
     useEffect(() => {
@@ -472,75 +495,16 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     };
 
     // --- Voice Recording Logic ---
-    //
-    // Recording and transcription are two separate phases. MediaRecorder keeps
-    // capturing the microphone; on stop the clip is transcribed on-device (see
-    // services/localSpeechRecognition) and the text lands in the composer.
-    const runTranscription = useCallback(
-      async (blob: Blob) => {
-        const controller = new AbortController();
-        transcribeAbortRef.current = controller;
-        setIsTranscribing(true);
-        setModelProgress(null);
-        try {
-          const text = await transcribeAudio(blob, {
-            locale: getLocale(),
-            signal: controller.signal,
-            onProgress: p => {
-              if (!isMountedRef.current) return;
-              if (p.status === 'ready' || p.status === 'done') {
-                setModelProgress(null);
-              } else if (typeof p.ratio === 'number') {
-                setModelProgress(p.ratio);
-              }
-            },
-          });
-
-          if (!isMountedRef.current) return;
-          if (controller.signal.aborted) return;
-
-          if (!text) {
-            setVoiceError(t('ai.voiceNoSpeech'));
-            return;
-          }
-          const base = initialTextRef.current || valueRef.current || '';
-          const prefix = base.trim() ? base.replace(/\s+$/, '') + ' ' : '';
-          handleValueChange((prefix + text).trim());
-        } catch (err: any) {
-          if (!isMountedRef.current) return;
-          if (controller.signal.aborted || err?.name === 'AbortError') return;
-          const reason = String(err?.message || err);
-          // A fetch/CORS failure here means the model shards or the ONNX
-          // runtime could not be fetched, which is a connectivity problem, not
-          // a recognition one.
-          if (/fetch|network|failed to load|NetworkError|ERR_/i.test(reason)) {
-            setVoiceError(t('ai.voiceNetwork'));
-          } else if (/too short/i.test(reason)) {
-            setVoiceError(t('ai.voiceTooShort'));
-          } else if (/no audio was recorded/i.test(reason)) {
-            setVoiceError(t('ai.voiceNoSpeech'));
-          } else {
-            setVoiceError(t('ai.voiceFailed', { reason }));
-          }
-        } finally {
-          if (isMountedRef.current) {
-            setIsTranscribing(false);
-            setModelProgress(null);
-          }
-          if (transcribeAbortRef.current === controller) transcribeAbortRef.current = null;
-        }
-      },
-      [handleValueChange, t]
-    );
-
-    const releaseMicrophone = useCallback(() => {
-      isExplicitlyStoppedRef.current = true;
-      isRecordingRef.current = false;
+    const stopVisualizerAndMedia = useCallback((stopRecorder = true) => {
+      if (stopFallbackTimerRef.current) {
+        clearTimeout(stopFallbackTimerRef.current);
+        stopFallbackTimerRef.current = null;
+      }
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      if (recorderRef.current) {
+      if (stopRecorder && recorderRef.current) {
         try {
           if (recorderRef.current.state !== 'inactive') recorderRef.current.stop();
         } catch {}
@@ -555,29 +519,111 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         streamRef.current = null;
       }
       if (audioContextRef.current) {
-        try { audioContextRef.current.close(); } catch {}
+        try { void audioContextRef.current.close(); } catch {}
         audioContextRef.current = null;
       }
-      setIsRecording(false);
       setAudioData(new Array(5).fill(0));
     }, []);
 
+    const releaseMicrophone = useCallback(() => {
+      isExplicitlyStoppedRef.current = true;
+      isRecordingRef.current = false;
+      cancelPendingStartRef.current = true;
+      stopVisualizerAndMedia(true);
+      setIsRecording(false);
+    }, [stopVisualizerAndMedia]);
+
+    const runTranscription = useCallback(
+      async (blob: Blob) => {
+        const controller = new AbortController();
+        transcribeAbortRef.current = controller;
+        setIsTranscribing(true);
+        setModelProgress(null);
+        try {
+          const text = await transcribeAudio(blob, {
+            locale: voiceLangRef.current,
+            signal: controller.signal,
+            onProgress: (p) => {
+              if (!isMountedRef.current || controller.signal.aborted) return;
+              if (p.status === 'ready' || p.status === 'done') {
+                setModelProgress(null);
+              } else if (typeof p.ratio === 'number') {
+                setModelProgress(p.ratio);
+              }
+            },
+          });
+
+          if (!isMountedRef.current || controller.signal.aborted) return;
+
+          if (!text) {
+            setVoiceError(t('ai.voiceNoSpeech'));
+            return;
+          }
+          const base = valueRef.current || initialTextRef.current || '';
+          const prefix = base.trim() ? base.replace(/\s+$/, '') + ' ' : '';
+          handleValueChange((prefix + text).trim());
+        } catch (err: any) {
+          if (!isMountedRef.current) return;
+          if (controller.signal.aborted || err?.name === 'AbortError') return;
+          const reason = String(err?.message || err);
+          if (/timed out|stalled/i.test(reason)) {
+            setVoiceError(t('ai.voiceTimeout'));
+          } else if (/fetch|network|failed to load|NetworkError|ERR_/i.test(reason)) {
+            setVoiceError(t('ai.voiceNetwork'));
+          } else if (/too short/i.test(reason)) {
+            setVoiceError(t('ai.voiceTooShort'));
+          } else if (/no audio was recorded/i.test(reason)) {
+            setVoiceError(t('ai.voiceNoSpeech'));
+          } else if (/unable to decode audio/i.test(reason)) {
+            setVoiceError(t('ai.voiceTooShort'));
+          } else {
+            setVoiceError(t('ai.voiceFailed', { reason }));
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setIsTranscribing(false);
+            setModelProgress(null);
+          }
+          if (transcribeAbortRef.current === controller) transcribeAbortRef.current = null;
+        }
+      },
+      [handleValueChange, t]
+    );
+
     const stopRecording = useCallback(() => {
+      if (isStartingRecordingRef.current && !isRecordingRef.current) {
+        cancelPendingStartRef.current = true;
+        return;
+      }
+
       const recorder = recorderRef.current;
       const chunks = recordedChunksRef.current;
       const wasRecording = isRecordingRef.current;
       const mimeType = recorder?.mimeType || 'audio/webm';
 
-      // Order matters. MediaRecorder.stop() flips `state` to "inactive"
-      // SYNCHRONOUSLY and only then queues the final `dataavailable` and
-      // `stop` tasks. So the listener has to be attached BEFORE anything calls
-      // stop() — releaseMicrophone() stops the recorder, which is why the old
-      // ordering made the `stop` branch unreachable and every dictation lost
-      // its final ~250ms chunk.
+      isExplicitlyStoppedRef.current = true;
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      setIsVoiceLangOpen(false);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      setAudioData(new Array(5).fill(0));
+
+      let finished = false;
       const finish = () => {
+        if (finished) return;
+        finished = true;
+        recorderRef.current = null;
+        // Release audio tracks & context AFTER MediaRecorder flushes its tail chunk
+        stopVisualizerAndMedia(false);
+
+        if (!isMountedRef.current) {
+          recordedChunksRef.current = [];
+          return;
+        }
         if (chunks.length === 0) {
-          // A tap shorter than one MediaRecorder timeslice produces no data
-          // at all. Say so instead of silently resetting the button.
           recordedChunksRef.current = [];
           setVoiceError(t('ai.voiceTooShort'));
           return;
@@ -587,186 +633,185 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         void runTranscription(blob);
       };
 
-      if (wasRecording && recorder) {
-        if (recorder.state !== 'inactive') {
+      if (wasRecording && recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.addEventListener('stop', finish, { once: true });
+          recorder.addEventListener('error', finish, { once: true });
+          stopFallbackTimerRef.current = setTimeout(finish, 1200);
           try {
-            recorder.addEventListener('stop', finish, { once: true });
-            // Flush what is buffered so the tail is in `chunks` before the
-            // final dataavailable task runs.
             recorder.requestData?.();
-            recorder.stop();
-            releaseMicrophone();
-            return;
-          } catch {
-            // fall through to transcribing whatever already arrived
-          }
-        } else {
-          // Already stopped (e.g. the recorder ended on its own).
-          releaseMicrophone();
-          finish();
+          } catch {}
+          recorder.stop();
           return;
+        } catch {
+          // Fall through to finish with whatever chunks arrived
         }
       }
 
-      releaseMicrophone();
       finish();
-    }, [releaseMicrophone, runTranscription, t]);
+    }, [runTranscription, stopVisualizerAndMedia, t]);
 
 
     const startRecording = useCallback(async () => {
-      // Re-entrancy guard: the mic button stays enabled during the awaits below
-      // (setIsRecording only runs after the media stream is acquired), so two
-      // clicks used to open two streams while stopRecording released only the
-      // last one — leaving the OS microphone indicator on with no UI to stop it.
       if (isStartingRecordingRef.current || isRecordingRef.current) return;
       isStartingRecordingRef.current = true;
+      cancelPendingStartRef.current = false;
       try {
         setVoiceError(null);
+        setIsVoiceLangOpen(false);
+        setIsModelSelectOpen(false);
         setIsSmoothResize(false);
         setExpanded(true);
 
-      let currentPlatform = 'unknown';
-      // 1. Electron OS-level permission checks (macOS / Windows / Linux)
-      if (typeof window !== 'undefined' && window.electronAPI) {
-        try {
-          if (window.electronAPI.checkMicrophonePermission) {
-            const check = await window.electronAPI.checkMicrophonePermission();
-            if (check.platform) currentPlatform = check.platform;
-            if (check.status === 'denied' || check.status === 'restricted') {
-              setVoiceError(
-                t('ai.voiceMicDenied', { settings: settingsHintFor(currentPlatform) })
-              );
-              return;
-            }
-          }
-          if (window.electronAPI.requestMicrophonePermission) {
-            const permResult = await window.electronAPI.requestMicrophonePermission();
-            if (permResult.platform) currentPlatform = permResult.platform;
-            if (!permResult.granted) {
-              setVoiceError(t('ai.voiceMicDenied', { settings: settingsHintFor(currentPlatform) }));
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn("[ai-chat-input] Microphone permission check error:", e);
-        }
-      }
-
-      // 2. Request user media stream for audio visualizer & device check
-      let stream: MediaStream | null = null;
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        }
-      } catch (err: any) {
-        console.warn("[ai-chat-input] Microphone access error:", err);
-        const settingsName = settingsHintFor(currentPlatform);
-        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err?.name === 'SecurityError') {
-          setVoiceError(t('ai.voiceMicDenied', { settings: settingsName }));
-        } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError' || err?.name === 'OverconstrainedError') {
-          setVoiceError(t('ai.voiceNoDevice'));
-        } else {
-          setVoiceError(t('ai.voiceInaccessible', { reason: err?.message || '' }));
-        }
-        return;
-      }
-
-      isExplicitlyStoppedRef.current = false;
-      isRecordingRef.current = true;
-      initialTextRef.current = valueRef.current;
-      setIsRecording(true);
-
-      // The panel can be closed while the OS permission prompt is still open.
-      // At that point the unmount cleanup has already run and nothing will ever
-      // read streamRef again, so the stream we just acquired would stay open
-      // (mic indicator on, no UI to release it). Hand it back and bail.
-      if (!isMountedRef.current) {
-        isRecordingRef.current = false;
-        try {
-          stream?.getTracks().forEach((track) => {
-            try { track.stop(); } catch {}
-          });
-        } catch {}
-        return;
-      }
-
-      if (stream) {
-        streamRef.current = stream;
-
-        try {
-          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-          const audioCtx = new AudioCtx();
-          audioContextRef.current = audioCtx;
-
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64;
-          const source = audioCtx.createMediaStreamSource(stream);
-          source.connect(analyser);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-          const updateVisualizer = () => {
-            if (!isMountedRef.current || !isRecordingRef.current) {
-              rafRef.current = null;
-              return;
-            }
-            analyser.getByteFrequencyData(dataArray);
-            const bands = new Array(5).fill(0);
-            const step = Math.floor(dataArray.length / 5);
-            for (let i = 0; i < 5; i++) {
-              let sum = 0;
-              for (let j = 0; j < step; j++) {
-                sum += dataArray[i * step + j];
+        let currentPlatform = 'unknown';
+        // 1. Electron OS-level permission checks (macOS / Windows / Linux)
+        if (typeof window !== 'undefined' && window.electronAPI) {
+          try {
+            if (window.electronAPI.checkMicrophonePermission) {
+              const check = await window.electronAPI.checkMicrophonePermission();
+              if (check.platform) currentPlatform = check.platform;
+              if (check.status === 'denied' || check.status === 'restricted') {
+                setVoiceError(
+                  t('ai.voiceMicDenied', { settings: settingsHintFor(currentPlatform) })
+                );
+                return;
               }
-              bands[i] = sum / step / 255;
             }
-            setAudioData(bands);
-            rafRef.current = requestAnimationFrame(updateVisualizer);
-          };
-          updateVisualizer();
-        } catch (audioErr) {
-          console.warn("[ai-chat-input] Audio visualizer error:", audioErr);
+            if (window.electronAPI.requestMicrophonePermission) {
+              const permResult = await window.electronAPI.requestMicrophonePermission();
+              if (permResult.platform) currentPlatform = permResult.platform;
+              // Only bail if permission was explicitly denied; on Windows/Linux
+              // 'not-determined' falls through cleanly to getUserMedia prompt.
+              if (permResult.status === 'denied' || permResult.status === 'restricted') {
+                setVoiceError(t('ai.voiceMicDenied', { settings: settingsHintFor(currentPlatform) }));
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn("[ai-chat-input] Microphone permission check error:", e);
+          }
         }
-      }
 
-      // 3. Capture raw microphone audio. Transcription runs on stop, on-device
-      //    (services/localSpeechRecognition). The previous webkitSpeechRecognition
-      //    path could never work in Electron: Chromium's cloud recognizer needs
-      //    the Google Speech API key that only the Chrome binary ships, so it
-      //    opened the microphone successfully and then always failed with
-      //    `network` — no permission, adblocker or CSP was involved.
-      if (!stream || typeof MediaRecorder === 'undefined') {
-        releaseMicrophone();
-        setVoiceError(t('ai.voiceUnsupported'));
-        return;
-      }
+        if (!isMountedRef.current || cancelPendingStartRef.current) return;
 
-      const mimeType =
-        ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(
-          m => MediaRecorder.isTypeSupported?.(m)
-        ) || '';
-      try {
-        const recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
-        recordedChunksRef.current = [];
-        recorder.ondataavailable = (event: BlobEvent) => {
-          if (event.data && event.data.size > 0) recordedChunksRef.current.push(event.data);
-        };
-        // A timeslice flushes chunks continuously, so an interrupted take is
-        // never lost entirely.
-        recorder.start(250);
-        recorderRef.current = recorder;
-      } catch (recErr: any) {
-        console.warn('[ai-chat-input] MediaRecorder failed:', recErr);
-        releaseMicrophone();
-        setVoiceError(t('ai.voiceFailed', { reason: String(recErr?.message || recErr) }));
-        return;
-      }
+        // 2. Request user media stream
+        let stream: MediaStream | null = null;
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          }
+        } catch (err: any) {
+          console.warn("[ai-chat-input] Microphone access error:", err);
+          const settingsName = settingsHintFor(currentPlatform);
+          if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err?.name === 'SecurityError') {
+            setVoiceError(t('ai.voiceMicDenied', { settings: settingsName }));
+          } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError' || err?.name === 'OverconstrainedError') {
+            setVoiceError(t('ai.voiceNoDevice'));
+          } else {
+            setVoiceError(t('ai.voiceInaccessible', { reason: err?.message || '' }));
+          }
+          return;
+        }
+
+        if (!isMountedRef.current || cancelPendingStartRef.current) {
+          try {
+            stream?.getTracks().forEach((track) => {
+              try { track.stop(); } catch {}
+            });
+          } catch {}
+          return;
+        }
+
+        isExplicitlyStoppedRef.current = false;
+        isRecordingRef.current = true;
+        initialTextRef.current = valueRef.current;
+        setIsRecording(true);
+
+        if (stream) {
+          streamRef.current = stream;
+
+          try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            const audioCtx = new AudioCtx();
+            audioContextRef.current = audioCtx;
+            if (audioCtx.state === 'suspended') {
+              void audioCtx.resume().catch(() => {});
+            }
+
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            const updateVisualizer = () => {
+              if (!isMountedRef.current || !isRecordingRef.current) {
+                rafRef.current = null;
+                return;
+              }
+              analyser.getByteFrequencyData(dataArray);
+              const bands = new Array(5).fill(0);
+              const step = Math.floor(dataArray.length / 5);
+              for (let i = 0; i < 5; i++) {
+                let sum = 0;
+                for (let j = 0; j < step; j++) {
+                  sum += dataArray[i * step + j];
+                }
+                bands[i] = sum / step / 255;
+              }
+              setAudioData(bands);
+              rafRef.current = requestAnimationFrame(updateVisualizer);
+            };
+            updateVisualizer();
+          } catch (audioErr) {
+            console.warn("[ai-chat-input] Audio visualizer error:", audioErr);
+          }
+        }
+
+        if (!stream || typeof MediaRecorder === 'undefined') {
+          releaseMicrophone();
+          setVoiceError(t('ai.voiceUnsupported'));
+          return;
+        }
+
+        const mimeType =
+          ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(
+            (m) => MediaRecorder.isTypeSupported?.(m)
+          ) || '';
+        try {
+          const recorder = mimeType
+            ? new MediaRecorder(stream, { mimeType })
+            : new MediaRecorder(stream);
+          recordedChunksRef.current = [];
+          recorder.ondataavailable = (event: BlobEvent) => {
+            if (event.data && event.data.size > 0) recordedChunksRef.current.push(event.data);
+          };
+          recorder.start(250);
+          recorderRef.current = recorder;
+
+          // Warm up the Whisper WASM pipeline in background while the user speaks
+          // so post-stop transcription starts without model load latency.
+          if (!isLocalSttLoaded()) {
+            preloadLocalStt((p) => {
+              if (!isMountedRef.current) return;
+              if (p.status === 'ready' || p.status === 'done') {
+                setModelProgress(null);
+              } else if (typeof p.ratio === 'number') {
+                setModelProgress(p.ratio);
+              }
+            });
+          }
+        } catch (recErr: any) {
+          console.warn('[ai-chat-input] MediaRecorder failed:', recErr);
+          releaseMicrophone();
+          setVoiceError(t('ai.voiceFailed', { reason: String(recErr?.message || recErr) }));
+          return;
+        }
       } finally {
         isStartingRecordingRef.current = false;
       }
-    }, [handleValueChange, releaseMicrophone, t]);
+    }, [releaseMicrophone, settingsHintFor, t]);
 
     // Keep textarea auto-scrolled to bottom while recording
     useEffect(() => {
@@ -845,22 +890,24 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     }, [textareaHeight]);
 
     useEffect(() => {
-      if (!isModelSelectOpen) return;
+      if (!isModelSelectOpen && !isVoiceLangOpen) return;
       const handleOutsideClick = (e: MouseEvent) => {
         if (internalContainerRef.current && !internalContainerRef.current.contains(e.target as Node)) {
           setIsModelSelectOpen(false);
+          setIsVoiceLangOpen(false);
         }
       };
       document.addEventListener("mousedown", handleOutsideClick);
       return () => document.removeEventListener("mousedown", handleOutsideClick);
-    }, [isModelSelectOpen]);
+    }, [isModelSelectOpen, isVoiceLangOpen]);
 
     const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
       if (internalContainerRef.current && internalContainerRef.current.contains(e.relatedTarget as Node)) return;
-      if (value.trim() === "" && !hasAttachments && !isRecording) {
+      if (value.trim() === "" && !hasAttachments && !isRecording && !isTranscribing) {
         setIsSmoothResize(false);
         setExpanded(false);
         setIsModelSelectOpen(false);
+        setIsVoiceLangOpen(false);
       }
     };
 
@@ -1001,7 +1048,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                     onClick={() => window.electronAPI?.openSystemSettings?.('microphone')}
                     className="px-1.5 py-0.5 text-[11px] font-medium bg-amber-500/20 hover:bg-amber-500/30 rounded transition-colors text-amber-700 dark:text-amber-300"
                   >
-                    {getLocale().startsWith('tr') ? "Ayarları Aç" : "Open Settings"}
+                    Open Settings
                   </button>
                 )}
                 <button
@@ -1100,10 +1147,11 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                     handleSubmit();
                   }
                 }
-                if (e.key === "Escape" && value.trim() === "" && !hasAttachments) {
+                if (e.key === "Escape" && value.trim() === "" && !hasAttachments && !isRecording && !isTranscribing) {
                   setIsSmoothResize(false);
                   setExpanded(false);
                   setIsModelSelectOpen(false);
+                  setIsVoiceLangOpen(false);
                 }
               }}
               placeholder={placeholder}
@@ -1155,87 +1203,179 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
             {/* Bottom Actions Wrapper - Hides when recording to make space for visualizer */}
             <div
               className={cn(
-                "absolute bottom-2 left-3 right-12 z-[10] flex items-center gap-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                "absolute bottom-2 left-3 right-12 z-[10] flex items-center gap-1 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
                 expanded && !isRecording ? "opacity-100 blur-0 translate-y-0 pointer-events-auto" : "opacity-0 blur-sm translate-y-2 pointer-events-none"
               )}
             >
-              <div className="relative">
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsModelSelectOpen((prev) => !prev);
-                  }}
-                  className={cn(
-                    "group flex items-center gap-1 rounded-full px-2 py-1 text-foreground/50 transition-all duration-200 outline-none hover:bg-accent/60 hover:text-foreground cursor-default",
-                    isModelSelectOpen ? "bg-accent/60 text-foreground" : ""
-                  )}
-                  aria-label={`Select model. Current: ${selectedModel}`}
-                >
-                  <ModelIcon model={selectedModel} className="size-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
-                  <span className="text-xs font-semibold select-none transition-colors">
-                    {selectedModel}
+              {isTranscribing ? (
+                <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-300 text-xs font-medium max-w-full">
+                  <span className="size-2 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+                  <span className="truncate">
+                    {modelDownloadPercent !== null
+                      ? t('ai.voiceDownloadingShort', { percent: modelDownloadPercent })
+                      : t('ai.voiceTranscribingShort')}
                   </span>
-                </button>
-
-                <div
-                  style={{ transformOrigin: "bottom left" }}
-                  onMouseLeave={() => {
-                    setHoverStyle((prev) => ({
-                      ...prev, opacity: 0, transform: prev.transform.replace("scale(1)", "scale(0.95)"), transition: "opacity 0.2s ease-in, transform 0.2s ease-out",
-                    }));
-                  }}
-                  className={cn(
-                    "absolute bottom-full left-0 mb-2.5 z-50 w-44 rounded-2xl border border-border bg-card/95 p-1 shadow-xl backdrop-blur-md flex flex-col gap-0.5 transition-all duration-300 cursor-default",
-                    isModelSelectOpen
-                      ? "opacity-100 scale-100 translate-y-0 pointer-events-auto ease-[cubic-bezier(0.16,1,0.3,1)]"
-                      : "opacity-0 scale-95 translate-y-2 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)]"
-                  )}
-                >
-                  <div className="relative flex flex-col gap-0.5">
-                    <div style={hoverStyle} className="absolute left-0 right-0 top-0 h-8 -z-10 rounded-xl bg-accent pointer-events-none" />
-                    {models.map((model, idx) => (
-                      <button
-                        key={model}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onMouseEnter={() => {
-                          setHoverStyle((prev) => ({
-                            opacity: 1, transform: `translateY(${idx * 34}px) scale(1)`,
-                            transition: prev.opacity === 0 ? "opacity 0.15s ease-out" : "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
-                          }));
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedModel(model);
-                          onModelChange?.(model);
-                          setIsModelSelectOpen(false);
-                        }}
-                        className={cn(
-                          "group relative flex h-8 w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs font-medium outline-none active:scale-[0.98] cursor-default transition-colors",
-                          model === selectedModel ? "text-cyan-600 dark:text-cyan-400 font-semibold" : "text-foreground/80 hover:text-foreground"
-                        )}
-                      >
-                        <span className="flex items-center gap-2">
-                          <ModelIcon model={model} className="size-3.5 opacity-85 group-hover:opacity-100 transition-opacity" />
-                          {model}
-                        </span>
-                        {model === selectedModel && (
-                          <Check className="size-3 text-cyan-600 dark:text-cyan-400 shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsVoiceLangOpen(false);
+                        setIsModelSelectOpen((prev) => !prev);
+                      }}
+                      className={cn(
+                        "group flex items-center gap-1 rounded-full px-2 py-1 text-foreground/50 transition-all duration-200 outline-none hover:bg-accent/60 hover:text-foreground cursor-default",
+                        isModelSelectOpen ? "bg-accent/60 text-foreground" : ""
+                      )}
+                      aria-label={`Select model. Current: ${selectedModel}`}
+                    >
+                      <ModelIcon model={selectedModel} className="size-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
+                      <span className="text-xs font-semibold select-none transition-colors">
+                        {selectedModel}
+                      </span>
+                    </button>
 
-              <button
-                type="button" onMouseDown={(e) => e.preventDefault()} onClick={openFileChooser} disabled={attachments.length >= maxAttachments}
-                className="ml-auto flex size-7 items-center justify-center rounded-full text-foreground/50 transition-all duration-200 hover:bg-accent/60 hover:text-foreground outline-none cursor-default disabled:opacity-40 disabled:pointer-events-none"
-              >
-                <PlusIcon />
-              </button>
+                    <div
+                      style={{ transformOrigin: "bottom left" }}
+                      onMouseLeave={() => {
+                        setHoverStyle((prev) => ({
+                          ...prev, opacity: 0, transform: prev.transform.replace("scale(1)", "scale(0.95)"), transition: "opacity 0.2s ease-in, transform 0.2s ease-out",
+                        }));
+                      }}
+                      className={cn(
+                        "absolute bottom-full left-0 mb-2.5 z-50 w-44 rounded-2xl border border-border bg-card/95 p-1 shadow-xl backdrop-blur-md flex flex-col gap-0.5 transition-all duration-300 cursor-default",
+                        isModelSelectOpen
+                          ? "opacity-100 scale-100 translate-y-0 pointer-events-auto ease-[cubic-bezier(0.16,1,0.3,1)]"
+                          : "opacity-0 scale-95 translate-y-2 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)]"
+                      )}
+                    >
+                      <div className="relative flex flex-col gap-0.5">
+                        <div style={hoverStyle} className="absolute left-0 right-0 top-0 h-8 -z-10 rounded-xl bg-accent pointer-events-none" />
+                        {models.map((model, idx) => (
+                          <button
+                            key={model}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => {
+                              setHoverStyle((prev) => ({
+                                opacity: 1, transform: `translateY(${idx * 34}px) scale(1)`,
+                                transition: prev.opacity === 0 ? "opacity 0.15s ease-out" : "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
+                              }));
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedModel(model);
+                              onModelChange?.(model);
+                              setIsModelSelectOpen(false);
+                            }}
+                            className={cn(
+                              "group relative flex h-8 w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs font-medium outline-none active:scale-[0.98] cursor-default transition-colors",
+                              model === selectedModel ? "text-cyan-600 dark:text-cyan-400 font-semibold" : "text-foreground/80 hover:text-foreground"
+                            )}
+                          >
+                            <span className="flex items-center gap-2">
+                              <ModelIcon model={model} className="size-3.5 opacity-85 group-hover:opacity-100 transition-opacity" />
+                              {model}
+                            </span>
+                            {model === selectedModel && (
+                              <Check className="size-3 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Voice Dictation Language Selector */}
+                  <div className="relative ml-auto">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsModelSelectOpen(false);
+                        setIsVoiceLangOpen((prev) => !prev);
+                      }}
+                      title="Voice dictation language"
+                      aria-label={`Voice dictation language: ${voiceLang.toUpperCase()}`}
+                      className={cn(
+                        "flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold text-foreground/50 transition-all duration-200 outline-none hover:bg-accent/60 hover:text-foreground cursor-default",
+                        isVoiceLangOpen ? "bg-accent/60 text-foreground" : ""
+                      )}
+                    >
+                      <Globe className="size-3 opacity-70" />
+                      <span>{voiceLang.toUpperCase()}</span>
+                    </button>
+
+                    <div
+                      style={{ transformOrigin: "bottom right" }}
+                      className={cn(
+                        "absolute bottom-full right-0 mb-2.5 z-50 w-36 max-h-56 overflow-y-auto prompt-scrollbar rounded-2xl border border-border bg-card/95 p-1 shadow-xl backdrop-blur-md flex flex-col gap-0.5 transition-all duration-200 cursor-default",
+                        isVoiceLangOpen
+                          ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                          : "opacity-0 scale-95 translate-y-2 pointer-events-none"
+                      )}
+                    >
+                      {SUPPORTED_VOICE_LANGUAGES.map((lang) => (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const saved = setPreferredVoiceLanguage(lang.code);
+                            setVoiceLang(saved);
+                            setIsVoiceLangOpen(false);
+                          }}
+                          className={cn(
+                            "flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs outline-none transition-colors hover:bg-accent/70 cursor-default",
+                            voiceLang === lang.code
+                              ? "text-cyan-600 dark:text-cyan-400 font-semibold"
+                              : "text-foreground/80"
+                          )}
+                        >
+                          <span className="truncate">{lang.name}</span>
+                          <span className="text-[10px] opacity-60 font-mono">{lang.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button" onMouseDown={(e) => e.preventDefault()} onClick={openFileChooser} disabled={attachments.length >= maxAttachments}
+                    className="flex size-7 items-center justify-center rounded-full text-foreground/50 transition-all duration-200 hover:bg-accent/60 hover:text-foreground outline-none cursor-default disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    <PlusIcon />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Live Recording Status Pill (timer + voice language) while capturing */}
+            <div
+              className={cn(
+                "absolute left-3.5 bottom-2 z-[10] flex h-8 items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                isRecording ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-2 pointer-events-none"
+              )}
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 text-[11px] font-medium text-rose-500">
+                <span className="size-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="tabular-nums font-mono">
+                  {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, '0')}
+                </span>
+              </span>
+              <span className="text-[11px] font-semibold text-foreground/50 font-mono select-none">
+                {voiceLang.toUpperCase()}
+              </span>
+              {modelDownloadPercent !== null && (
+                <span className="text-[11px] text-cyan-500 font-medium truncate max-w-[110px]">
+                  {modelDownloadPercent}%
+                </span>
+              )}
             </div>
 
             {/* Audio Wave Visualizer Overlay positioned precisely to the left of the mic button */}
@@ -1259,7 +1399,15 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onClick={onActionButtonClick}
               aria-label={actionLabel}
-              title={isTranscribing ? t('ai.voiceTranscribing') : modelDownloadPercent !== null ? t('ai.voiceModelDownloading', { percent: modelDownloadPercent }) : undefined}
+              title={
+                isTranscribing
+                  ? (modelDownloadPercent !== null
+                    ? `${t('ai.voiceModelDownloading', { percent: modelDownloadPercent })} (Click to cancel)`
+                    : `${t('ai.voiceTranscribing')} (Click to cancel)`)
+                  : modelDownloadPercent !== null
+                  ? t('ai.voiceModelDownloading', { percent: modelDownloadPercent })
+                  : actionLabel
+              }
               style={{ borderRadius: 9999 }}
               className="absolute right-2 bottom-2 z-[10] flex h-8 w-8 items-center justify-center bg-primary text-primary-foreground transition-all duration-300 hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-default"
             >
@@ -1295,11 +1443,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   </svg>
                 )}
               </span>
-              {modelDownloadPercent !== null && (
-                <span className="pointer-events-none absolute -top-7 right-0 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background shadow-sm">
-                  {t('ai.voiceModelDownloading', { percent: modelDownloadPercent })}
-                </span>
-              )}
             </button>
           </div>
         </div>

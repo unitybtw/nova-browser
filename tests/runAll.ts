@@ -111,3 +111,4 @@ import './newtab_collection_recovery.test';
 
 import './privacy_boundary_fixes.test';
 import './security_hardening_fixes.test';
+import './voice_speech_recognition.test';

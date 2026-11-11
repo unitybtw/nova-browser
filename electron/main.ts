@@ -1818,7 +1818,9 @@ app.whenReady().then(async () => {
     const persistent = targetSession === session.defaultSession;
     const decisions: typeof rememberedPermissions = persistent ? rememberedPermissions : new Map();
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-      const url = details.requestingUrl || webContents.getURL() || '';
+      const url = (!details.requestingUrl || details.requestingUrl === 'file://')
+        ? (webContents.getURL() || details.requestingUrl || '')
+        : details.requestingUrl;
       const keys = permissionKeys(permission, (details as any)?.mediaTypes);
       if (!keys) return callback(false);
 
@@ -1984,25 +1986,26 @@ app.whenReady().then(async () => {
       if (!keys) return false;
 
       // Fail-closed permission checking:
-      // Internal pages: Permit microphone (audio) checks only if remembered/granted.
+      // Internal pages: Permit microphone (audio) checks only if OS/remembered permission is granted.
       // All other app-origin permission checks remain strictly denied.
-      if (isTrustedAppOrigin(requestingOrigin)) {
+      const effectiveCheckOrigin = (!requestingOrigin || requestingOrigin === 'file://') && webContents
+        ? (webContents.getURL() || requestingOrigin)
+        : requestingOrigin;
+      if (isTrustedAppOrigin(effectiveCheckOrigin)) {
         if (permission === 'media') {
           const mediaType = (details as any)?.mediaType as string | undefined;
           if (mediaType === 'audio') {
+            const appPerm = decisions.get('app')?.get('media:audio') ||
+                            (effectiveCheckOrigin ? decisions.get(effectiveCheckOrigin)?.get('media:audio') : undefined);
+            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
+              return appPerm.allow;
+            }
             if (process.platform === 'darwin') {
               try {
-                if (systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
-                  return false;
-                }
+                return systemPreferences.getMediaAccessStatus('microphone') === 'granted';
               } catch {
                 return false; // Fail closed!
               }
-            }
-            const appPerm = decisions.get('app')?.get('media:audio') ||
-                            (requestingOrigin ? decisions.get(requestingOrigin)?.get('media:audio') : undefined);
-            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
-              return appPerm.allow;
             }
             return false; // Fail closed if not granted
           }

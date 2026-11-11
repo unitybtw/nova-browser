@@ -7,45 +7,72 @@ import { logger } from '../utils/logger';
  * which cannot work inside Electron at all. Chromium's cloud recognizer needs
  * the Google Speech API key that only the Chrome binary ships; an Electron build
  * has no key, so the recognizer starts, opens the microphone successfully, and
- * then fails the round-trip with `error: network`. Reproduced in a bare Electron
- * app with a fake capture device, so it is not caused by permissions, the
- * adblocker, or the CSP. It was also the wrong design for a privacy browser:
- * the audio would have been streamed to Google.
+ * then fails the round-trip with `error: network`.
  *
- * This service runs Whisper locally through transformers.js instead. Nothing
- * leaves the device, and the model shards are cached in userData by the main
- * process (`model-cache-get`/`model-cache-set`) because the packaged app runs on
- * a `file://` origin where the Cache API is unavailable.
+ * This service runs Whisper locally through transformers.js on WASM SIMD
+ * (zero GPU/VRAM contention with WebLLM and deterministic latency). Model
+ * shards are cached in userData by the main process (`model-cache-get` /
+ * `model-cache-set`) because the packaged app runs on `file://`.
  */
 
-/** Multilingual tiny model: ~41 MB of q8 encoder+decoder shards. */
+/** Multilingual tiny model: ~44 MB of q8 encoder+decoder+tokenizer shards. */
 export const LOCAL_STT_MODEL = 'onnx-community/whisper-tiny';
 const TARGET_SAMPLE_RATE = 16_000;
 
 /** Whisper expects 30s chunks; longer input is split by the pipeline. */
 const MAX_AUDIO_SECONDS = 120;
 
+/** Approximate total download footprint across all q8 shards + tokenizer JSON. */
+const EXPECTED_MODEL_TOTAL_BYTES = 44_600_000;
+const MODEL_LOAD_TIMEOUT_MS = 90_000;
+const STALL_TIMEOUT_MS = 30_000;
+const DECODE_TIMEOUT_MS = 15_000;
+const INFERENCE_TIMEOUT_MS = 35_000;
+const VOICE_LANGUAGE_STORAGE_KEY = 'nova_voice_language';
+
 export interface SttProgress {
-  /** 0..1 across all shards, or null once loading has finished. */
+  /** 0..0.99 across all shards, or null once loading has finished. */
   ratio: number | null;
   file: string;
   /**
    * `'ready'` is the only terminal status this service emits, and the only one
-   * ever paired with `ratio: null`. transformers.js also dispatches `'done'`,
-   * but it does so once per file rather than once per load, so a single file
-   * finishing is reported here as an ordinary `'progress'` event at ratio 1.
-   * `'done'` stays in the union so existing consumer checks for it keep
-   * compiling.
+   * ever paired with `ratio: null`. transformers.js also dispatches `'done'` once
+   * per file, which we fold into byte-weighted `'progress'` so tiny JSON configs
+   * never prematurely jump the indicator to 100%.
    */
   status: 'download' | 'progress' | 'ready' | 'done';
 }
 
 export interface TranscribeOptions {
-  /** BCP-47 tag from the UI, used to skip language detection. */
+  /** BCP-47 tag from the UI / voice selector; overrides auto-resolved preference. */
   locale?: string;
   onProgress?: (progress: SttProgress) => void;
   signal?: AbortSignal;
 }
+
+export interface VoiceLanguageOption {
+  code: string;
+  label: string;
+  name: string;
+}
+
+export const SUPPORTED_VOICE_LANGUAGES: VoiceLanguageOption[] = [
+  { code: 'tr', label: 'TR', name: 'Türkçe' },
+  { code: 'en', label: 'EN', name: 'English' },
+  { code: 'de', label: 'DE', name: 'Deutsch' },
+  { code: 'fr', label: 'FR', name: 'Français' },
+  { code: 'es', label: 'ES', name: 'Español' },
+  { code: 'ar', label: 'AR', name: 'العربية' },
+  { code: 'it', label: 'IT', name: 'Italiano' },
+  { code: 'pt', label: 'PT', name: 'Português' },
+  { code: 'nl', label: 'NL', name: 'Nederlands' },
+  { code: 'pl', label: 'PL', name: 'Polski' },
+  { code: 'ru', label: 'RU', name: 'Русский' },
+  { code: 'uk', label: 'UK', name: 'Українська' },
+  { code: 'ja', label: 'JA', name: '日本語' },
+  { code: 'ko', label: 'KO', name: '한국어' },
+  { code: 'zh', label: 'ZH', name: '中文' },
+];
 
 type AnyPipeline = (audio: Float32Array, opts?: Record<string, unknown>) => Promise<any>;
 
@@ -68,20 +95,63 @@ const LOCALE_TO_WHISPER: Record<string, string> = {
 };
 
 let pipelinePromise: Promise<AnyPipeline> | null = null;
+let loadedPipeline: AnyPipeline | null = null;
 let transformersModule: any = null;
+let currentLoadProgress: SttProgress | null = null;
+const progressListeners = new Set<(p: SttProgress) => void>();
 
 function getElectronAPI(): any {
   return (globalThis as any).window?.electronAPI;
 }
 
 /**
- * Cache keys arrive as the resolved remote URL when a custom (non-FileCache)
- * backend is used, but `tryCache` also probes a repo-relative path first.
- * Accept both, and only ever persist keys naming a model on the HF hosts.
+ * Resolves the user's preferred dictation language. Falls back to the browser's
+ * system/preferred languages (so Turkish systems default cleanly to 'tr' even
+ * when the browser chrome UI is English).
  */
+export function getPreferredVoiceLanguage(): string {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(VOICE_LANGUAGE_STORAGE_KEY);
+      if (saved && LOCALE_TO_WHISPER[saved.toLowerCase()]) {
+        return saved.toLowerCase();
+      }
+    }
+  } catch {}
+
+  try {
+    const nav = (globalThis as any).navigator;
+    const candidates: string[] = [];
+    if (Array.isArray(nav?.languages)) candidates.push(...nav.languages);
+    if (typeof nav?.language === 'string') candidates.push(nav.language);
+    for (const tag of candidates) {
+      const base = String(tag || '').toLowerCase().split(/[-_]/)[0];
+      if (LOCALE_TO_WHISPER[base]) {
+        return base;
+      }
+    }
+  } catch {}
+
+  return 'en';
+}
+
+export function setPreferredVoiceLanguage(code: string): string {
+  const normalized = String(code || '').toLowerCase().split(/[-_]/)[0];
+  const resolved = LOCALE_TO_WHISPER[normalized] ? normalized : 'en';
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(VOICE_LANGUAGE_STORAGE_KEY, resolved);
+    }
+  } catch {}
+  return resolved;
+}
+
+export function isLocalSttLoaded(): boolean {
+  return loadedPipeline !== null;
+}
+
 function isTrustedModelKey(key: string): boolean {
   if (!key || key.length > 1024) return false;
-  // repo-relative path, e.g. onnx-community/whisper-tiny/onnx/encoder_model.onnx
   if (/^[a-z0-9._-]+\/[a-z0-9._\-/]+$/i.test(key)) return true;
   try {
     const parsed = new URL(key);
@@ -93,64 +163,53 @@ function isTrustedModelKey(key: string): boolean {
   }
 }
 
-// The app logger redacts some forwarded renderer output, which would hide real
-// cache failures. Report these through the console with an explicit prefix.
 function cacheLog(message: string, err?: unknown) {
   console.warn(`[LocalSTT] ${message}`, err ?? '');
 }
 
 /**
- * onnxruntime-web resolves its wasm through `env.backends.onnx.wasm.wasmPaths`,
- * which defaults to the **jsdelivr CDN**. The app's connect-src allowlist
- * blocks that (deliberately — it is a bare third-party origin and would leak a
- * request on every model load), so the runtime gets the copy shipped in
- * `public/ort/`, taken from the installed onnxruntime-web at build time.
- *
- * The variant must be `asyncify`: that is the build transformers.js resolves
- * and requests, not the WebGPU/JSEP build.
+ * Resolves ORT wasm/mjs URLs against the document base URI rather than the
+ * chunk directory (`dist/assets/`) so dynamic `import()` always finds `dist/ort/`
+ * in packaged `file://` builds as well as `http://localhost:5173/ort/` in dev.
  */
 function configureOnnxRuntime(env: any) {
+  // Never wrap the ONNX runtime factory JS into a `blob:` URL — production CSP
+  // (`script-src 'self' 'wasm-unsafe-eval'`) blocks `import(blob:...)` even
+  // when Cache API is exposed under `file://`.
+  env.useWasmCache = false;
+
   const wasm = env?.backends?.onnx?.wasm;
   if (!wasm) {
-    // Report this loudly, because leaving it silent is the difference between a
-    // five-second fix and an afternoon. Without wasmPaths the runtime falls back
-    // to its built-in `new URL('./ort-wasm-simd-threaded.asyncify.<hash>.wasm',
-    // import.meta.url)` — and `nova-drop-duplicate-onnx-wasm` in vite.config.ts
-    // DELETES that hashed asset from the bundle, so model loading dies on a bare
-    // 404 inside ort's own loader with nothing pointing at the cause. The usual
-    // trigger is an onnxruntime-web/transformers upgrade that renames or moves
-    // `env.backends.onnx`.
     cacheLog(
-      'env.backends.onnx.wasm is missing, so the ORT wasm path was NOT configured. ' +
-        'Model loading is expected to fail with a 404 for ' +
-        'ort-wasm-simd-threaded.asyncify.<hash>.wasm, since the build deletes that ' +
-        'hashed asset (see the nova-drop-duplicate-onnx-wasm plugin in vite.config.ts) ' +
-        'and public/ort/ is then never pointed at. This usually means onnxruntime-web ' +
-        'renamed or moved env.backends.onnx.'
+      'env.backends.onnx.wasm is missing, so the ORT wasm path was NOT configured.'
     );
     return;
   }
-  // The variant is dictated by what transformers.js imports — it is not a free
-  // choice. transformers.js pulls in `onnxruntime-web/webgpu`, and that entry
-  // point is the build whose own loader requests
-  // `ort-wasm-simd-threaded.asyncify.wasm` by name. Pointing this at the plain
-  // or jsep build 404s inside ort even though those files exist in
-  // node_modules, and swapping the extension or dropping `asyncify` breaks it
-  // the same way. Keep in step with public/ort/, which is a verbatim copy of
-  // this build.
+
   const base = 'ort-wasm-simd-threaded.asyncify';
-  wasm.wasmPaths = { mjs: `./ort/${base}.mjs`, wasm: `./ort/${base}.wasm` };
-  // Keep the runtime single-threaded: the app sends COOP/COEP, but a lower
-  // ceiling is safer than a silent fallback to cross-origin isolation.
-  if (typeof wasm.numThreads !== 'number') wasm.numThreads = 1;
+  let baseHref: string | undefined;
+  try {
+    if (typeof document !== 'undefined' && document.baseURI) {
+      baseHref = document.baseURI;
+    } else if (typeof window !== 'undefined' && window.location?.href) {
+      baseHref = window.location.href;
+    }
+  } catch {}
+
+  wasm.wasmPaths = baseHref
+    ? {
+        mjs: new URL(`./ort/${base}.mjs`, baseHref).href,
+        wasm: new URL(`./ort/${base}.wasm`, baseHref).href,
+      }
+    : {
+        mjs: `./ort/${base}.mjs`,
+        wasm: `./ort/${base}.wasm`,
+      };
+
+  wasm.numThreads = 1;
   wasm.proxy = false;
 }
 
-/**
- * Disk-backed cache for model shards. The Cache API does not exist on the
- * `file://` origin the packaged app is served from, so without this the whole
- * model would be re-downloaded on every launch.
- */
 function createIpcCache() {
   const api = getElectronAPI();
   if (!api?.modelCacheGet || !api?.modelCacheSet) {
@@ -168,13 +227,6 @@ function createIpcCache() {
           status: 200,
           headers: {
             'Content-Type': guessContentType(key),
-            // Required by transformers.js's read path, which sizes its buffer
-            // from this header (readResponse in utils/hub). Missing it means
-            // `total` starts at 0, so the buffer is reallocated and fully
-            // re-copied on every chunk, and "Unable to determine content-length"
-            // is logged for every file on every launch. The length is already in
-            // hand: the cache stores only the bytes, so the header the network
-            // response carried has to be restated here.
             'Content-Length': String(buffer.byteLength),
           },
         });
@@ -207,156 +259,230 @@ function guessContentType(url: string): string {
   return 'application/octet-stream';
 }
 
-async function selectDevice(): Promise<'webgpu' | 'wasm'> {
-  try {
-    const gpu = (globalThis as any).navigator?.gpu;
-    if (gpu) {
-      const adapter = await gpu.requestAdapter();
-      if (adapter) return 'webgpu';
-    }
-  } catch (_) {
-    // fall through to wasm
-  }
-  return 'wasm';
+function emitProgress(progress: SttProgress) {
+  currentLoadProgress = progress.status === 'ready' ? null : progress;
+  progressListeners.forEach((listener) => {
+    try {
+      listener(progress);
+    } catch {}
+  });
 }
 
-/** Loads the pipeline, downloading shards on first use. Idempotent. */
-export function loadLocalStt(onProgress?: (p: SttProgress) => void): Promise<AnyPipeline> {
-  if (pipelinePromise) return pipelinePromise;
+function withProgressSubscription<T>(
+  work: Promise<T>,
+  onProgress?: (p: SttProgress) => void
+): Promise<T> {
+  if (!onProgress) return work;
+  progressListeners.add(onProgress);
+  if (currentLoadProgress) {
+    try {
+      onProgress(currentLoadProgress);
+    } catch {}
+  }
+  return work.finally(() => {
+    progressListeners.delete(onProgress);
+  });
+}
 
-  pipelinePromise = (async () => {
+/**
+ * Computes byte-weighted download ratio across shards so tiny config JSON files
+ * never lock the progress indicator at 100% before ONNX weights finish.
+ */
+export function computeWeightedDownloadRatio(
+  files: ReadonlyMap<string, { loaded: number; total: number }>,
+  expectedFloorBytes: number = EXPECTED_MODEL_TOTAL_BYTES
+): number {
+  let loadedBytes = 0;
+  let knownTotalBytes = 0;
+  files.forEach((entry) => {
+    const safeTotal = Number.isFinite(entry.total) && entry.total > 0 ? entry.total : 0;
+    const safeLoaded = Number.isFinite(entry.loaded) && entry.loaded > 0 ? entry.loaded : 0;
+    loadedBytes += safeTotal > 0 ? Math.min(safeLoaded, safeTotal) : safeLoaded;
+    knownTotalBytes += safeTotal;
+  });
+  const denominator = Math.max(knownTotalBytes, expectedFloorBytes, 1);
+  return Math.min(0.99, Math.max(0, loadedBytes / denominator));
+}
+
+/**
+ * Loads the Whisper STT pipeline onto WASM SIMD. Reuses an active load or ready
+ * instance; resets cleanly on failure/timeout so future attempts never get stuck.
+ */
+export function loadLocalStt(onProgress?: (p: SttProgress) => void): Promise<AnyPipeline> {
+  if (loadedPipeline) {
+    if (onProgress) {
+      try {
+        onProgress({ ratio: null, file: '', status: 'ready' });
+      } catch {}
+    }
+    return Promise.resolve(loadedPipeline);
+  }
+
+  if (pipelinePromise) {
+    return withProgressSubscription(pipelinePromise, onProgress);
+  }
+
+  const runLoad = (async () => {
+    let lastActivityAt = Date.now();
     const transformers = await import('@huggingface/transformers');
     transformersModule = transformers;
     const env = transformers.env;
     env.allowLocalModels = false;
     env.useBrowserCache = false;
+    env.useWasmCache = false;
     configureOnnxRuntime(env);
+
+    // Ensure HuggingFace HTTP requests fail fast on network stalls rather than hanging forever
+    const nativeFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null;
+    if (nativeFetch) {
+      env.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal) return nativeFetch(input, init);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS);
+        return nativeFetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+      };
+    }
 
     const cache = createIpcCache();
     if (cache) {
       env.useCustomCache = true;
       env.customCache = cache;
     } else {
-      // No cache backend: transformers.js would otherwise try the Cache API,
-      // which throws on this origin and takes the whole load down with it.
       env.useBrowserCache = false;
       env.useCustomCache = false;
     }
 
-    const device = await selectDevice();
-    logger.info('LocalSTT', `Loading ${LOCAL_STT_MODEL} on ${device}`);
+    logger.info('LocalSTT', `Loading ${LOCAL_STT_MODEL} on wasm`);
 
-    // transformers.js reports progress per FILE, not per load: `initiate` when
-    // a file starts, `progress` repeatedly while it streams, and `done` when
-    // that one file finishes. `done` is dispatched once per file (utils/hub.js),
-    // so it must not be read as "the model is ready" — config.json is ~1 KB and
-    // finishes while ~40 MB of encoder/decoder is still streaming, which would
-    // clear the ring at 1% and then flicker it back on every later file. A
-    // per-file `done` therefore only marks that file at 100% and re-reports a
-    // ratio; only the global `ready` event, or build() resolving, ends the load.
-    const perFile = new Map<string, number>();
-
-    // The mean of perFile is not monotonic, so it is not what the UI is told. A
-    // mean only moves forward with a fixed denominator, and every new file
-    // enters at 0 on `initiate`: {0.6} = 60% becomes {0.6, 0} = 30%. The
-    // WebGPU -> wasm retry re-emits `initiate` for the same keys and resets
-    // them all, dropping the mean to 0 mid-load. perFile keeps tracking the true
-    // per-file ratios while what the UI sees is clamped to a high-water mark, so
-    // the displayed percentage is guaranteed non-decreasing.
+    const perFileBytes = new Map<string, { loaded: number; total: number }>();
     let reportedRatio = 0;
     let reportedTerminal = false;
 
-    /** The one and only end-of-load event, emitted at most once per load. */
     const reportReady = () => {
-      if (!onProgress || reportedTerminal) return;
+      if (reportedTerminal) return;
       reportedTerminal = true;
-      onProgress({ ratio: null, file: '', status: 'ready' });
+      emitProgress({ ratio: null, file: '', status: 'ready' });
     };
 
-    const reportOverall = (status: 'download' | 'progress', file = '') => {
-      if (!onProgress) return;
-      const ratios = Array.from(perFile.values());
-      const mean = ratios.length ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0;
-      reportedRatio = Math.min(1, Math.max(reportedRatio, mean));
-      onProgress({ ratio: reportedRatio, file, status });
+    const reportBytes = (status: 'download' | 'progress', file: string) => {
+      lastActivityAt = Date.now();
+      const weighted = computeWeightedDownloadRatio(perFileBytes);
+      reportedRatio = Math.max(reportedRatio, weighted);
+      emitProgress({ ratio: reportedRatio, file, status });
     };
 
-    const build = (targetDevice: 'webgpu' | 'wasm') =>
-      transformers.pipeline('automatic-speech-recognition', LOCAL_STT_MODEL, {
-        // q8 keeps the download at ~41 MB instead of ~150 MB.
-        dtype: 'q8',
-        device: targetDevice,
-        progress_callback: (info: any) => {
-          const status = info?.status;
-          if (status === 'progress' && typeof info?.progress === 'number') {
-            const key = String(info?.file || '');
-            const ratio = Math.min(100, Math.max(0, info.progress)) / 100;
-            perFile.set(key, Math.max(perFile.get(key) ?? 0, ratio));
-            reportOverall('progress', key);
-          } else if (status === 'download' || status === 'initiate') {
-            const key = String(info?.file || '');
-            perFile.set(key, 0);
-            reportOverall('download', key);
-          } else if (status === 'done') {
-            // One file finished, not the load. Mark it at 100% and re-report a
-            // ratio so the ring keeps filling for the files still streaming.
-            const key = String(info?.file || '');
-            perFile.set(key, 1);
-            reportOverall('progress', key);
-          } else if (status === 'ready') {
-            reportReady();
+    const buildPromise = transformers.pipeline('automatic-speech-recognition', LOCAL_STT_MODEL, {
+      dtype: 'q8',
+      device: 'wasm',
+      progress_callback: (info: any) => {
+        const status = info?.status;
+        const key = String(info?.file || '');
+        if (status === 'download' || status === 'initiate') {
+          if (!perFileBytes.has(key)) {
+            perFileBytes.set(key, { loaded: 0, total: Number(info?.total) || 0 });
           }
-        },
-      });
+          reportBytes('download', key);
+        } else if (status === 'progress') {
+          const prev = perFileBytes.get(key) ?? { loaded: 0, total: 0 };
+          const total = typeof info?.total === 'number' && info.total > 0 ? info.total : prev.total;
+          let loaded = typeof info?.loaded === 'number' && info.loaded >= 0 ? info.loaded : prev.loaded;
+          if (loaded === 0 && total > 0 && typeof info?.progress === 'number') {
+            loaded = Math.round((Math.min(100, Math.max(0, info.progress)) / 100) * total);
+          }
+          perFileBytes.set(key, {
+            loaded: Math.max(prev.loaded, loaded),
+            total: Math.max(prev.total, total),
+          });
+          reportBytes('progress', key);
+        } else if (status === 'done') {
+          const prev = perFileBytes.get(key) ?? { loaded: 0, total: 0 };
+          const total = prev.total > 0 ? prev.total : prev.loaded;
+          perFileBytes.set(key, { loaded: total, total });
+          reportBytes('progress', key);
+        } else if (status === 'ready') {
+          reportReady();
+        }
+      },
+    });
+
+    // Guard against silent hangs where neither bytes nor pipeline completion occur
+    let stallTimer: ReturnType<typeof setInterval> | null = null;
+    let totalTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const timeoutRace = new Promise<never>((_, reject) => {
+      totalTimer = setTimeout(() => {
+        reject(new Error('Model preparation timed out. Check your connection and try again.'));
+      }, MODEL_LOAD_TIMEOUT_MS);
+      stallTimer = setInterval(() => {
+        if (Date.now() - lastActivityAt > STALL_TIMEOUT_MS) {
+          reject(new Error('Model download stalled. Check your connection and try again.'));
+        }
+      }, 2000);
+    });
 
     try {
-      const pipe = await build(device);
+      const pipe = (await Promise.race([buildPromise, timeoutRace])) as AnyPipeline;
+      loadedPipeline = pipe;
       reportReady();
-      return pipe as AnyPipeline;
-    } catch (err) {
-      // WebGPU can be present but fail at runtime (no adapter, shader
-      // compilation, driver quirk). Retry once on the CPU backend.
-      if (device === 'webgpu') {
-        logger.warn('LocalSTT', 'WebGPU pipeline failed, retrying on wasm', err);
-        const pipe = await build('wasm');
-        reportReady();
-        return pipe as AnyPipeline;
-      }
-      throw err;
+      return pipe;
+    } finally {
+      if (stallTimer) clearInterval(stallTimer);
+      if (totalTimer) clearTimeout(totalTimer);
     }
   })();
 
-  // A failed load must not poison every later attempt.
-  pipelinePromise = pipelinePromise.catch(err => {
+  pipelinePromise = runLoad.catch((err) => {
     pipelinePromise = null;
+    loadedPipeline = null;
+    currentLoadProgress = null;
     throw err;
   });
 
-  return pipelinePromise;
+  return withProgressSubscription(pipelinePromise, onProgress);
 }
 
 /**
- * Frees the pipeline and its wasm arena.
- *
- * Currently unreferenced: nothing in `src/` calls it yet, so the ~41 MB of
- * weights, the ort session and the wasm arena stay resident for the lifetime of
- * the renderer process. It is kept because it is the only thing that can release
- * that memory, and wiring it up to a UI affordance was out of scope for this
- * change. (The companion `isLocalSttLoaded()` predicate was deleted for the same
- * reason — unreferenced, and unlike this one it could not release anything.)
+ * Starts warming up the local STT pipeline while recording is still active,
+ * eliminating the post-stop wait on subsequent clicks. Errors are swallowed
+ * here because the foreground `transcribeAudio` call will report them if still failing.
  */
+export function preloadLocalStt(onProgress?: (p: SttProgress) => void): void {
+  loadLocalStt(onProgress).catch((err) => {
+    logger.warn('LocalSTT', 'Background preload did not complete cleanly', err);
+  });
+}
+
 export async function disposeLocalStt(): Promise<void> {
-  const pipe = await pipelinePromise?.catch(() => null);
+  const pipe = loadedPipeline ?? (await pipelinePromise?.catch(() => null));
   pipelinePromise = null;
+  loadedPipeline = null;
+  currentLoadProgress = null;
   try {
     await (pipe as any)?.dispose?.();
   } catch (_) {}
   transformersModule = null;
 }
 
+/** Measures RMS energy & peak amplitude before any normalization boost. */
+export function analyzeSpeechEnergy(samples: Float32Array): { peak: number; rms: number } {
+  if (!samples || samples.length === 0) return { peak: 0, rms: 0 };
+  let peak = 0;
+  let sumSq = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i];
+    const abs = v < 0 ? -v : v;
+    if (abs > peak) peak = abs;
+    sumSq += v * v;
+  }
+  return {
+    peak,
+    rms: Math.sqrt(sumSq / samples.length),
+  };
+}
+
 /**
  * Decodes recorded audio to the mono 16 kHz Float32Array Whisper expects.
- * `blob` is whatever MediaRecorder produced (webm/opus on Chromium).
+ * Preserves raw signal level without inflating silence/background hiss.
  */
 export async function decodeToWhisperInput(blob: Blob): Promise<Float32Array> {
   const arrayBuffer = await blob.arrayBuffer();
@@ -364,26 +490,18 @@ export async function decodeToWhisperInput(blob: Blob): Promise<Float32Array> {
     (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
   if (!AudioCtx) throw new Error('AudioContext is unavailable in this environment.');
 
-  // Decode with the AudioContext for the hardware-supported rate…
   const ctx = new AudioCtx();
   let decoded: AudioBuffer;
   try {
-    decoded = await ctx.decodeAudioData(arrayBuffer);
+    decoded = await withTimeout(
+      ctx.decodeAudioData(arrayBuffer),
+      DECODE_TIMEOUT_MS,
+      'Audio decoding timed out.'
+    );
   } finally {
-    void ctx.close();
+    void ctx.close().catch(() => {});
   }
 
-  // …then resample to 16 kHz mono through an OfflineAudioContext.
-  //
-  // The buffer is sized to the clip but never beyond MAX_AUDIO_SECONDS: only
-  // the LEADING MAX_AUDIO_SECONDS of a recording is transcribed, so the cap is
-  // applied to the frame count here, before the render, rather than by slicing
-  // the result afterwards. Slicing after the fact bounded nothing — it had
-  // already rendered and materialised the whole clip, so a mic left recording
-  // for 30 minutes meant a ~29M-frame AudioBuffer plus a 115 MB Float32Array
-  // that could get the renderer OOM-killed, with the slice then a no-op
-  // because the length was already over the cap. Capping the frame count
-  // bounds the render at 1920000 frames / 7.7 MB whatever the input length.
   const maxFrames = TARGET_SAMPLE_RATE * MAX_AUDIO_SECONDS;
   const frames = Math.max(
     1,
@@ -394,24 +512,21 @@ export async function decodeToWhisperInput(blob: Blob): Promise<Float32Array> {
   source.buffer = decoded;
 
   const gain = offline.createGain();
-  // Whisper was trained on audio at roughly this level; MediaRecorder output
-  // varies wildly with the input gain, which otherwise wrecks accuracy.
   gain.gain.value = 1;
   source.connect(gain);
   gain.connect(offline.destination);
   source.start();
 
-  const rendered = await offline.startRendering();
+  const rendered = await withTimeout(
+    offline.startRendering(),
+    DECODE_TIMEOUT_MS,
+    'Audio resampling timed out.'
+  );
   const mono = rendered.getChannelData(0);
 
-  // Simple peak normalisation. The length is already capped by the frame count
-  // above, so there is nothing left to trim here.
-  let peak = 0;
-  for (let i = 0; i < mono.length; i++) {
-    const v = Math.abs(mono[i]);
-    if (v > peak) peak = v;
-  }
-  if (peak > 0 && peak < 0.9) {
+  // Measure energy before normalization: only boost genuine audible audio (not silent hiss)
+  const { peak, rms } = analyzeSpeechEnergy(mono);
+  if (peak >= 0.012 && rms >= 0.002 && peak < 0.9) {
     const scale = Math.min(4, 0.9 / peak);
     for (let i = 0; i < mono.length; i++) mono[i] *= scale;
   }
@@ -420,38 +535,9 @@ export async function decodeToWhisperInput(blob: Blob): Promise<Float32Array> {
 }
 
 function resolveWhisperLanguage(locale?: string): string | undefined {
-  if (!locale) return undefined;
-  const lang = locale.toLowerCase().split(/[-_]/)[0];
+  const candidate = locale || getPreferredVoiceLanguage();
+  const lang = candidate.toLowerCase().split(/[-_]/)[0];
   return LOCALE_TO_WHISPER[lang];
-}
-
-/**
- * Races a promise against an abort signal.
- *
- * The model download and Whisper inference both take seconds to minutes and
- * neither transformers.js nor onnxruntime accepts a cancellation signal, so a
- * plain `await` would leave the UI's cancel button doing nothing: the spinner
- * kept turning and the result was discarded only at the very end. Racing makes
- * the rejection immediate; the underlying work still finishes in the background
- * and its result is dropped, which is the correct trade for a dictation box.
- */
-function abortable<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return work;
-  if (signal.aborted) return Promise.reject(abortError());
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(abortError());
-    signal.addEventListener('abort', onAbort, { once: true });
-    work.then(
-      value => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(value);
-      },
-      err => {
-        signal.removeEventListener('abort', onAbort);
-        reject(err);
-      }
-    );
-  });
 }
 
 function abortError(): Error {
@@ -460,42 +546,108 @@ function abortError(): Error {
   return err;
 }
 
+function withTimeout<T>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return new Promise<T>((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    work.then(
+      (value) => {
+        if (timer) clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        if (timer) clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+function abortable<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      }
+    );
+  });
+}
+
+const WHISPER_SILENCE_ARTIFACTS_RE =
+  /^(?:thank you\.?|thanks for watching\.?|you|bye\.?|subtitles by .*|\[.*\]|\(.*\)|\.+|…+)$/i;
+
 /**
  * Transcribes a recorded clip. Returns trimmed text, or an empty string when
- * the audio contained no speech (silence, a cough, a door).
+ * the audio contained no speech (silence, ambient noise, mic bump).
  */
 export async function transcribeAudio(
   blob: Blob,
   options: TranscribeOptions = {}
 ): Promise<string> {
-  if (blob.size === 0) {
+  if (!blob || blob.size === 0) {
     throw new Error('No audio was recorded.');
   }
 
   options.signal?.throwIfAborted();
 
-  const pipe = await abortable(loadLocalStt(options.onProgress), options.signal);
-  options.signal?.throwIfAborted();
-
+  // Decode audio first so too-short or silent clips fail cleanly without
+  // spinning on a model download or running useless Whisper inference.
   const audio = await abortable(decodeToWhisperInput(blob), options.signal);
-  if (audio.length < TARGET_SAMPLE_RATE * 0.2) {
+  if (audio.length < TARGET_SAMPLE_RATE * 0.25) {
     throw new Error('Recording was too short to transcribe.');
+  }
+
+  const { peak, rms } = analyzeSpeechEnergy(audio);
+  if (rms < 0.002 && peak < 0.012) {
+    return '';
   }
   options.signal?.throwIfAborted();
 
-  const language = resolveWhisperLanguage(options.locale);
-  const result = await abortable(
-    pipe(audio, {
-      // A little prompt conditioning measurably reduces hallucinated output on
-      // short clips (Whisper's well-known "thank you" loops).
-      chunk_length_s: 30,
-      stride_length_s: 5,
-      return_timestamps: false,
-      ...(language ? { language, task: 'transcribe' } : {}),
-    }),
-    options.signal
-  );
+  const pipe = await abortable(loadLocalStt(options.onProgress), options.signal);
+  options.signal?.throwIfAborted();
 
-  const text = Array.isArray(result) ? result[0]?.text : result?.text;
-  return String(text || '').trim();
+  const language = resolveWhisperLanguage(options.locale);
+  let result: any;
+  try {
+    result = await abortable(
+      withTimeout(
+        pipe(audio, {
+          chunk_length_s: 30,
+          stride_length_s: 5,
+          return_timestamps: false,
+          max_new_tokens: 128,
+          no_repeat_ngram_size: 3,
+          repetition_penalty: 1.15,
+          ...(language ? { language, task: 'transcribe' } : {}),
+        }),
+        INFERENCE_TIMEOUT_MS,
+        'Speech recognition timed out.'
+      ),
+      options.signal
+    );
+  } catch (err: any) {
+    // Do not keep a potentially wedged ONNX session alive after a non-abort failure
+    if (err?.name !== 'AbortError') {
+      loadedPipeline = null;
+      pipelinePromise = null;
+    }
+    throw err;
+  }
+
+  const rawText = Array.isArray(result) ? result[0]?.text : result?.text;
+  const cleaned = String(rawText || '').trim();
+  if (!cleaned) return '';
+  if (rms < 0.025 && WHISPER_SILENCE_ARTIFACTS_RE.test(cleaned)) {
+    return '';
+  }
+  return cleaned;
 }
