@@ -48,12 +48,14 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
+  Check,
   Compass,
   Cloud,
   Languages,
   PictureInPicture2
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
+import { getWorkspaceIcon, WORKSPACE_COLORS } from '../utils/workspaceIcons';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
@@ -93,15 +95,6 @@ const isFromNestedControl = (e: React.SyntheticEvent<HTMLElement>): boolean => {
   const target = e.target as HTMLElement | null;
   if (!target || target === e.currentTarget) return false;
   return !!target.closest('button, a, input, select, textarea');
-};
-
-const WORKSPACE_COLORS: Record<string, string> = {
-  slate: '#64748b',
-  blue: '#3b82f6',
-  emerald: '#10b981',
-  purple: '#a855f7',
-  rose: '#f43f5e',
-  amber: '#f59e0b'
 };
 
 interface TopBarProps {
@@ -1127,6 +1120,27 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const workspaceDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isWorkspaceDropdownOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsWorkspaceDropdownOpen(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (workspaceDropdownRef.current && !workspaceDropdownRef.current.contains(e.target as Node)) {
+        setIsWorkspaceDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isWorkspaceDropdownOpen]);
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
   const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('win');
@@ -1168,60 +1182,137 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           transition={{ duration: 0.2 }}
           className="flex items-end px-2 pt-2.5 gap-1"
         >
-          {/* macOS Traffic Lights Spacer: 78px so native traffic lights never collide with Workspace or Tabs */}
+          {/* macOS Traffic Lights Spacer: 88px so native traffic lights never collide with Workspace or Tabs */}
           {isMac && (
             <div
-              className="w-[78px] h-full shrink-0 select-none drag-region"
+              className="w-[88px] h-full shrink-0 select-none drag-region"
               style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             />
           )}
 
           {/* Workspace Selector */}
           {workspaces && activeWorkspace && onSelectWorkspace && (
-            <div className="relative no-drag mb-1">
+            <div ref={workspaceDropdownRef} className="relative no-drag mb-1">
               <button
                 onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-slate-200/50 hover:bg-slate-300/50 text-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:text-slate-300 transition-colors mr-1"
+                aria-haspopup="true"
+                aria-expanded={isWorkspaceDropdownOpen}
+                aria-label="Switch workspace"
+                className={`group flex items-center gap-2 h-7 px-2.5 rounded-lg text-xs font-medium transition-all duration-150 border mr-1 cursor-pointer select-none ${
+                  isWorkspaceDropdownOpen
+                    ? 'bg-slate-300/80 dark:bg-white/15 border-blue-500/40 dark:border-blue-400/40 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                    : 'bg-slate-200/60 hover:bg-slate-300/70 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] border-slate-300/60 dark:border-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white shadow-2xs'
+                }`}
               >
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b' }} />
-                <span>{activeWorkspace.name}</span>
+                <span
+                  className="w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                  style={{
+                    backgroundColor: `${WORKSPACE_COLORS[activeWorkspace.color] || '#64748b'}25`,
+                    color: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b'
+                  }}
+                >
+                  {React.createElement(getWorkspaceIcon(activeWorkspace.icon, activeWorkspace.name), {
+                    className: "w-2.5 h-2.5 stroke-[2.5]"
+                  })}
+                </span>
+                <span className="font-semibold truncate max-w-[110px] tracking-tight">
+                  {activeWorkspace.name}
+                </span>
+                <ChevronDown
+                  className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform duration-200 group-hover:text-slate-600 dark:group-hover:text-slate-200 ${
+                    isWorkspaceDropdownOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+                  }`}
+                />
               </button>
               <AnimatePresence>
               {isWorkspaceDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsWorkspaceDropdownOpen(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
-                    {workspaces.map(w => (
-                      <button
-                        key={w.id}
-                        onClick={() => {
-                          onSelectWorkspace(w.id);
-                          setIsWorkspaceDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      >
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }} />
-                        <span className={w.id === activeWorkspaceId ? 'font-medium text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}>{w.name}</span>
-                      </button>
-                    ))}
-                    <div className="border-t border-slate-100 dark:border-slate-700 my-1" />
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute top-full left-0 mt-1.5 w-64 backdrop-blur-xl bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 overflow-hidden"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      Workspaces
+                    </span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400">
+                      {workspaces.length}
+                    </span>
+                  </div>
+
+                  {/* Workspaces List */}
+                  <div className="max-h-60 overflow-y-auto no-scrollbar space-y-0.5">
+                    {workspaces.map(w => {
+                      const isCurrent = w.id === activeWorkspaceId;
+                      const IconComp = getWorkspaceIcon(w.icon, w.name);
+                      const colorHex = WORKSPACE_COLORS[w.color] || '#64748b';
+                      const count = tabs.filter(t => (t.workspaceId || 'default') === w.id).length;
+
+                      return (
+                        <button
+                          key={w.id}
+                          onClick={() => {
+                            onSelectWorkspace(w.id);
+                            setIsWorkspaceDropdownOpen(false);
+                          }}
+                          className={`w-full group/ws flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer ${
+                            isCurrent
+                              ? 'bg-blue-50/90 dark:bg-blue-500/15 text-slate-900 dark:text-white font-medium'
+                              : 'hover:bg-slate-100/80 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover/ws:scale-105"
+                            style={{ backgroundColor: `${colorHex}22`, color: colorHex }}
+                          >
+                            <IconComp className="w-3.5 h-3.5 stroke-[2.2]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold truncate flex items-center gap-1.5">
+                              <span>{w.name}</span>
+                              {isCurrent && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" />
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block leading-tight">
+                              {count} {count === 1 ? 'tab' : 'tabs'}
+                            </span>
+                          </div>
+                          {isCurrent && (
+                            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 stroke-[2.5]" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Quick Actions Footer */}
+                  <div className="border-t border-slate-100 dark:border-white/5 mt-1.5 pt-1.5 grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => {
+                        setIsWorkspaceDropdownOpen(false);
+                        window.dispatchEvent(new CustomEvent('open-workspace-manager', { detail: { mode: 'create' } }));
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-blue-500" />
+                      <span>New Space</span>
+                    </button>
                     <button
                       onClick={() => {
                         setIsWorkspaceDropdownOpen(false);
                         window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                       }}
-                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 font-medium"
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Manage Workspaces</span>
+                      <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Manage</span>
                     </button>
-                  </motion.div>
-                </>
+                  </div>
+                </motion.div>
               )}
               </AnimatePresence>
             </div>

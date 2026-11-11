@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
 import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
+import { getWorkspaceIcon, WORKSPACE_COLORS } from '../utils/workspaceIcons';
 import { getSidebarTabRows } from '../utils/verticalTabs';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
@@ -60,15 +61,6 @@ import {
   ADBLOCK_WHITELIST_UPDATED_EVENT,
   notifyAdblockWhitelistUpdated,
 } from '../utils/adblockUtils';
-
-const WORKSPACE_COLORS: Record<string, string> = {
-  slate: '#64748b',
-  blue: '#3b82f6',
-  emerald: '#10b981',
-  purple: '#a855f7',
-  rose: '#f43f5e',
-  amber: '#f59e0b'
-};
 
 /**
  * True when a `click`/`keydown` reaching a container handler came from a
@@ -1334,7 +1326,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             aria-expanded={isWorkspaceDropdownOpen}
             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group cursor-pointer"
           >
-            <span className="nova-space-indicator" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace?.color] || WORKSPACE_COLORS.slate }} />
+            <span
+              className="w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+              style={{
+                backgroundColor: `${WORKSPACE_COLORS[activeWorkspace?.color || 'slate'] || '#64748b'}25`,
+                color: WORKSPACE_COLORS[activeWorkspace?.color || 'slate'] || '#64748b'
+              }}
+            >
+              {React.createElement(getWorkspaceIcon(activeWorkspace?.icon, activeWorkspace?.name), {
+                className: "w-2.5 h-2.5 stroke-[2.5]"
+              })}
+            </span>
             <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
               {activeWorkspace?.name || 'Personal'}
             </span>
@@ -1351,39 +1353,67 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 p-1.5"
               >
-                <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
-                  {workspaces.map(w => (
-                    <button
-                      key={w.id}
-                      onClick={() => {
-                        onSelectWorkspace(w.id);
-                        setIsWorkspaceDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="w-4 h-4 rounded-md flex items-center justify-center text-[10px] text-white font-bold"
-                           style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
-                        {w.name.charAt(0)}
-                      </div>
-                      <span className={`text-xs flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
-                        {w.name}
-                      </span>
-                      {w.id === activeWorkspaceId && <Check className="w-3 h-3 text-cyan-500 dark:text-cyan-400" />}
-                    </button>
-                  ))}
+                <div className="max-h-56 overflow-y-auto no-scrollbar py-0.5 space-y-0.5">
+                  {workspaces.map(w => {
+                    const isCurrent = w.id === activeWorkspaceId;
+                    const IconComp = getWorkspaceIcon(w.icon, w.name);
+                    const colorHex = WORKSPACE_COLORS[w.color] || '#64748b';
+                    const count = tabs.filter(t => (t.workspaceId || 'default') === w.id).length;
+
+                    return (
+                      <button
+                        key={w.id}
+                        onClick={() => {
+                          onSelectWorkspace(w.id);
+                          setIsWorkspaceDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 transition-colors text-left cursor-pointer rounded-lg ${
+                          isCurrent
+                            ? 'bg-blue-50/80 dark:bg-white/10 font-medium'
+                            : 'hover:bg-slate-100 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <div
+                          className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: `${colorHex}22`, color: colorHex }}
+                        >
+                          <IconComp className="w-3 h-3 stroke-[2.2]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-xs block truncate ${isCurrent ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                            {w.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block leading-none">
+                            {count} {count === 1 ? 'tab' : 'tabs'}
+                          </span>
+                        </div>
+                        {isCurrent && <Check className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="border-t border-slate-100 dark:border-white/10 mt-1 pt-1">
+                <div className="border-t border-slate-100 dark:border-white/10 mt-1 pt-1 grid grid-cols-2 gap-1 px-0.5">
+                  <button
+                    onClick={() => {
+                      setIsWorkspaceDropdownOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-workspace-manager', { detail: { mode: 'create' } }));
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-blue-500" />
+                    New Space
+                  </button>
                   <button
                     onClick={() => {
                       setIsWorkspaceDropdownOpen(false);
                       window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    Manage Spaces
+                    Manage
                   </button>
                 </div>
               </motion.div>

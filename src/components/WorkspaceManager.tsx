@@ -69,6 +69,19 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
     return () => { document.body.style.overflow = previousOverflow; };
   }, [isOpen]);
 
+  useEffect(() => {
+    const handleOpenWithDetail = (e: Event) => {
+      const customEvent = e as CustomEvent<{ mode?: string }>;
+      if (customEvent.detail?.mode === 'create') {
+        handleAddWorkspace();
+      }
+    };
+    window.addEventListener('open-workspace-manager', handleOpenWithDetail);
+    return () => {
+      window.removeEventListener('open-workspace-manager', handleOpenWithDetail);
+    };
+  }, []);
+
   const cancelEdit = () => {
     setEditingId(null);
     setDraftWorkspace(null);
