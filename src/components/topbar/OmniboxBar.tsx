@@ -338,7 +338,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer h-7 px-1 rounded-md"
           >
             {isIncognito ? (
-              <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-cyan-500/25 transition-colors" title="Private & Incognito Mode (Click for Site Info)">
+              <div className="flex items-center gap-1.5 text-accent bg-accent/15 border border-accent/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-accent/25 transition-colors" title="Private & Incognito Mode (Click for Site Info)">
                 <VenetianMask className="w-3.5 h-3.5" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
               </div>
@@ -394,12 +394,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 e.preventDefault();
                 e.stopPropagation();
                 setIsPermissionPromptDismissed(prev => !prev);
-              }}              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg text-xs font-semibold shadow-xs ${
+              }}
+              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent-hover dark:text-accent px-2 py-0.5 rounded-lg text-xs font-semibold shadow-xs ${
                 isIncognito ? 'left-28' : 'left-10'
               }`}
               title="Site Permissions (Click to toggle)"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
               <span className="text-[11px] font-semibold whitespace-nowrap">Permissions</span>
             </div>
           )}
@@ -457,15 +458,41 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
             placeholder={isAIMode ? t('nav.aiPlaceholder') : t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
-            className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:shadow-[0_0_0_3px_rgba(6,182,212,0.12)] rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs ${
+            style={{
+              fontFamily: 'var(--nova-font-ui, inherit)',
+              borderRadius: 'var(--nova-omnibox-radius, 12px)',
+              backdropFilter: 'blur(var(--nova-omnibox-blur, 0px))',
+              WebkitBackdropFilter: 'blur(var(--nova-omnibox-blur, 0px))',
+              ...(!isIncognito
+                ? {
+                    background: isAIMode
+                      ? 'color-mix(in srgb, var(--nova-accent, #3b82f6) 10%, var(--nova-omnibox-bg, var(--nova-header-bg, rgba(241, 245, 249, 0.92))))'
+                      : 'var(--nova-omnibox-bg, var(--nova-header-bg, rgba(241, 245, 249, 0.92)))',
+                    ...(useVerticalTabs && !isFocused && !isAIMode
+                      ? {}
+                      : { color: 'var(--nova-omnibox-text, var(--foreground, #0f172a))' }),
+                    borderWidth: 'var(--nova-omnibox-border-width, 1px)',
+                    borderColor:
+                      isFocused || isAIMode
+                        ? 'var(--nova-accent, #3b82f6)'
+                        : 'var(--nova-omnibox-border, var(--nova-border-subtle, rgba(148, 163, 184, 0.35)))',
+                    ...(isFocused || isAIMode ? {} : { boxShadow: 'var(--nova-omnibox-shadow, none)' }),
+                  }
+                : {
+                    ...(isFocused || isAIMode
+                      ? { borderColor: 'var(--nova-accent, #3b82f6)' }
+                      : {}),
+                  }),
+            }}
+            className={`w-full border focus:border-accent dark:focus:border-accent focus:ring-2 focus:ring-accent/20 focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--nova-accent,#3b82f6)_15%,transparent)] rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs ${
               relevantPermissionRequests.length > 0
                 ? isIncognito ? 'pl-52' : 'pl-34'
                 : isIncognito ? 'pl-28' : 'pl-11'
             } ${
               isIncognito
-                ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500'
-                : 'bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-            } ${isAIMode ? 'border-cyan-500 ring-2 ring-cyan-500/15 bg-cyan-950/20 text-cyan-100' : ''} ${
+                ? 'border-white/10 bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500'
+                : 'border-slate-200/60 dark:border-white/10 bg-slate-100/90 text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:text-slate-200 dark:placeholder-slate-500'
+            } ${isAIMode ? 'border-accent ring-2 ring-accent/20 bg-accent/10' : ''} ${
               (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
             }`}
           />
@@ -477,11 +504,17 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 ? isIncognito ? 'pl-52' : 'pl-34'
                 : isIncognito ? 'pl-28' : 'pl-11'
             }`}>
-              <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
+              <span
+                style={!isIncognito ? { color: 'var(--nova-omnibox-text, var(--foreground, #1e293b))' } : undefined}
+                className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]"
+              >
                 {activeTab?.title || 'New Tab'}
               </span>
               {activeTab?.url && activeTab.url !== 'nova://newtab' && (
-                <span className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]">
+                <span
+                  style={!isIncognito ? { color: 'var(--nova-omnibox-muted, var(--muted-foreground, #64748b))' } : undefined}
+                  className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]"
+                >
                   {formatDisplayUrl(activeTab.url)}
                 </span>
               )}
@@ -504,7 +537,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               <button
                 type="button"
                 onClick={onResetZoom}
-                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
+                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-accent' : 'bg-slate-200 hover:bg-slate-300 text-accent-hover dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-accent'}`}
                 title="Zoom Level (Click to reset 100%)"
               >
                 {Math.round(activeTab.zoomFactor * 100)}%
@@ -528,10 +561,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 onClick={onTogglePip}
                 className={`p-1.5 rounded-lg transition-colors ${
                   activeTab.isInPip
-                    ? 'text-blue-500 bg-blue-500/15 hover:bg-blue-500/25 ring-1 ring-blue-500/30'
+                    ? 'text-accent bg-accent/15 hover:bg-accent/25 ring-1 ring-accent/30'
                     : isIncognito
-                      ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700'
-                      : 'text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:text-blue-400 dark:hover:bg-slate-700'
+                      ? 'text-slate-400 hover:text-accent hover:bg-slate-700'
+                      : 'text-slate-400 hover:text-accent hover:bg-slate-200 dark:hover:text-accent dark:hover:bg-slate-700'
                 }`}
                 title={activeTab.isInPip ? "Exit Picture in Picture" : "Picture in Picture"}
               >
@@ -547,7 +580,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                   onClick={() => setIsTranslateOpen(!isTranslateOpen)}
                   className={`p-1.5 rounded-lg transition-colors relative ${
                     activeTab.isTranslated
-                      ? 'text-cyan-500 bg-cyan-500/15 hover:bg-cyan-500/25'
+                      ? 'text-accent-hover dark:text-accent bg-accent/15 hover:bg-accent/25'
                       : isIncognito
                         ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
                         : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'
@@ -556,7 +589,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 >
                   <Languages className="w-3.5 h-3.5" />
                   {activeTab.isTranslated && (
-                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 ring-1 ring-white dark:ring-slate-900" />
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-accent ring-1 ring-white dark:ring-slate-900" />
                   )}
                 </button>
 
@@ -580,7 +613,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
               title="Bookmark Page"
             >
-              <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-cyan-500 text-cyan-500' : ''}`} />
+              <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-accent text-accent' : ''}`} />
             </button>
           </div>
         </form>
@@ -593,6 +626,16 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                style={!isIncognito ? {
+                  background: 'var(--nova-popovers-bg, var(--nova-card-bg))',
+                  color: 'var(--nova-popovers-text, var(--foreground))',
+                  borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))',
+                  borderWidth: 'var(--nova-popovers-border-width, 1px)',
+                  borderRadius: 'var(--nova-popovers-radius, 12px)',
+                  backdropFilter: 'blur(var(--nova-popovers-blur, 0px))',
+                  WebkitBackdropFilter: 'blur(var(--nova-popovers-blur, 0px))',
+                  boxShadow: 'var(--nova-popovers-shadow, 0 20px 25px -5px rgba(0, 0, 0, 0.15))',
+                } : undefined}
                 className={`absolute left-0 right-0 top-full mt-2 rounded-xl shadow-xl py-1.5 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-900 dark:border-white/10 dark:divide-white/5'}`}
                 onMouseDown={(e) => e.preventDefault()}
               >
@@ -608,21 +651,21 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
                     selectedIndex === -1
-                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold'
+                      ? 'bg-accent/10 text-accent-hover dark:text-accent font-semibold'
                       : isIncognito
                         ? 'hover:bg-slate-700 text-slate-200'
-                        : 'hover:bg-slate-100 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-800'
+                        : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                   }`}
                 >
                 {isValidUrlOrDomain(searchValue) ? (
                   <>
-                    <Globe className="w-4 h-4 shrink-0 text-cyan-500" />
-                    <span className="truncate font-medium text-cyan-600 dark:text-cyan-400">Go to: <span className="underline">{searchValue}</span></span>
+                    <Globe className="w-4 h-4 shrink-0 text-accent" />
+                    <span className="truncate font-medium text-accent-hover dark:text-accent">Go to: <span className="underline">{searchValue}</span></span>
                   </>
                 ) : (
                   <>
-                    <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-cyan-500' : 'text-slate-400 group-hover:text-cyan-500'}`} />
-                    <span className="truncate text-slate-700 dark:text-slate-200">Search with {getSearchEngineName(searchEngine)}: <strong className="text-slate-900 dark:text-white">{searchValue}</strong></span>
+                    <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-accent' : 'text-slate-400 group-hover:text-accent'}`} />
+                    <span className="truncate opacity-90">Search with {getSearchEngineName(searchEngine)}: <strong className="font-semibold">{searchValue}</strong></span>
                   </>
                 )}
               </button>
@@ -651,12 +694,14 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         }}
                         className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
                           isSelected
-                            ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
+                            ? 'bg-accent/10 text-accent-hover dark:text-accent font-medium'
+                            : isIncognito
+                              ? 'hover:bg-slate-700 text-slate-200'
+                              : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                         }`}
                       >
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <Star className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-cyan-500 fill-cyan-500' : 'text-amber-400 fill-amber-400'}`} />
+                          <Star className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-accent fill-accent' : 'text-amber-400 fill-amber-400'}`} />
                           <span className="truncate font-medium">{bookmark.title || bookmark.url}</span>
                         </div>
                         <span className="text-xs text-slate-400 dark:text-slate-500 ml-4 shrink-0 font-mono text-[11px] max-w-[150px] truncate">
@@ -693,11 +738,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
                           isSelected
-                            ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
+                            ? 'bg-accent/10 text-accent-hover dark:text-accent font-medium'
+                            : isIncognito
+                              ? 'hover:bg-slate-700 text-slate-200'
+                              : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                         }`}
                       >
-                        <Search className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
+                        <Search className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-accent' : 'text-slate-400'}`} />
                         <span className="truncate">{suggestion}</span>
                       </button>
                     );

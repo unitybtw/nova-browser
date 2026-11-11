@@ -79,6 +79,17 @@ export { OmniboxBar };
 /** Stable identity handed to the downloads popover while it is closed. */
 const EMPTY_DOWNLOADS: DownloadItem[] = [];
 
+const POPOVER_SURFACE_STYLE: React.CSSProperties = {
+  background: 'var(--nova-popovers-bg, var(--nova-card-bg))',
+  color: 'var(--nova-popovers-text, var(--foreground))',
+  borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))',
+  borderWidth: 'var(--nova-popovers-border-width, 1px)',
+  borderRadius: 'var(--nova-popovers-radius, 12px)',
+  backdropFilter: 'blur(var(--nova-popovers-blur, 16px))',
+  WebkitBackdropFilter: 'blur(var(--nova-popovers-blur, 16px))',
+  boxShadow: 'var(--nova-popovers-shadow, 0 20px 25px -5px rgba(0, 0, 0, 0.2))',
+};
+
 /**
  * True when a `click`/`keydown` reaching a container handler came from a
  * nested interactive control rather than from the container's own surface.
@@ -337,6 +348,21 @@ const MemoizedTabItem = React.memo(
     }
   }, [animPreset, targetWidth, targetPadding, tab.id, !!splitTab]);
 
+  const tabCornerStyle: React.CSSProperties =
+    tabStyle === 'square'
+      ? { borderRadius: 0 }
+      : tabStyle === 'floating'
+        ? { borderRadius: isActive ? 'var(--nova-activeTab-radius, 8px)' : 'var(--nova-inactiveTab-radius, 8px)' }
+        : {
+            borderTopLeftRadius: isActive ? 'var(--nova-activeTab-radius, 12px)' : 'var(--nova-inactiveTab-radius, 12px)',
+            borderTopRightRadius: isActive ? 'var(--nova-activeTab-radius, 12px)' : 'var(--nova-inactiveTab-radius, 12px)',
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+          };
+  const tabHeightExpr = tabStyle === 'floating'
+    ? 'calc(var(--nova-tab-height, 38px) - 6px)'
+    : 'calc(var(--nova-tab-height, 38px) - 4px)';
+
   return (
     <Reorder.Item
       ref={ref}
@@ -404,9 +430,24 @@ const MemoizedTabItem = React.memo(
       style={{
         flex: '0 0 auto',
         width: targetWidth,
-        ...(isActive && !isIncognito
-          ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' }
-          : {})
+        height: tabHeightExpr,
+        ...tabCornerStyle,
+        ...(!isIncognito
+          ? isActive
+            ? {
+                background: 'var(--nova-activeTab-bg, var(--nova-active-tab-bg))',
+                color: 'var(--nova-activeTab-text)',
+                borderColor: 'var(--nova-activeTab-border, var(--nova-border-subtle))',
+                borderTopColor: 'var(--nova-accent, #3b82f6)',
+                backdropFilter: 'blur(var(--nova-activeTab-blur, 0px))',
+                WebkitBackdropFilter: 'blur(var(--nova-activeTab-blur, 0px))',
+                boxShadow: 'var(--nova-activeTab-shadow, 0 1px 2px rgba(0, 0, 0, 0.05))',
+              }
+            : {
+                color: 'var(--nova-inactiveTab-text)',
+                borderColor: 'var(--nova-inactiveTab-border, transparent)',
+              }
+          : {}),
       }}
       className={`group flex items-center justify-between ${
         isPinned ? 'justify-center' : ''
@@ -417,17 +458,17 @@ const MemoizedTabItem = React.memo(
       } ${
         isActive
           ? isIncognito
-            ? 'bg-slate-800 text-slate-100 border-slate-700 font-medium shadow-xs border-t-2 border-t-blue-500 relative z-10'
-            : 'bg-white text-slate-900 border-slate-300/80 font-medium shadow-xs border-t-2 border-t-blue-500 relative z-10 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700'
+            ? 'bg-slate-800 text-slate-100 border-slate-700 font-medium shadow-xs border-t-2 border-t-accent relative z-10'
+            : 'bg-white text-slate-900 border-slate-300/80 font-medium shadow-xs border-t-2 border-t-accent relative z-10 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700'
           : isIncognito
             ? 'bg-slate-800/40 text-slate-400 hover:bg-slate-800/80 hover:text-slate-200 border-transparent font-medium'
-            : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
+            : 'bg-slate-200/40 [background:var(--nova-inactiveTab-bg,transparent)] hover:[background:var(--nova-inactive-tab-hover-bg,rgba(148,163,184,0.16))] text-slate-600 hover:text-slate-900 border-transparent font-medium dark:text-slate-400 dark:hover:text-slate-200'
       }`}
     >
       {isPinned ? (
         <div className="flex items-center justify-center w-full h-full relative">
           {tab.isLoading ? (
-            <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+            <div className="w-3.5 h-3.5 border-2 border-accent/50 border-t-transparent rounded-full animate-spin shrink-0" />
           ) : tab.favicon ? (
             <img src={tab.favicon} width={16} height={16} alt="" className="w-4 h-4 rounded-xs shrink-0" />
           ) : (
@@ -436,7 +477,7 @@ const MemoizedTabItem = React.memo(
           {tab.isPlayingAudio && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleMuteTab(tab.id, e); }}
-              className="absolute -top-1 -right-1 p-0.5 bg-blue-500 text-white rounded-full shadow-xs"
+              className="absolute -top-1 -right-1 p-0.5 bg-accent text-accent-text rounded-full shadow-xs"
               title="Mute Tab"
             >
               <Volume2 className="w-2.5 h-2.5 animate-pulse" />
@@ -451,7 +492,7 @@ const MemoizedTabItem = React.memo(
             tabIndex={0}
             className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-left relative ${
               activeTabId === tab.id
-                ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
+                ? 'bg-accent/15 text-accent-hover dark:text-accent font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
             }`}
             onClick={(e) => {
@@ -477,7 +518,7 @@ const MemoizedTabItem = React.memo(
             title={tab.title}
           >
             {tab.isLoading ? (
-              <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+              <div className="w-3.5 h-3.5 border-2 border-accent/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : tab.favicon ? (
               <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
             ) : (
@@ -523,7 +564,7 @@ const MemoizedTabItem = React.memo(
             tabIndex={0}
             className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-right relative ${
               activeTabId === splitTab.id
-                ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
+                ? 'bg-accent/15 text-accent-hover dark:text-accent font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
             }`}
             onClick={(e) => {
@@ -549,7 +590,7 @@ const MemoizedTabItem = React.memo(
             title={splitTab.title}
           >
             {splitTab.isLoading ? (
-              <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+              <div className="w-3.5 h-3.5 border-2 border-accent/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : splitTab.favicon ? (
               <img src={splitTab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
             ) : (
@@ -576,7 +617,7 @@ const MemoizedTabItem = React.memo(
         <>
           <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden px-1">
             {tab.isLoading ? (
-              <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+              <div className="w-3.5 h-3.5 border-2 border-accent/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : tab.favicon ? (
               <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0" />
             ) : tab.url === 'nova://settings' ? (
@@ -609,8 +650,8 @@ const MemoizedTabItem = React.memo(
                     onClick={(e) => { e.stopPropagation(); onTogglePip(tab.id); }}
                     className={`p-0.5 rounded-full transition-colors shrink-0 ${
                       tab.isInPip
-                        ? 'text-blue-500 bg-blue-500/15 hover:bg-blue-500/25 ring-1 ring-blue-500/30'
-                        : 'text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        ? 'text-accent bg-accent/15 hover:bg-accent/25 ring-1 ring-accent/30'
+                        : 'text-slate-400 hover:text-accent hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                     title={tab.isInPip ? "Exit Picture in Picture" : "Picture in Picture"}
                   >
@@ -623,7 +664,7 @@ const MemoizedTabItem = React.memo(
                     className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-colors shrink-0"
                     title="Mute Tab"
                   >
-                    <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                    <Volume2 className="w-3.5 h-3.5 text-accent animate-pulse" />
                   </button>
                 )}
               </div>
@@ -659,7 +700,7 @@ const MemoizedTabItem = React.memo(
       {/* Active Tab Bottom Cover (to blend with the toolbar below) */}
       {isActive && (
         <div
-          style={!isIncognito ? { backgroundColor: 'var(--nova-active-tab-bg)' } : undefined}
+          style={!isIncognito ? { background: 'var(--nova-activeTab-bg, var(--nova-active-tab-bg))' } : undefined}
           className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`}
         />
       )}
@@ -1167,7 +1208,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   return (
     <>
     <header
-      style={!isIncognito ? { backgroundColor: 'var(--nova-header-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
+      style={!isIncognito ? {
+        background: 'var(--nova-tabBar-bg, var(--nova-header-bg))',
+        color: 'var(--nova-tabBar-text)',
+        borderColor: 'var(--nova-tabBar-border, var(--nova-border-subtle))',
+        borderBottomWidth: 'var(--nova-tabBar-border-width, 1px)',
+        fontFamily: 'var(--nova-font-ui, inherit)',
+      } : {
+        fontFamily: 'var(--nova-font-ui, inherit)',
+      }}
       className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}
     >
       {/*
@@ -1177,9 +1226,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       {!useVerticalTabs && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 44, opacity: 1, transitionEnd: { overflow: 'visible' } }}
+          animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
           exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
           transition={{ duration: 0.2 }}
+          style={!isIncognito ? {
+            minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
+            backdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
+            WebkitBackdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
+          } : {
+            minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
+          }}
           className="flex items-end px-2 pt-2.5 gap-1"
         >
           {/* macOS Traffic Lights Spacer: 88px so native traffic lights never collide with Workspace or Tabs */}
@@ -1200,7 +1256,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 aria-label="Switch workspace"
                 className={`group flex items-center gap-2 h-7 px-2.5 rounded-lg text-xs font-medium transition-all duration-150 border mr-1 cursor-pointer select-none ${
                   isWorkspaceDropdownOpen
-                    ? 'bg-slate-300/80 dark:bg-white/15 border-blue-500/40 dark:border-blue-400/40 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                    ? 'bg-slate-300/80 dark:bg-white/15 border-accent/40 text-slate-900 dark:text-white shadow-sm ring-2 ring-accent/20'
                     : 'bg-slate-200/60 hover:bg-slate-300/70 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] border-slate-300/60 dark:border-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white shadow-2xs'
                 }`}
               >
@@ -1220,7 +1276,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 </span>
                 <ChevronDown
                   className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform duration-200 group-hover:text-slate-600 dark:group-hover:text-slate-200 ${
-                    isWorkspaceDropdownOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+                    isWorkspaceDropdownOpen ? 'rotate-180 text-accent-hover dark:text-accent' : ''
                   }`}
                 />
               </button>
@@ -1231,14 +1287,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.96 }}
                   transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute top-full left-0 mt-1.5 w-64 backdrop-blur-xl bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 overflow-hidden"
+                  style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
+                  className="absolute top-full left-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 overflow-hidden"
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       Workspaces
                     </span>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/[0.05] dark:bg-white/5 text-slate-500 dark:text-slate-400">
                       {workspaces.length}
                     </span>
                   </div>
@@ -1260,8 +1317,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                           }}
                           className={`w-full group/ws flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer ${
                             isCurrent
-                              ? 'bg-blue-50/90 dark:bg-blue-500/15 text-slate-900 dark:text-white font-medium'
-                              : 'hover:bg-slate-100/80 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300'
+                              ? 'bg-accent/15 font-medium'
+                              : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06] opacity-85 hover:opacity-100'
                           }`}
                         >
                           <div
@@ -1274,7 +1331,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                             <div className="text-xs font-semibold truncate flex items-center gap-1.5">
                               <span>{w.name}</span>
                               {isCurrent && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
                               )}
                             </div>
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 block leading-tight">
@@ -1282,7 +1339,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                             </span>
                           </div>
                           {isCurrent && (
-                            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 stroke-[2.5]" />
+                            <Check className="w-4 h-4 text-accent-hover dark:text-accent shrink-0 stroke-[2.5]" />
                           )}
                         </button>
                       );
@@ -1296,9 +1353,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         setIsWorkspaceDropdownOpen(false);
                         window.dispatchEvent(new CustomEvent('open-workspace-manager', { detail: { mode: 'create' } }));
                       }}
-                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5 text-blue-500" />
+                      <Plus className="w-3.5 h-3.5 text-accent" />
                       <span>New Space</span>
                     </button>
                     <button
@@ -1306,7 +1363,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         setIsWorkspaceDropdownOpen(false);
                         window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                       }}
-                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
                       <Settings className="w-3.5 h-3.5 text-slate-400" />
                       <span>Manage</span>
@@ -1374,6 +1431,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             }}
             ref={tabsContainerRef}
             onWheel={handleWheel}
+            style={{ height: 'var(--nova-tab-height, 38px)' }}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px] relative"
           >
             <AnimatePresence mode="popLayout" initial={hasMounted}>
@@ -1502,21 +1560,46 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         ROW 2: Toolbar (Nav, Omnibox, Extensions)
       */}
       <div
-        style={!isIncognito ? { backgroundColor: 'var(--nova-toolbar-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
-        className={`flex items-center px-3 py-1.5 gap-3 no-drag ${isIncognito ? 'bg-slate-800 border-b border-slate-700' : 'bg-white dark:bg-slate-800 dark:border-b dark:border-slate-700'}`}
+        style={!isIncognito ? {
+          color: 'var(--nova-toolbar-text)',
+          borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
+          borderBottomWidth: 'var(--nova-toolbar-border-width, 1px)',
+          minHeight: 'var(--nova-toolbar-height, 44px)',
+          paddingTop: 'var(--nova-density-pad-y, 6px)',
+          paddingBottom: 'var(--nova-density-pad-y, 6px)',
+          paddingLeft: 'var(--nova-density-pad-x, 12px)',
+          paddingRight: 'var(--nova-density-pad-x, 12px)',
+          boxShadow: 'var(--nova-toolbar-shadow, none)',
+        } : {
+          minHeight: 'var(--nova-toolbar-height, 44px)',
+        }}
+        className={`relative flex items-center px-3 py-1.5 gap-3 no-drag ${isIncognito ? 'bg-slate-800 border-b border-slate-700' : 'bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700'}`}
       >
+        {/* Dedicated backdrop layer keeps backdrop-filter off the toolbar container so fixed popovers stay viewport-anchored */}
+        {!isIncognito && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: 'var(--nova-toolbar-bg, var(--nova-card-bg))',
+              backdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
+              WebkitBackdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
+            }}
+          />
+        )}
+
         {/* Navigation Buttons */}
-        <div className="flex items-center gap-1">
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoBack} disabled={!activeTab?.canGoBack} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Go Back">
+        <div className="relative flex items-center gap-1">
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoBack} disabled={!activeTab?.canGoBack} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="Go Back">
             <ArrowLeft className="w-4 h-4" />
           </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoForward} disabled={!activeTab?.canGoForward} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Go Forward">
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoForward} disabled={!activeTab?.canGoForward} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="Go Forward">
             <ArrowRight className="w-4 h-4" />
           </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Reload Page">
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="Reload Page">
             <RotateCw className={`w-4 h-4 transition-transform duration-500 active:rotate-180 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
           </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onNavigate('nova://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="New Tab Page">
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onNavigate('nova://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="New Tab Page">
             <Home className="w-4 h-4" />
           </motion.button>
         </div>
@@ -1547,10 +1630,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onClick={onToggleAIAssistant}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium cursor-pointer ${
               isAIAssistantOpen
-                ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                ? 'bg-accent/15 text-accent-hover dark:text-accent ring-1 ring-accent/30'
                 : isIncognito
                 ? 'text-slate-400 hover:text-white hover:bg-slate-800'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                : 'opacity-75 hover:opacity-100 hover:bg-black/[0.06] dark:hover:bg-white/10'
             }`}
             title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
           >
@@ -1565,16 +1648,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <button
               ref={adBlockerBtnRef}
               onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
-              className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
+              className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`}
               title={!privacyShield ? 'Privacy Shield Disabled' : isWhitelisted ? 'Ad Shield Paused on this site' : 'Privacy & Ad Shield'}
             >
               {!isShieldActiveOnPage ? (
                 <ShieldOff className="w-4 h-4 text-slate-400" />
               ) : (
-                <Shield className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
+                <Shield className="w-4 h-4 text-accent" />
               )}
               {(isShieldActiveOnPage && (activeTab?.blockedAdsCount || 0) > 0) && (
-                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-accent text-accent-text text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
                   {activeTab?.blockedAdsCount ?? 0}
                 </span>
               )}
@@ -1600,16 +1683,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               onClick={() => setIsDownloadsOpen(!isDownloadsOpen)}
               className={`p-1.5 rounded-lg transition-colors relative cursor-pointer ${
                 (activeDownloadsCount || 0) > 0
-                  ? 'text-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20 shadow-xs'
+                  ? 'text-accent-hover dark:text-accent bg-accent/10 hover:bg-accent/20 shadow-xs'
                   : isIncognito
                     ? 'hover:bg-slate-700 text-slate-300'
-                    : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
+                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
               }`}
               title="Downloads"
             >
-              <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'text-cyan-500' : ''}`} />
+              <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'text-accent' : ''}`} />
               {(activeDownloadsCount || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1 bg-accent text-accent-text text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs">
                   {activeDownloadsCount}
                 </span>
               )}
@@ -1636,7 +1719,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               className={`p-1.5 rounded-lg transition-colors flex items-center justify-center relative cursor-pointer ${
                 isIncognito
                   ? 'hover:bg-slate-700 text-slate-300'
-                  : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white'
+                  : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
               }`}
               title={`${ext.name}${ext.popupUrl ? ' (Click to open popup)' : ''}`}
             >
@@ -1653,7 +1736,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           {/* Extensions Manager Button */}
           <button
             onClick={onOpenExtensions}
-            className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
+            className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`}
             title="Extensions"
           >
             <Puzzle className="w-4 h-4" />
@@ -1667,13 +1750,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 isIncognito
                   ? 'hover:bg-slate-700 text-slate-300'
                   : syncStatus.isLoggedIn
-                    ? 'hover:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
-                    : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
+                    ? 'hover:bg-accent/10 text-accent-hover dark:text-accent'
+                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
               }`}
               title={syncStatus.isLoggedIn ? `Nova Account (${syncStatus.user?.displayName || syncStatus.user?.email})` : 'Sign In to Nova Sync'}
             >
               {syncStatus.isLoggedIn && syncStatus.user ? (
-                <div className="w-5 h-5 rounded-full bg-cyan-600 text-white font-semibold text-[10px] flex items-center justify-center shadow-xs uppercase">
+                <div className="w-5 h-5 rounded-full bg-accent text-accent-text font-semibold text-[10px] flex items-center justify-center shadow-xs uppercase">
                   {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
                 </div>
               ) : (
@@ -1691,8 +1774,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
               className={`p-1.5 rounded-lg transition-colors ${
                 isMoreMenuOpen
-                  ? 'bg-slate-200 dark:bg-slate-700 text-cyan-500'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-black/[0.08] dark:bg-white/15 text-accent'
+                  : isIncognito
+                    ? 'hover:bg-slate-700 text-slate-300'
+                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
               }`}
               title="More Options"
             >
@@ -1708,6 +1793,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
+                    style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
                     className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
                   >
                     {/* Nova Account Header inside menu */}
@@ -1715,15 +1801,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       <div className="p-1">
                         <button
                           onClick={() => { onOpenAccount(); setIsMoreMenuOpen(false); }}
-                          className="w-full flex items-center justify-between px-3 py-2 bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg transition-colors text-left"
+                          className="w-full flex items-center justify-between px-3 py-2 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] rounded-lg transition-colors text-left"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             {syncStatus.isLoggedIn && syncStatus.user ? (
-                              <div className="w-6 h-6 rounded-full bg-cyan-600 text-white font-semibold text-xs flex items-center justify-center shrink-0 uppercase">
+                              <div className="w-6 h-6 rounded-full bg-accent text-accent-text font-semibold text-xs flex items-center justify-center shrink-0 uppercase">
                                 {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
                               </div>
                             ) : (
-                              <div className="p-1 rounded-lg bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
+                              <div className="p-1 rounded-lg bg-accent/15 text-accent-hover dark:text-accent">
                                 <Cloud className="w-4 h-4" />
                               </div>
                             )}
@@ -1739,7 +1825,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                           {syncStatus.isLoggedIn ? (
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                           ) : (
-                            <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md shrink-0">Sync</span>
+                            <span className="text-[10px] font-semibold text-accent-hover dark:text-accent bg-accent/10 px-2 py-0.5 rounded-md shrink-0">Sync</span>
                           )}
                         </button>
                       </div>
@@ -1749,22 +1835,22 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     <div className="py-1">
                       <button
                         onClick={() => { onToggleSplitView(); setIsMoreMenuOpen(false); }}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
                       >
                         <div className="flex items-center gap-2.5">
-                          <Columns className="w-4 h-4 text-cyan-400" />
+                          <Columns className="w-4 h-4 text-accent" />
                           <span>Split View (Side-by-Side)</span>
                         </div>
-                        {isSplitView && <span className="text-[10px] font-bold bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">ON</span>}
+                        {isSplitView && <span className="text-[10px] font-bold bg-accent/20 text-accent-hover dark:text-accent px-1.5 py-0.5 rounded">ON</span>}
                       </button>
 
                       {onToggleVpn && (
                         <button
                           onClick={() => { onToggleVpn(); setIsMoreMenuOpen(false); }}
-                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
                         >
                           <div className="flex items-center gap-2.5">
-                            <Network className="w-4 h-4 text-cyan-400" />
+                            <Network className="w-4 h-4 text-accent" />
                             <span>VPN (Secure Proxy)</span>
                           </div>
                           {isVpnEnabled ? (
@@ -1777,10 +1863,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
                       <button
                         onClick={() => { onNavigate('nova://settings#mcp'); setIsMoreMenuOpen(false); }}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
                       >
                         <div className="flex items-center gap-2.5">
-                          <Cpu className="w-4 h-4 text-cyan-400" />
+                          <Cpu className="w-4 h-4 text-accent" />
                           <span>MCP AI Tools Server</span>
                         </div>
                         {mcpRunning ? (
@@ -1797,44 +1883,44 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     {/* Tools Section */}
                     <div className="py-1">
                       <div className="flex items-center justify-between px-3 py-1.5">
-                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Zoom</span>
-                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200/50 dark:border-white/5">
-                          <button onClick={onZoomOut} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
-                          <span className="text-[11px] font-bold px-1.5 text-slate-700 dark:text-slate-200">{Math.round((activeTab?.zoomFactor || 1) * 100)}%</span>
-                          <button onClick={onZoomIn} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
+                        <span className="text-xs font-medium opacity-85">Zoom</span>
+                        <div className="flex items-center gap-1 bg-black/[0.05] dark:bg-white/[0.08] rounded-lg p-0.5 border border-slate-200/50 dark:border-white/5">
+                          <button onClick={onZoomOut} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
+                          <span className="text-[11px] font-bold px-1.5">{Math.round((activeTab?.zoomFactor || 1) * 100)}%</span>
+                          <button onClick={onZoomIn} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
                       {onTakeScreenshot && (
-                        <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                           <Camera className="w-4 h-4 text-slate-400" /> Screenshot
                         </button>
                       )}
                       {onOpenShare && (
-                        <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                           <Share2 className="w-4 h-4 text-slate-400" /> Share Link
                         </button>
                       )}
-                      <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                      <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                         <Search className="w-4 h-4 text-slate-400" /> Find in Page
                       </button>
                     </div>
 
                     {/* Navigation / Library */}
                     <div className="py-1">
-                      <button onClick={() => { onOpenDownloads(); setIsMoreMenuOpen(false); }} className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                      <button onClick={() => { onOpenDownloads(); setIsMoreMenuOpen(false); }} className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                         <div className="flex items-center gap-2.5">
                           <Download className="w-4 h-4 text-slate-400" /> Downloads
                         </div>
-                        {(activeDownloadsCount || 0) > 0 && <span className="bg-cyan-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{activeDownloadsCount}</span>}
+                        {(activeDownloadsCount || 0) > 0 && <span className="bg-accent text-accent-text text-[10px] px-1.5 py-0.5 rounded-full font-bold">{activeDownloadsCount}</span>}
                       </button>
-                      <button onClick={() => { onOpenHistory(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                      <button onClick={() => { onOpenHistory(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                         <Clock className="w-4 h-4 text-slate-400" /> History
                       </button>
-                      <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                      <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                         <Settings className="w-4 h-4 text-slate-400" /> Settings
                       </button>
                       {onOpenHelp && (
-                        <button onClick={() => { onOpenHelp(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <button onClick={() => { onOpenHelp(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
                           <HelpCircle className="w-4 h-4 text-slate-400" /> Help & Support
                         </button>
                       )}
@@ -1860,9 +1946,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       */}
       {showBookmarksBar && (
         <div
-          style={!isIncognito ? { backgroundColor: 'var(--nova-toolbar-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
+          style={!isIncognito ? {
+            background: 'var(--nova-toolbar-bg)',
+            color: 'var(--nova-toolbar-text)',
+            borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
+            borderTopWidth: 'var(--nova-toolbar-border-width, 1px)',
+          } : undefined}
           className={`flex items-center px-3 py-1 gap-2 border-t overflow-x-auto no-scrollbar no-drag ${
-            isIncognito ? 'bg-slate-800/80 border-slate-700/60' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800'
+            isIncognito ? 'bg-slate-800/80 border-slate-700/60 text-slate-300' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-300'
           }`}
         >
           {Array.isArray(bookmarks) && bookmarks.length > 0 ? (
@@ -1873,7 +1964,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[12px] max-w-[150px] group ${
                   isIncognito
                     ? 'hover:bg-slate-700 text-slate-300'
-                    : 'hover:bg-slate-200/70 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
+                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10'
                 }`}
                 title={bookmark.url}
               >
@@ -1884,13 +1975,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <Globe className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                  <Globe className="w-3.5 h-3.5 text-slate-400 group-hover:text-accent transition-colors" />
                 )}
                 <span className="truncate font-medium">{bookmark.title}</span>
               </button>
             ))
           ) : (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 italic px-2 py-0.5 select-none">
+            <span className="text-[11px] opacity-60 italic px-2 py-0.5 select-none">
               Bookmarks will appear here. Press {isMac ? '⌘D' : 'Ctrl+D'} to bookmark the current page.
             </span>
           )}
@@ -1905,11 +1996,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         className="fixed top-0 left-0 pointer-events-none z-[999999] opacity-90 transition-none"
         style={{ display: 'none', willChange: 'transform' }}
       >
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-md ${
-          isIncognito
-            ? 'bg-slate-800/90 border-slate-600 text-slate-200'
-            : 'bg-white/90 border-blue-500/50 text-slate-800 dark:bg-slate-800/90 dark:border-blue-500/50 dark:text-slate-200'
-        }`}>
+        <div
+          style={!isIncognito ? {
+            background: 'var(--nova-popovers-bg, var(--nova-card-bg))',
+            color: 'var(--nova-popovers-text, var(--foreground))',
+            borderRadius: 'var(--nova-popovers-radius, 12px)',
+          } : undefined}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-md ${
+            isIncognito
+              ? 'bg-slate-800/90 border-slate-600 text-slate-200'
+              : 'bg-white/90 border-accent/50 text-slate-800 dark:bg-slate-800/90 dark:border-accent/50 dark:text-slate-200'
+          }`}
+        >
           <Globe className="w-4 h-4 opacity-70" />
           <span ref={ghostTextRef} className="text-[13px] font-medium max-w-[160px] truncate">
             Drop to Split Screen

@@ -90,6 +90,17 @@ export interface FavoriteApp {
   iconBg?: string;
 }
 
+const POPOVER_SURFACE_STYLE: React.CSSProperties = {
+  background: 'var(--nova-popovers-bg, var(--nova-card-bg))',
+  color: 'var(--nova-popovers-text, var(--foreground))',
+  borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))',
+  borderWidth: 'var(--nova-popovers-border-width, 1px)',
+  borderRadius: 'var(--nova-popovers-radius, 12px)',
+  backdropFilter: 'blur(var(--nova-popovers-blur, 0px))',
+  WebkitBackdropFilter: 'blur(var(--nova-popovers-blur, 0px))',
+  boxShadow: 'var(--nova-popovers-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.25))',
+};
+
 const DEFAULT_FAVORITE_APPS: FavoriteApp[] = [
   { id: 'fav_yt', name: 'YouTube', url: 'https://youtube.com', iconType: 'youtube', iconBg: '#ef4444' },
   { id: 'fav_gh', name: 'GitHub', url: 'https://github.com', iconType: 'github', iconBg: '#24292f' },
@@ -140,7 +151,7 @@ function renderFavoriteIcon(fav: FavoriteApp) {
         </svg>
       );
     default:
-      return <Globe className="w-4 h-4 text-cyan-400" />;
+      return <Globe className="w-4 h-4 text-accent" />;
   }
 }
 
@@ -204,6 +215,7 @@ interface SidebarTabItemProps {
   splitTab?: Tab | null;
   activeTabId?: string;
   isActive: boolean;
+  isIncognito?: boolean;
   isDragOver: boolean;
   isNested: boolean;
   tabsLength: number;
@@ -226,6 +238,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
   splitTab,
   activeTabId,
   isActive,
+  isIncognito = false,
   isDragOver,
   isNested,
   tabsLength,
@@ -316,15 +329,37 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       }}
       onMouseEnter={(e) => onMouseEnter(tab, e)}
       onMouseLeave={onMouseLeave}
-      style={isActive ? { backgroundColor: 'var(--sidebar-selected)', borderColor: 'var(--sidebar-border)' } : undefined}
+      style={{
+        minHeight: 'var(--nova-tab-height, 36px)',
+        height: 'var(--nova-tab-height, 36px)',
+        borderRadius: isActive ? 'var(--nova-activeTab-radius, 10px)' : 'var(--nova-inactiveTab-radius, 10px)',
+        ...(!isIncognito && !isDragOver
+          ? isActive
+            ? {
+                background: 'var(--nova-activeTab-bg, var(--sidebar-selected))',
+                color: 'var(--nova-activeTab-text, var(--sidebar-ink))',
+                borderColor: 'var(--nova-activeTab-border, var(--sidebar-border))',
+                borderWidth: 'var(--nova-activeTab-border-width, 1px)',
+                boxShadow: 'var(--nova-activeTab-shadow, 0 1px 2px rgba(0, 0, 0, 0.04))',
+              }
+            : {
+                color: 'var(--nova-inactiveTab-text, var(--sidebar-ink))',
+                borderColor: 'var(--nova-inactiveTab-border, transparent)',
+              }
+          : {}),
+      }}
       className={`nova-sidebar-tab relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none overflow-hidden ${
         isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
       } ${
         isDragOver
-          ? 'ring-2 ring-cyan-500 bg-cyan-500/15 text-slate-900 dark:text-white shadow-md'
+          ? 'ring-2 ring-accent bg-accent/15 text-slate-900 dark:text-white shadow-md'
           : isActive
-            ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
-            : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
+            ? isIncognito
+              ? 'bg-white/12 text-white shadow-sm font-medium border border-white/10'
+              : 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
+            : isIncognito
+              ? 'text-slate-300/80 hover:bg-white/8 hover:text-white'
+              : 'text-slate-600 [background:var(--nova-inactiveTab-bg,transparent)] hover:[background:var(--sidebar-hover,rgba(148,163,184,0.14))] hover:text-slate-900 dark:text-slate-300/80 dark:hover:text-white'
       }`}
     >
       {splitTab ? (
@@ -333,7 +368,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
           <div
             className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-left relative ${
               activeTabId === tab.id
-                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold'
+                ? 'bg-accent/15 text-accent-hover dark:text-accent font-semibold'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
             }`}
             onClick={(e) => { if (isFromNestedControl(e)) return; e.stopPropagation(); onSelectTab(tab.id); }}
@@ -378,7 +413,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
           <div
             className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-right relative ${
               activeTabId === splitTab.id
-                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold'
+                ? 'bg-accent/15 text-accent-hover dark:text-accent font-semibold'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
             }`}
             onClick={(e) => {
@@ -425,9 +460,9 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 <Download className="w-3.5 h-3.5 opacity-70" />
               ) : isNewTabUrl ? (
                 tab.isIncognito ? (
-                  <VenetianMask className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                  <VenetianMask className={`w-3.5 h-3.5 ${isActive ? 'text-accent-hover dark:text-accent' : 'opacity-70'}`} />
                 ) : (
-                  <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                  <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-accent-hover dark:text-accent' : 'opacity-70'}`} />
                 )
               ) : (
                 <Globe className="w-3.5 h-3.5 opacity-70" />
@@ -437,7 +472,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
             </span>
             {tab.isPinned && (
-              <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
+              <Pin className="w-2.5 h-2.5 text-accent shrink-0 opacity-80" />
             )}
           </div>
 
@@ -450,8 +485,8 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 onKeyDown={(e) => { e.stopPropagation(); }}
                 className={`p-1 rounded-md transition-colors ${
                   tab.isInPip
-                    ? 'bg-blue-500/20 text-blue-500 dark:text-blue-400 hover:bg-blue-500/30 ring-1 ring-blue-500/30'
-                    : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500 dark:hover:text-blue-400'
+                    ? 'bg-accent/20 text-accent-hover dark:text-accent hover:bg-accent/30 ring-1 ring-accent/30'
+                    : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-accent'
                 }`}
                 title={tab.isInPip ? "Exit Picture in Picture" : "Picture in Picture"}
               >
@@ -463,7 +498,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 <VolumeX className="w-3 h-3" />
               </button>
             ) : tab.isPlayingAudio ? (
-              <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-accent-hover dark:text-accent">
                 <Volume2 className="w-3 h-3 animate-pulse" />
               </button>
             ) : null}
@@ -480,7 +515,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                   onCloseTab(tab.id, e);
                 }}
                 onKeyDown={(e) => { e.stopPropagation(); }}
-                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 hover:text-white transition-colors cursor-pointer"
+                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
                 title="Close Tab"
               >
                 <X className="w-3 h-3" />
@@ -494,6 +529,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
 }, (prev: SidebarTabItemProps, next: SidebarTabItemProps): boolean => {
   return (
     prev.isActive === next.isActive &&
+    prev.isIncognito === next.isIncognito &&
     prev.isDragOver === next.isDragOver &&
     prev.isNested === next.isNested &&
     // For non-split tabs, activeTabId doesn't affect rendering because isActive captures whether this tab is active.
@@ -975,6 +1011,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <SidebarTabItem
       key={tab.id} tab={tab} splitTab={splitTab} activeTabId={activeTabId}
       isActive={tab.id === activeTabId || splitTab?.id === activeTabId}
+      isIncognito={Boolean(isIncognito || tab.isIncognito)}
       isDragOver={dragOverTabId === tab.id} isNested={isNested} tabsLength={tabs.length}
       onSelectTab={onSelectTab} onCloseTab={onCloseTab} onCloseSplit={onCloseSplit}
       onToggleMuteTab={onToggleMuteTab} onTogglePip={onTogglePip} onTabDragStart={onTabDragStart} onTabDragEnd={onTabDragEnd}
@@ -989,8 +1026,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
       <div
-        style={{ backgroundColor: 'var(--sidebar-surface)', borderColor: 'var(--sidebar-border)' }}
-        className="nova-vertical-sidebar flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
+        style={!isIncognito ? {
+          background: 'var(--nova-sidebar-bg, var(--sidebar-surface))',
+          color: 'var(--nova-sidebar-text, var(--sidebar-ink))',
+          borderColor: 'var(--nova-sidebar-border, var(--sidebar-border))',
+          borderRightWidth: 'var(--nova-sidebar-border-width, 1px)',
+          fontFamily: 'var(--nova-font-ui, inherit)',
+        } : {
+          background: 'var(--nova-sidebar-bg, #0c0a14)',
+          color: 'var(--nova-sidebar-text, #e2e8f0)',
+          borderColor: 'var(--nova-sidebar-border, rgba(148, 163, 184, 0.16))',
+          borderRightWidth: 'var(--nova-sidebar-border-width, 1px)',
+          fontFamily: 'var(--nova-font-ui, inherit)',
+        }}
+        className={`nova-vertical-sidebar flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none z-50 border-r ${isIncognito ? 'dark bg-[#0c0a14] text-slate-200 border-slate-800' : 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 border-slate-200/80 dark:border-white/[0.06]'}`}
       >
 
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
@@ -1009,11 +1058,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <button
                 onClick={onToggleCollapse}
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag cursor-pointer flex items-center justify-center"
+                className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors no-drag cursor-pointer flex items-center justify-center"
                 title={isCollapsed ? (isMac ? "Pin Sidebar (⌘S)" : "Pin Sidebar (Ctrl+S)") : (isMac ? "Hide Sidebar (⌘S)" : "Hide Sidebar (Ctrl+S)")}
               >
                 {isCollapsed ? (
-                  <Pin className="w-3.5 h-3.5 rotate-45 text-cyan-500 dark:text-cyan-400" />
+                  <Pin className="w-3.5 h-3.5 rotate-45 text-accent" />
                 ) : (
                   <PanelLeft className="w-3.5 h-3.5" />
                 )}
@@ -1030,8 +1079,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               onClick={onGoBack}
               disabled={!canGoBack}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
-                canGoBack ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
+              className={`p-1.5 rounded-lg transition-colors no-drag ${
+                canGoBack ? 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-85 hover:opacity-100 cursor-pointer' : 'opacity-35 cursor-default'
               }`}
               title="Back"
             >
@@ -1041,8 +1090,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               onClick={onGoForward}
               disabled={!canGoForward}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
-                canGoForward ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
+              className={`p-1.5 rounded-lg transition-colors no-drag ${
+                canGoForward ? 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-85 hover:opacity-100 cursor-pointer' : 'opacity-35 cursor-default'
               }`}
               title="Forward"
             >
@@ -1051,7 +1100,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <button
               onClick={onReload}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors no-drag cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-85 hover:opacity-100 transition-colors no-drag cursor-pointer"
               title="Reload"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -1062,8 +1111,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer flex items-center justify-center ${
                   isAIAssistantOpen
-                    ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold ring-1 ring-cyan-500/30'
-                    : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                    ? 'bg-accent/15 text-accent-hover dark:text-accent font-semibold ring-1 ring-accent/30'
+                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-85 hover:opacity-100'
                 }`}
                 title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
               >
@@ -1079,11 +1128,34 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <form onSubmit={handleOmniboxSubmit}>
-            <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-colors duration-200 border ${
-              isOmniboxFocused
-                ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10'
-                : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
-            }`}>
+            <div
+              style={{
+                borderRadius: 'var(--nova-omnibox-radius, 12px)',
+                backdropFilter: 'blur(var(--nova-omnibox-blur, 0px))',
+                WebkitBackdropFilter: 'blur(var(--nova-omnibox-blur, 0px))',
+                ...(!isIncognito
+                  ? {
+                      background: 'var(--nova-omnibox-bg, var(--nova-active-tab-bg, rgba(255, 255, 255, 0.85)))',
+                      color: 'var(--nova-omnibox-text, var(--foreground))',
+                      borderWidth: 'var(--nova-omnibox-border-width, 1px)',
+                      borderColor: isOmniboxFocused
+                        ? 'var(--nova-accent, #3b82f6)'
+                        : 'var(--nova-omnibox-border, var(--sidebar-border))',
+                    }
+                  : isOmniboxFocused
+                    ? { borderColor: 'var(--nova-accent, #3b82f6)' }
+                    : {}),
+              }}
+              className={`relative flex items-center h-8 px-2.5 rounded-xl transition-colors duration-200 border ${
+                isOmniboxFocused
+                  ? isIncognito
+                    ? 'bg-slate-900 border-accent/60 shadow-lg ring-1 ring-accent/25'
+                    : 'bg-white border-accent/60 shadow-md ring-1 ring-accent/25 dark:bg-white/12'
+                  : isIncognito
+                    ? 'bg-slate-900/80 hover:bg-slate-900 border-white/10'
+                    : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
+              }`}
+            >
               <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 opacity-70" />
 
               <input
@@ -1135,6 +1207,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   }
                 }}
                 placeholder="Search or Enter URL..."
+                style={!isIncognito ? { color: 'var(--nova-omnibox-text, var(--foreground))' } : undefined}
                 className="w-full bg-transparent text-[12px] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400/60 focus:outline-none tracking-tight"
                 spellCheck={false}
                 autoCapitalize="off"
@@ -1203,6 +1276,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
                 className="absolute top-11 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 {suggestions.map((s, idx) => (
@@ -1215,10 +1289,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       setShowSuggestions(false);
                     }}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                      idx === selectedIndex ? 'bg-slate-100 text-slate-900 font-medium dark:bg-white/15 dark:text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/8'
+                      idx === selectedIndex ? 'bg-accent/15 text-accent-hover dark:text-accent font-medium' : 'hover:bg-black/[0.05] dark:hover:bg-white/8 opacity-90 hover:opacity-100'
                     }`}
                   >
-                    <Search className="w-3 h-3 text-slate-400 shrink-0" />
+                    <Search className={`w-3 h-3 shrink-0 ${idx === selectedIndex ? 'text-accent' : 'text-slate-400'}`} />
                     <span className="truncate">{s}</span>
                   </button>
                 ))}
@@ -1279,13 +1353,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               className="px-3 pb-2.5 no-drag"
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
-              <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5">
+              <form
+                onSubmit={handleAddFavorite}
+                style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
+                className="p-2 rounded-xl bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5"
+              >
                 <input
                   type="text"
                   placeholder="Name (e.g. Reddit)"
                   value={newFavName}
                   onChange={(e) => setNewFavName(e.target.value)}
-                  className="w-full h-6 px-2 bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                  className="w-full h-6 px-2 bg-black/[0.04] dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
                   autoFocus
                 />
                 <input
@@ -1293,7 +1371,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   placeholder="URL (e.g. reddit.com)"
                   value={newFavUrl}
                   onChange={(e) => setNewFavUrl(e.target.value)}
-                  className="w-full h-6 px-2 bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                  className="w-full h-6 px-2 bg-black/[0.04] dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
                 />
                 <div className="flex items-center justify-end gap-1 pt-0.5">
                   <button
@@ -1305,7 +1383,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   </button>
                   <button
                     type="submit"
-                    className="px-2 py-0.5 text-[10px] bg-cyan-600 rounded-md text-white font-medium hover:bg-cyan-500 cursor-pointer"
+                    className="px-2 py-0.5 text-[10px] bg-accent rounded-md text-accent-text font-medium hover:bg-accent-hover cursor-pointer"
                   >
                     Save
                   </button>
@@ -1326,7 +1404,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
             aria-label="Switch workspace"
             aria-expanded={isWorkspaceDropdownOpen}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group cursor-pointer"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/6 transition-colors text-left group cursor-pointer"
           >
             <span
               className="w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
@@ -1339,7 +1417,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 className: "w-2.5 h-2.5 stroke-[2.5]"
               })}
             </span>
-            <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
+            <span className="text-[13px] font-semibold truncate flex-1 tracking-tight">
               {activeWorkspace?.name || 'Personal'}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
@@ -1355,6 +1433,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
                 className="absolute top-9 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 p-1.5"
               >
                 <div className="max-h-56 overflow-y-auto no-scrollbar py-0.5 space-y-0.5">
@@ -1373,8 +1452,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         }}
                         className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 transition-colors text-left cursor-pointer rounded-lg ${
                           isCurrent
-                            ? 'bg-blue-50/80 dark:bg-white/10 font-medium'
-                            : 'hover:bg-slate-100 dark:hover:bg-white/5'
+                            ? 'bg-accent/15 font-medium'
+                            : 'hover:bg-black/[0.05] dark:hover:bg-white/5'
                         }`}
                       >
                         <div
@@ -1384,14 +1463,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                           <IconComp className="w-3 h-3 stroke-[2.2]" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className={`text-xs block truncate ${isCurrent ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                          <span className={`text-xs block truncate ${isCurrent ? 'font-semibold' : 'opacity-85'}`}>
                             {w.name}
                           </span>
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 block leading-none">
                             {count} {count === 1 ? 'tab' : 'tabs'}
                           </span>
                         </div>
-                        {isCurrent && <Check className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400 shrink-0" />}
+                        {isCurrent && <Check className="w-3.5 h-3.5 text-accent-hover dark:text-accent shrink-0" />}
                       </button>
                     );
                   })}
@@ -1402,9 +1481,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       setIsWorkspaceDropdownOpen(false);
                       window.dispatchEvent(new CustomEvent('open-workspace-manager', { detail: { mode: 'create' } }));
                     }}
-                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5 text-blue-500" />
+                    <Plus className="w-3.5 h-3.5 text-accent" />
                     New Space
                   </button>
                   <button
@@ -1412,7 +1491,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       setIsWorkspaceDropdownOpen(false);
                       window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                     }}
-                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/10 rounded-md transition-colors cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5" />
                     Manage
@@ -1507,7 +1586,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
+                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-black/[0.08] dark:bg-white/15 ring-2 ring-accent/50' : ''}`}
                   >
                     <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -1515,7 +1594,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
                     {editingFolderId === folder.id ? (
                       <input autoFocus aria-label="Folder name" title="Enter to save, Escape to cancel" maxLength={100}
-                        className="min-w-0 flex-1 rounded px-1 py-0.5 text-xs bg-white dark:bg-slate-800 outline-none ring-1 ring-slate-400"
+                        className="min-w-0 flex-1 rounded px-1 py-0.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none ring-1 ring-accent/60"
                         value={folderName} onChange={event => setFolderName(event.target.value)}
                         onFocus={event => event.target.select()}
                         onBlur={() => setEditingFolderId(null)}
@@ -1591,12 +1670,16 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         {/* 7. BOTTOM DOCK FOOTER */}
         <div
           className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          style={{
+            WebkitAppRegion: 'no-drag',
+            borderColor: 'var(--nova-sidebar-border, var(--sidebar-border))',
+            borderTopWidth: 'var(--nova-sidebar-border-width, 1px)',
+          } as React.CSSProperties}
           ref={libraryRef}
         >
           <button
             onClick={() => setIsLibraryDropdownOpen(!isLibraryDropdownOpen)}
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
             title="Library"
           >
             <Package className="w-4 h-4" />
@@ -1610,12 +1693,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
                 className="absolute bottom-12 left-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
               >
                 {onToggleAIAssistant && (
                   <button
                     onClick={() => { onToggleAIAssistant(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer font-medium"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors text-left cursor-pointer font-medium"
                   >
                     <NovaAssistantIcon size={14} active={isAIAssistantOpen} />
                     {isMac ? 'Nova AI Assistant (⌘I)' : 'Nova AI Assistant (Ctrl+I)'}
@@ -1624,7 +1708,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenDownloads && (
                   <button
                     onClick={() => { onOpenDownloads(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5 text-slate-400" />
                     {isMac ? 'Downloads (⌘J)' : 'Downloads (Ctrl+J)'}
@@ -1633,7 +1717,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenHistory && (
                   <button
                     onClick={() => { onOpenHistory(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     History
@@ -1642,7 +1726,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenAccount && (
                   <button
                     onClick={() => { onOpenAccount(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Cloud className="w-3.5 h-3.5 text-slate-400" />
                     Nova Sync
@@ -1651,7 +1735,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenSettings && (
                   <button
                     onClick={() => { onOpenSettings(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5 text-slate-400" />
                     Settings
@@ -1660,7 +1744,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenHelp && (
                   <button
                     onClick={() => { onOpenHelp(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
                     Help & Support
@@ -1674,7 +1758,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {onCreateFolder && (
               <button
                 onClick={onCreateFolder}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
                 title="New Folder"
               >
                 <FolderPlus className="w-4 h-4" />
@@ -1682,7 +1766,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             )}
             <button
               onClick={() => onNewTab()}
-              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
               title="New Tab"
             >
               <Plus className="w-4 h-4" />

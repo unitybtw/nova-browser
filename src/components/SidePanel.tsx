@@ -111,7 +111,7 @@ const MARKDOWN_COMPONENTS: Components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-cyan-500 underline hover:text-cyan-400 break-all"
+        className="text-accent underline hover:text-accent-hover dark:hover:text-accent-light break-all"
       >
         {children}
       </a>
@@ -125,7 +125,7 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
   code: ({ inline, children }: any) =>
     inline ? (
-      <code className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-cyan-600 dark:text-cyan-400 font-mono text-[11.5px] break-all border border-slate-200/60 dark:border-white/5">
+      <code className="px-1.5 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/10 text-accent-hover dark:text-accent font-mono text-[11.5px] break-all border border-slate-200/60 dark:border-white/5">
         {children}
       </code>
     ) : (
@@ -174,11 +174,11 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
       className={`flex flex-col gap-1.5 w-full ${isUser ? 'items-end' : 'items-start'} group`}
     >
       {/* Sender Tag */}
-      <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-400 font-medium">
+      <div className="flex items-center gap-1.5 px-1 text-[11px] font-medium" style={{ color: 'var(--nova-aiPanel-muted, var(--muted-foreground, #94a3b8))' }}>
         {isUser ? (
           <span>You</span>
         ) : (
-          <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
+          <div className="flex items-center gap-1.5 text-accent-hover dark:text-accent font-semibold">
             <NovaAssistantIcon size={12} active />
             <span>Nova Assistant</span>
           </div>
@@ -187,11 +187,14 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
 
       {/* Reasoning Accordion (DeepSeek/Claude style) */}
       {!isUser && msg.reasoning && (
-        <div className="w-full max-w-[92%] rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-2xs">
+        <div
+          style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+          className="w-full max-w-[92%] rounded-xl border border-slate-200/80 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.05] backdrop-blur-sm overflow-hidden shadow-2xs"
+        >
           <button
             type="button"
             onClick={() => onToggleReasoning(idx)}
-            className="flex w-full items-center justify-between px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer select-none"
+            className="flex w-full items-center justify-between px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer select-none"
           >
             <div className="flex items-center gap-2">
               <Brain className="w-3.5 h-3.5 text-purple-500" />
@@ -218,9 +221,10 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
           {msg.toolCalls.map((tc) => (
             <div
               key={tc.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 shadow-2xs"
+              style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-black/[0.04] dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 shadow-2xs"
             >
-              <Zap className="w-3 h-3 text-cyan-500" />
+              <Zap className="w-3 h-3 text-accent" />
               <span className="font-semibold text-slate-700 dark:text-slate-200">{tc.name}</span>
               {tc.durationMs && (
                 <span className="text-[9.5px] text-slate-400">
@@ -241,10 +245,14 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
 
       {/* Message Bubble */}
       <div
+        style={!isUser ? {
+          borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))',
+          color: 'var(--nova-aiPanel-text, var(--foreground))',
+        } : undefined}
         className={`max-w-[92%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed overflow-hidden shadow-2xs transition-all relative ${
           isUser
             ? 'bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 rounded-tr-xs font-normal border border-slate-800/80 dark:border-white/10'
-            : 'bg-white/95 dark:bg-slate-900/80 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-white/10 backdrop-blur-sm prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-950 prose-pre:border prose-pre:border-slate-800 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs prose-pre:text-slate-100'
+            : 'bg-white/80 dark:bg-white/[0.05] text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-white/10 backdrop-blur-sm prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-950 prose-pre:border prose-pre:border-slate-800 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs prose-pre:text-slate-100'
         }`}
       >
         {isUser ? (
@@ -824,8 +832,19 @@ export const SidePanel = React.memo(({
             width: { duration: 0.32, ease: [0.16, 1, 0.3, 1] },
             opacity: { duration: 0.24, ease: [0.16, 1, 0.3, 1] }
           }}
-          style={{ willChange: 'width, opacity' }}
-          className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-8px_0_24px_-6px_rgba(0,0,0,0.08)] dark:shadow-[-8px_0_24px_-6px_rgba(0,0,0,0.25)] overflow-hidden select-none"
+          style={{
+            willChange: 'width, opacity',
+            background: 'var(--nova-aiPanel-bg, var(--nova-card-bg, rgba(15, 23, 42, 0.96)))',
+            color: 'var(--nova-aiPanel-text, var(--foreground))',
+            borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))',
+            borderLeftWidth: 'var(--nova-aiPanel-border-width, 1px)',
+            backdropFilter: 'blur(var(--nova-aiPanel-blur, 24px))',
+            WebkitBackdropFilter: 'blur(var(--nova-aiPanel-blur, 24px))',
+            boxShadow: 'var(--nova-aiPanel-shadow, -8px 0 24px -6px rgba(0, 0, 0, 0.18))',
+            borderRadius: 'var(--nova-aiPanel-radius, 0px)',
+            fontFamily: 'var(--nova-font-ui, inherit)',
+          }}
+          className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 flex flex-col z-20 overflow-hidden select-none"
         >
           <motion.div
             initial={{ opacity: 0 }}
@@ -841,12 +860,12 @@ export const SidePanel = React.memo(({
               <div className="flex items-center justify-between min-h-[30px]">
                 {/* Left: Brand title & model indicator */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-100">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs" style={{ color: 'var(--nova-aiPanel-text, var(--foreground))' }}>
                     <NovaAssistantIcon size={15} active={isLoading || isInitializing} />
                     <span className="tracking-tight font-medium">Nova AI</span>
                   </div>
                   {isInitializing ? (
-                    <div className="flex items-center gap-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                    <div className="flex items-center gap-1 text-[11px] text-accent-hover dark:text-accent font-mono">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       <span>{downloadProgress > 0 ? `${downloadProgress}%` : ''}</span>
                     </div>
@@ -854,7 +873,8 @@ export const SidePanel = React.memo(({
                     <button
                       type="button"
                       onClick={() => setIsModelMenuOpen((prev) => !prev)}
-                      className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+                      className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.08] dark:hover:bg-white/10 transition-colors cursor-pointer"
                       title={isTr ? 'Model ve Sağlayıcı Değiştir' : 'Switch Model or Provider'}
                     >
                       <span className="truncate max-w-[140px]">{displayModelBadge}</span>
@@ -869,7 +889,7 @@ export const SidePanel = React.memo(({
                     <button
                       type="button"
                       onClick={handleResetChat}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors cursor-pointer"
                       title={isTr ? 'Sohbeti Temizle' : 'Reset Chat'}
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -879,7 +899,7 @@ export const SidePanel = React.memo(({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors cursor-pointer"
                     title={isTr ? 'Kapat' : 'Close'}
                   >
                     <X className="w-4 h-4" />
@@ -896,10 +916,23 @@ export const SidePanel = React.memo(({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
                     transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-full left-3.5 right-3.5 mt-1 z-30 bg-white/95 dark:bg-slate-900/98 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 space-y-3 select-none"
+                    style={{
+                      background: 'var(--nova-popovers-bg, var(--nova-card-bg))',
+                      color: 'var(--nova-popovers-text, var(--foreground))',
+                      borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))',
+                      borderWidth: 'var(--nova-popovers-border-width, 1px)',
+                      borderRadius: 'var(--nova-popovers-radius, 16px)',
+                      backdropFilter: 'blur(var(--nova-popovers-blur, 20px))',
+                      WebkitBackdropFilter: 'blur(var(--nova-popovers-blur, 20px))',
+                      boxShadow: 'var(--nova-popovers-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.25))',
+                    }}
+                    className="absolute top-full left-3.5 right-3.5 mt-1 z-30 bg-white/95 dark:bg-slate-900/98 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 space-y-3 select-none"
                   >
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    <div
+                      style={{ borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))' }}
+                      className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800"
+                    >
+                      <span className="text-xs font-semibold">
                         {isTr ? 'Sağlayıcı & Model Değiştir' : 'Switch Provider & Model'}
                       </span>
                       {onOpenSettings && (
@@ -909,7 +942,7 @@ export const SidePanel = React.memo(({
                             setIsModelMenuOpen(false);
                             onOpenSettings('nova://settings#ai');
                           }}
-                          className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                          className="text-[11px] text-accent-hover dark:text-accent hover:underline flex items-center gap-1 font-medium cursor-pointer"
                         >
                           <Settings className="w-3 h-3" />
                           {isTr ? 'AI Ayarları' : 'AI Settings'}
@@ -919,7 +952,7 @@ export const SidePanel = React.memo(({
 
                     {/* Provider Quick Grid */}
                     <div className="space-y-1">
-                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nova-popovers-muted, var(--muted-foreground, #94a3b8))' }}>
                         {isTr ? 'Sağlayıcılar' : 'Providers'}
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
@@ -928,8 +961,8 @@ export const SidePanel = React.memo(({
                           onClick={() => handleQuickSwitchPreset('webgpu')}
                           className={`px-2 py-1.5 rounded-lg text-left text-xs transition-colors flex items-center gap-2 cursor-pointer ${
                             aiAgent.getBackend() === 'webgpu'
-                              ? 'bg-blue-600 text-white font-medium'
-                              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              ? 'bg-accent text-accent-text font-medium'
+                              : 'bg-black/[0.04] dark:bg-white/[0.06] opacity-85 hover:opacity-100 hover:bg-black/[0.08] dark:hover:bg-white/[0.12]'
                           }`}
                         >
                           <Cpu className="w-3.5 h-3.5 shrink-0" />
@@ -948,8 +981,8 @@ export const SidePanel = React.memo(({
                               onClick={() => handleQuickSwitchPreset(p.id)}
                               className={`px-2 py-1.5 rounded-lg text-left text-xs transition-colors flex items-center gap-2 cursor-pointer ${
                                 isSelected
-                                  ? 'bg-blue-600 text-white font-medium'
-                                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                  ? 'bg-accent text-accent-text font-medium'
+                                  : 'bg-black/[0.04] dark:bg-white/[0.06] opacity-85 hover:opacity-100 hover:bg-black/[0.08] dark:hover:bg-white/[0.12]'
                               }`}
                             >
                               <Server className="w-3.5 h-3.5 shrink-0" />
@@ -965,8 +998,11 @@ export const SidePanel = React.memo(({
 
                     {/* Model Quick Switcher */}
                     {aiAgent.getBackend() === 'webgpu' ? (
-                      <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
-                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      <div
+                        style={{ borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))' }}
+                        className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800"
+                      >
+                        <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nova-popovers-muted, var(--muted-foreground, #94a3b8))' }}>
                           {isTr ? 'WebGPU Modelleri' : 'WebGPU Models'}
                         </div>
                         <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
@@ -977,8 +1013,8 @@ export const SidePanel = React.memo(({
                               onClick={() => handleQuickSwitchModel(m.id)}
                               className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                                 selectedModelId === m.id
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                                  ? 'bg-accent text-accent-text border-accent'
+                                  : 'bg-black/[0.04] dark:bg-white/[0.06] opacity-85 hover:opacity-100 border-slate-200/80 dark:border-white/10 hover:border-accent/60'
                               }`}
                             >
                               {m.name.split('(')[0].trim()}
@@ -987,8 +1023,11 @@ export const SidePanel = React.memo(({
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
-                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      <div
+                        style={{ borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))' }}
+                        className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800"
+                      >
+                        <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nova-popovers-muted, var(--muted-foreground, #94a3b8))' }}>
                           {isTr ? 'Popüler Modeller' : 'Popular Models'}
                         </div>
                         <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
@@ -1001,8 +1040,8 @@ export const SidePanel = React.memo(({
                                 onClick={() => handleQuickSwitchModel(m)}
                                 className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                                   currentModelName === m
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                                    ? 'bg-accent text-accent-text border-accent'
+                                    : 'bg-black/[0.04] dark:bg-white/[0.06] opacity-85 hover:opacity-100 border-slate-200/80 dark:border-white/10 hover:border-accent/60'
                                 }`}
                               >
                                 {m}
@@ -1028,24 +1067,24 @@ export const SidePanel = React.memo(({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-3.5 rounded-2xl border border-cyan-500/30 bg-cyan-50/50 dark:bg-cyan-950/20 shadow-sm"
+            className="p-3.5 rounded-2xl border border-accent/30 bg-accent/10 shadow-sm"
           >
             <div className="flex items-center justify-between mb-2 text-xs">
-              <div className="flex items-center gap-2 font-semibold text-cyan-700 dark:text-cyan-300">
+              <div className="flex items-center gap-2 font-semibold text-accent-hover dark:text-accent">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>{currentModel.name.split('(')[0].trim()}</span>
               </div>
-              <span className="text-[10.5px] font-mono text-cyan-600 dark:text-cyan-400">
+              <span className="text-[10.5px] font-mono text-accent-hover dark:text-accent">
                 {downloadProgress}%
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
               <div
-                className="h-full bg-cyan-500 transition-all duration-300 ease-out"
+                className="h-full bg-accent transition-all duration-300 ease-out"
                 style={{ width: `${downloadProgress}%` }}
               />
             </div>
-            <p className="mt-1.5 text-[10.5px] text-slate-500 dark:text-slate-400 truncate">
+            <p className="mt-1.5 text-[10.5px] truncate" style={{ color: 'var(--nova-aiPanel-muted, var(--muted-foreground, #64748b))' }}>
               {downloadStatusText || (isTr ? 'Ağırlıklar diske indiriliyor...' : 'Downloading model weights...')}
             </p>
           </motion.div>
@@ -1054,13 +1093,16 @@ export const SidePanel = React.memo(({
         {/* Empty State */}
         {messages.length === 0 && !isLoading && (
           <div className="my-auto flex flex-col items-center justify-center text-center px-4 py-8">
-            <div className="mb-3.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 text-cyan-500 shadow-2xs">
+            <div
+              style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+              className="mb-3.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-black/[0.04] dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/10 text-accent shadow-2xs"
+            >
               <NovaAssistantIcon size={20} active={false} />
             </div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--nova-aiPanel-text, var(--foreground))' }}>
               {isTr ? 'Nova Asistan' : 'Nova Assistant'}
             </h3>
-            <p className="mt-1 max-w-[250px] text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="mt-1 max-w-[250px] text-xs leading-relaxed" style={{ color: 'var(--nova-aiPanel-muted, var(--muted-foreground, #64748b))' }}>
               {isTr
                 ? 'Bu sayfa hakkında soru sorun, web’de arayın veya sekmelerinizi yönetin.'
                 : 'Ask about this page, search the web, or manage your tabs.'}
@@ -1071,27 +1113,30 @@ export const SidePanel = React.memo(({
               <button
                 type="button"
                 onClick={() => handleSendPrompt(isTr ? 'Yeni sekme aç' : 'Open new tab')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
+                style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.07] dark:hover:bg-white/[0.09] text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs opacity-85 hover:opacity-100 group cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-accent shrink-0 transition-colors" />
                 <span className="truncate">{isTr ? 'Yeni sekme aç' : 'Open new tab'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendPrompt(isTr ? 'Açık sekmeleri listele' : 'List open tabs')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
+                style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.07] dark:hover:bg-white/[0.09] text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs opacity-85 hover:opacity-100 group cursor-pointer"
               >
-                <Layers className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <Layers className="w-3.5 h-3.5 text-slate-400 group-hover:text-accent shrink-0 transition-colors" />
                 <span className="truncate">{isTr ? 'Açık sekmeleri listele' : 'List open tabs'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendPrompt(isTr ? 'Web üzerinde en son haberleri ara' : 'Search latest news on web')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
+                style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.07] dark:hover:bg-white/[0.09] text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs opacity-85 hover:opacity-100 group cursor-pointer"
               >
-                <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-accent shrink-0 transition-colors" />
                 <span className="truncate">{isTr ? 'En son haberleri ara' : 'Search latest news'}</span>
               </button>
             </div>
@@ -1123,7 +1168,7 @@ export const SidePanel = React.memo(({
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col gap-1.5 w-full items-start"
           >
-            <div className="flex items-center gap-1.5 px-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">
+            <div className="flex items-center gap-1.5 px-1 text-[11px] text-accent-hover dark:text-accent font-semibold">
               <NovaAssistantIcon size={12} active />
               <span>Nova Assistant</span>
               {streamStartTime && (
@@ -1132,15 +1177,21 @@ export const SidePanel = React.memo(({
                 </span>
               )}
             </div>
-            <div className="max-w-[92%] rounded-2xl rounded-tl-xs px-4 py-3 bg-white/95 dark:bg-slate-900/80 border border-slate-200/90 dark:border-white/10 text-slate-800 dark:text-slate-100 text-[13px] leading-relaxed shadow-2xs">
+            <div
+              style={{
+                borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))',
+                color: 'var(--nova-aiPanel-text, var(--foreground))',
+              }}
+              className="max-w-[92%] rounded-2xl rounded-tl-xs px-4 py-3 bg-white/80 dark:bg-white/[0.05] border border-slate-200/90 dark:border-white/10 text-slate-800 dark:text-slate-100 text-[13px] leading-relaxed shadow-2xs"
+            >
               {streamingText ? (
                 <>
                   <span className="whitespace-pre-wrap break-words">{streamingText}</span>
-                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-500 animate-pulse rounded-full align-middle" />
+                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-accent animate-pulse rounded-full align-middle" />
                 </>
               ) : (
                 <div className="flex items-center gap-2 text-slate-400 font-medium text-xs">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
                   <span>{agentStatusText || (isTr ? 'Düşünüyor veya işlem yapıyor...' : 'Thinking or executing action...')}</span>
                 </div>
               )}
@@ -1153,7 +1204,12 @@ export const SidePanel = React.memo(({
           <button
             type="button"
             onClick={() => scrollToBottom(true)}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/95 dark:bg-slate-800/95 border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-200 shadow-lg backdrop-blur-md hover:border-cyan-400/60 hover:text-cyan-600 dark:hover:text-cyan-300 transition-all cursor-pointer"
+            style={{
+              background: 'var(--nova-popovers-bg, var(--nova-card-bg))',
+              color: 'var(--nova-popovers-text, var(--foreground))',
+              borderColor: 'var(--nova-popovers-border, var(--nova-border-subtle))',
+            }}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/95 dark:bg-slate-800/95 border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-200 shadow-lg backdrop-blur-md hover:border-accent/60 hover:text-accent-hover dark:hover:text-accent transition-all cursor-pointer"
             title={isTr ? 'En alta git' : 'Scroll to bottom'}
           >
             <ChevronDown className="w-3.5 h-3.5" />
@@ -1163,7 +1219,10 @@ export const SidePanel = React.memo(({
       </div>
 
       {/* 3. MODERN SPRING PHYSICS PROMPT INPUT */}
-      <footer className="p-3 pt-2 bg-transparent border-t border-slate-200/50 dark:border-white/5 flex justify-center">
+      <footer
+        style={{ borderColor: 'var(--nova-aiPanel-border, var(--nova-border-subtle))' }}
+        className="p-3 pt-2 bg-transparent border-t border-slate-200/50 dark:border-white/5 flex justify-center"
+      >
         <PromptInput
           fullWidth
           className="w-full"
