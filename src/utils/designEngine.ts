@@ -167,7 +167,8 @@ export function designToCssVariables(
     const z = design.surfaces[zone];
     const baseBg = z?.bg && z.bg !== 'inherit' ? z.bg : fallbackBg[zone];
     const opacity = z?.opacity ?? 1;
-    vars[`--nova-${zone}-bg`] = opacity < 1 && baseBg !== 'transparent'
+    const isGradient = /gradient\(/i.test(baseBg);
+    vars[`--nova-${zone}-bg`] = opacity < 1 && baseBg !== 'transparent' && !isGradient
       ? `color-mix(in srgb, ${baseBg} ${Math.round(opacity * 100)}%, transparent)`
       : baseBg;
     if (z?.textColor && z.textColor !== 'inherit') {
@@ -188,10 +189,7 @@ export function designToCssVariables(
   }
 
   // Keep existing core tokens synchronized with per-zone overrides so legacy selectors inherit immediately
-  vars['--nova-frame-bg'] = vars['--nova-frame-bg'];
   vars['--nova-header-bg'] = vars['--nova-tabBar-bg'];
-  vars['--nova-toolbar-bg'] = vars['--nova-toolbar-bg'];
-  vars['--nova-sidebar-bg'] = vars['--nova-sidebar-bg'];
   vars['--nova-active-tab-bg'] = vars['--nova-activeTab-bg'];
   vars['--nova-card-bg'] = vars['--nova-popovers-bg'];
 

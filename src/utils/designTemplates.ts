@@ -46,7 +46,7 @@ export const STARTER_DESIGN_TEMPLATES: StarterDesignTemplate[] = [
       },
       density: 'compact',
       surfaces: {
-        omnibox: { radius: 999 },
+        omnibox: { radius: 24 },
         activeTab: { radius: 12 },
       },
     },

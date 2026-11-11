@@ -48,6 +48,7 @@ assert.equal(getStarterTemplateById('nonexistent-template'), undefined);
 const zen = getStarterTemplateById('zen-compact')!;
 assert.equal(zen.profile.layout.chromeMode, 'compact-single-row');
 assert.equal(zen.profile.density, 'compact');
+assert.equal(zen.profile.surfaces.omnibox?.radius, 24);
 
 const arc = getStarterTemplateById('arc-studio')!;
 assert.equal(arc.profile.layout.chromeMode, 'vertical-left');
@@ -230,11 +231,46 @@ assert.equal(varsDark['--nova-toolbar-height'], '50px'); // comfortable density
 assert.equal(varsDark['--nova-tab-height'], '42px');
 
 // Legacy variable synchronization
-assert.equal(varsDark['--nova-toolbar-bg'], varsDark['--nova-toolbar-bg']);
-assert.equal(varsDark['--nova-sidebar-bg'], varsDark['--nova-sidebar-bg']);
+assert.equal(varsDark['--nova-toolbar-bg'], '#112233');
+assert.equal(varsDark['--nova-sidebar-bg'], '#0f172a');
 assert.equal(varsDark['--nova-header-bg'], varsDark['--nova-tabBar-bg']);
 assert.equal(varsDark['--nova-active-tab-bg'], varsDark['--nova-activeTab-bg']);
 assert.equal(varsDark['--nova-card-bg'], varsDark['--nova-popovers-bg']);
+
+// Gradient background + opacity < 1 bypasses color-mix (CSS color-mix does not support <image> gradients)
+const gradientDesign: ResolvedBrowserDesign = {
+  ...workResolved,
+  surfaces: {
+    ...workResolved.surfaces,
+    toolbar: {
+      bg: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+      opacity: 0.8,
+    },
+    sidebar: {
+      bg: 'radial-gradient(circle at top, #0f172a, #020617)',
+      opacity: 0.65,
+    },
+  },
+};
+const varsGradient = designToCssVariables(gradientDesign, true);
+assert.equal(
+  varsGradient['--nova-toolbar-bg'],
+  'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+  'linear-gradient must not produce color-mix'
+);
+assert.ok(
+  !varsGradient['--nova-toolbar-bg'].includes('color-mix'),
+  'linear-gradient must bypass color-mix'
+);
+assert.equal(
+  varsGradient['--nova-sidebar-bg'],
+  'radial-gradient(circle at top, #0f172a, #020617)',
+  'radial-gradient must not produce color-mix'
+);
+assert.ok(
+  !varsGradient['--nova-sidebar-bg'].includes('color-mix'),
+  'radial-gradient must bypass color-mix'
+);
 
 // Opacity color-mix formula test
 const translucentDesign: ResolvedBrowserDesign = {
