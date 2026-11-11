@@ -52,9 +52,26 @@ import {
   Compass,
   Cloud,
   Languages,
-  PictureInPicture2
+  PictureInPicture2,
+  LayoutGrid,
+  SlidersHorizontal
 } from 'lucide-react';
-import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
+import {
+  Tab,
+  Bookmark,
+  Workspace,
+  PermissionRequest,
+  Extension,
+  UserSettings,
+  DownloadItem,
+  ChromeMode,
+  TabBarPosition,
+  ToolbarItemKind,
+  ToolbarSlotItem,
+} from '../types/browser';
+import type { ResolvedBrowserDesign } from '../utils/designEngine';
+import { ALLOWED_TOOLBAR_KINDS, TOOLBAR_ITEM_ORDER_DEFAULT } from '../utils/designDefaults';
+import { CustomizeSlotWrapper, getToolbarItemMeta } from './customization/toolbarRegistry';
 import { getWorkspaceIcon, WORKSPACE_COLORS } from '../utils/workspaceIcons';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
@@ -108,7 +125,7 @@ const isFromNestedControl = (e: React.SyntheticEvent<HTMLElement>): boolean => {
   return !!target.closest('button, a, input, select, textarea');
 };
 
-interface TopBarProps {
+export interface TopBarProps {
   tabs: Tab[];
   workspaces?: Workspace[];
   activeWorkspaceId?: string;
@@ -161,6 +178,7 @@ interface TopBarProps {
   downloads?: DownloadItem[];
   onClearDownloads?: () => void;
   showBookmarksBar?: boolean;
+  onToggleBookmarksBar?: () => void;
   onToggleReaderMode?: () => void;
   onOpenExtensions: () => void;
   extensions?: Extension[];
@@ -177,6 +195,187 @@ interface TopBarProps {
   onDismissPermission?: (requestId: string) => void;
   privacyShield?: boolean;
   onTogglePrivacyShield?: () => void;
+  design?: ResolvedBrowserDesign;
+  isCustomizeMode?: boolean;
+  onReorderToolbarSlot?: (draggedId: string, targetId: string) => void;
+  onMoveToolbarSlotToIndex?: (draggedId: string, targetIndex: number) => void;
+  onInsertToolbarSlot?: (kind: ToolbarItemKind, atIndex: number) => void;
+  onToggleToolbarSlotVisibility?: (id: string) => void;
+  onRemoveToolbarSlot?: (id: string) => void;
+  onOpenCustomizeMode?: () => void;
+}
+
+export interface TopBarLayoutConfig {
+  chromeMode: ChromeMode;
+  tabBarPosition: TabBarPosition;
+  isVerticalChrome: boolean;
+  isCompactSingleRow: boolean;
+  toolbarItems: ToolbarSlotItem[];
+  toolbarShowLabels: boolean;
+  omniboxMaxWidth: 'compact' | 'balanced' | 'full';
+  reduceMotion: boolean;
+}
+
+export function resolveTopBarLayoutConfig(
+  design?: ResolvedBrowserDesign,
+  useVerticalTabs = false
+): TopBarLayoutConfig {
+  const chromeMode: ChromeMode =
+    design?.layout?.chromeMode ?? (useVerticalTabs ? 'vertical-left' : 'classic-top');
+  const isVerticalChrome =
+    Boolean(useVerticalTabs) || chromeMode === 'vertical-left' || chromeMode === 'vertical-right';
+  const isCompactSingleRow = !isVerticalChrome && chromeMode === 'compact-single-row';
+  const tabBarPosition: TabBarPosition = design?.layout?.tabBarPosition ?? 'above-toolbar';
+  const rawItems = design?.layout?.toolbarItems;
+  const toolbarItems =
+    Array.isArray(rawItems) && rawItems.length > 0 ? rawItems : TOOLBAR_ITEM_ORDER_DEFAULT;
+  const toolbarShowLabels = Boolean(design?.layout?.toolbarShowLabels);
+  const omniboxMaxWidth = design?.layout?.omniboxMaxWidth ?? 'balanced';
+  const reduceMotion = Boolean(design?.effects?.reduceChromeMotion);
+
+  return {
+    chromeMode,
+    tabBarPosition,
+    isVerticalChrome,
+    isCompactSingleRow,
+    toolbarItems,
+    toolbarShowLabels,
+    omniboxMaxWidth,
+    reduceMotion,
+  };
+}
+
+export function getOmniboxWidthClass(
+  omniboxMaxWidth: 'compact' | 'balanced' | 'full'
+): string {
+  if (omniboxMaxWidth === 'compact') return 'max-w-md';
+  if (omniboxMaxWidth === 'balanced') return 'max-w-2xl';
+  return '';
+}
+
+export function parseToolbarDropPayload(
+  getData: (type: string) => string
+): { type: 'slot'; draggedId: string } | { type: 'kind'; kind: ToolbarItemKind } | null {
+  const draggedSlotId = (getData('application/x-nova-toolbar-slot') || '').trim();
+  if (draggedSlotId) {
+    return { type: 'slot', draggedId: draggedSlotId };
+  }
+  const kindRaw = (getData('application/x-nova-toolbar-kind') || '').trim();
+  if (kindRaw && ALLOWED_TOOLBAR_KINDS.includes(kindRaw as ToolbarItemKind)) {
+    return { type: 'kind', kind: kindRaw as ToolbarItemKind };
+  }
+  return null;
+}
+
+export function resolveDropInsertionIndex(
+  items: ToolbarSlotItem[],
+  draggedId: string,
+  rawTargetIndex: number
+): number {
+  const fromIdx = items.findIndex((i) => i.id === draggedId);
+  if (fromIdx === -1) return Math.max(0, rawTargetIndex);
+  if (fromIdx < rawTargetIndex) {
+    return Math.max(0, rawTargetIndex - 1);
+  }
+  return Math.max(0, rawTargetIndex);
+}
+
+export function topBarPropsEqual(prevProps: TopBarProps, nextProps: TopBarProps): boolean {
+  // Compare only rendered fields — tabs array identity changes on every webview
+  // event. Callback props from App are stable useCallback references (or closed over
+  // fields already checked below).
+  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
+  if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
+  if (prevProps.activeDownloadsCount !== nextProps.activeDownloadsCount) return false;
+  if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
+  if (prevProps.showBookmarksBar !== nextProps.showBookmarksBar) return false;
+  if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;
+  if (prevProps.isSplitView !== nextProps.isSplitView) return false;
+  if (prevProps.tabStyle !== nextProps.tabStyle) return false;
+  if (prevProps.tabAnimation !== nextProps.tabAnimation) return false;
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
+  if (prevProps.isVpnEnabled !== nextProps.isVpnEnabled) return false;
+  if (prevProps.splitTabId !== nextProps.splitTabId) return false;
+  // Drives the AI pill's active state and sparkle; toggling the assistant only
+  // flips this prop, so without the check the pill never repainted.
+  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
+  if (prevProps.design !== nextProps.design) return false;
+  if (prevProps.isCustomizeMode !== nextProps.isCustomizeMode) return false;
+  if (prevProps.extensions !== nextProps.extensions) return false;
+
+  // Customization & modular toolbar callbacks
+  if (prevProps.onReorderToolbarSlot !== nextProps.onReorderToolbarSlot) return false;
+  if (prevProps.onMoveToolbarSlotToIndex !== nextProps.onMoveToolbarSlotToIndex) return false;
+  if (prevProps.onInsertToolbarSlot !== nextProps.onInsertToolbarSlot) return false;
+  if (prevProps.onToggleToolbarSlotVisibility !== nextProps.onToggleToolbarSlotVisibility) return false;
+  if (prevProps.onRemoveToolbarSlot !== nextProps.onRemoveToolbarSlot) return false;
+  if (prevProps.onOpenCustomizeMode !== nextProps.onOpenCustomizeMode) return false;
+  if (prevProps.onToggleBookmarksBar !== nextProps.onToggleBookmarksBar) return false;
+
+  // Presence checks for conditional toolbar actions
+  if (Boolean(prevProps.onOpenAccount) !== Boolean(nextProps.onOpenAccount)) return false;
+  if (Boolean(prevProps.onTogglePip) !== Boolean(nextProps.onTogglePip)) return false;
+  if (Boolean(prevProps.onTakeScreenshot) !== Boolean(nextProps.onTakeScreenshot)) return false;
+  if (Boolean(prevProps.onOpenShare) !== Boolean(nextProps.onOpenShare)) return false;
+  if (Boolean(prevProps.onOpenHelp) !== Boolean(nextProps.onOpenHelp)) return false;
+
+  // Array-valued props compared by reference (state arrays from App; stable
+  // unless actually changed)
+  if (prevProps.workspaces !== nextProps.workspaces) return false;
+  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+  // `downloads` now arrives as a stable reference while the popover is closed
+  // (see EMPTY_DOWNLOADS), so a plain reference check no longer repaints the
+  // strip on every progress broadcast. The badge only needs the count.
+  if (prevProps.downloads !== nextProps.downloads) return false;
+  if ((prevProps.activeDownloadsCount || 0) !== (nextProps.activeDownloadsCount || 0)) return false;
+  if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
+
+  // Tabs: length + order-sensitive per-field comparison of every field the
+  // strip or the active-tab-derived UI reads:
+  //   strip items: id, url, title, favicon, isLoading, isMuted, isPinned,
+  //                isPlayingAudio, isSuspended, splitWith, isIncognito
+  //   active tab:  canGoBack, canGoForward, zoomFactor, blockedAdsCount,
+  //                webContentsId (+ url/title/favicon/id above)
+  const prevTabs = prevProps.tabs;
+  const nextTabs = nextProps.tabs;
+  if (prevTabs === nextTabs) return true;
+  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
+  for (let i = 0; i < prevTabs.length; i++) {
+    const a = prevTabs[i];
+    const b = nextTabs[i];
+    if (a === b) continue;
+    if (
+      a.id !== b.id ||
+      a.url !== b.url ||
+      a.title !== b.title ||
+      a.favicon !== b.favicon ||
+      a.isLoading !== b.isLoading ||
+      a.isMuted !== b.isMuted ||
+      a.isPinned !== b.isPinned ||
+      a.isIncognito !== b.isIncognito ||
+      a.isPlayingAudio !== b.isPlayingAudio ||
+      a.isInPip !== b.isInPip ||
+      a.isSuspended !== b.isSuspended ||
+      a.isTranslated !== b.isTranslated ||
+      a.splitWith !== b.splitWith
+    ) {
+      return false;
+    }
+    if (a.id === nextProps.activeTabId) {
+      if (
+        a.canGoBack !== b.canGoBack ||
+        a.canGoForward !== b.canGoForward ||
+        a.zoomFactor !== b.zoomFactor ||
+        a.blockedAdsCount !== b.blockedAdsCount ||
+        a.webContentsId !== b.webContentsId
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 const MemoizedTabItem = React.memo(
@@ -800,8 +999,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onToggleAIAssistant,
   isAIAssistantOpen = false,
   showBookmarksBar = false,
+  onToggleBookmarksBar,
   onToggleReaderMode,
   onOpenExtensions,
+  extensions: propExtensions,
   onOpenAccount,
   onTabDragStart,
   onTabDragEnd,
@@ -813,7 +1014,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onRespondPermission,
   onDismissPermission,
   privacyShield = true,
-  onTogglePrivacyShield
+  onTogglePrivacyShield,
+  design,
+  isCustomizeMode = false,
+  onReorderToolbarSlot,
+  onMoveToolbarSlotToIndex,
+  onInsertToolbarSlot,
+  onToggleToolbarSlotVisibility,
+  onRemoveToolbarSlot,
+  onOpenCustomizeMode,
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
 
@@ -837,8 +1046,20 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     tab: null,
     tabIndex: -1
   });
+  const [topBarContextMenu, setTopBarContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+  });
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+  const topBarContextMenuRef = useRef<HTMLDivElement>(null);
 
   const handleOpenContextMenu = useCallback((targetTab: Tab, index: number, e: React.MouseEvent) => {
+    setTopBarContextMenu(prev => (prev.isOpen ? { ...prev, isOpen: false } : prev));
     const wsId = targetTab.workspaceId || activeWorkspaceId || 'default';
     const wsTabs = tabs.filter(t => (t.workspaceId || 'default') === wsId);
     const wsIdx = wsTabs.findIndex(t => t.id === targetTab.id);
@@ -1159,20 +1380,42 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     };
   }, []);
 
-  const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
+  const [openWorkspaceMenu, setOpenWorkspaceMenu] = useState<'tabbar' | 'toolbar' | 'compact' | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const workspaceDropdownRef = useRef<HTMLDivElement>(null);
+  const tabbarWorkspaceRef = useRef<HTMLDivElement>(null);
+  const toolbarWorkspaceRef = useRef<HTMLDivElement>(null);
+  const compactWorkspaceRef = useRef<HTMLDivElement>(null);
+
+  const layoutConfig = useMemo(
+    () => resolveTopBarLayoutConfig(design, useVerticalTabs),
+    [design, useVerticalTabs]
+  );
+
+  const effectiveExtensions = useMemo(
+    () => (propExtensions ?? extensions).filter((ext) => ext.enabled !== false),
+    [propExtensions, extensions]
+  );
+
+  const activeTabIdForPip = activeTab?.id;
+  const omniboxTogglePip = useMemo(
+    () => (onTogglePip && activeTabIdForPip ? () => onTogglePip(activeTabIdForPip) : undefined),
+    [onTogglePip, activeTabIdForPip]
+  );
 
   useEffect(() => {
-    if (!isWorkspaceDropdownOpen) return;
+    if (!openWorkspaceMenu) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsWorkspaceDropdownOpen(false);
+        setOpenWorkspaceMenu(null);
       }
     };
     const handleClickOutside = (e: MouseEvent) => {
-      if (workspaceDropdownRef.current && !workspaceDropdownRef.current.contains(e.target as Node)) {
-        setIsWorkspaceDropdownOpen(false);
+      const target = e.target as Node;
+      const inTabbar = tabbarWorkspaceRef.current?.contains(target);
+      const inToolbar = toolbarWorkspaceRef.current?.contains(target);
+      const inCompact = compactWorkspaceRef.current?.contains(target);
+      if (!inTabbar && !inToolbar && !inCompact) {
+        setOpenWorkspaceMenu(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -1181,7 +1424,51 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       window.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isWorkspaceDropdownOpen]);
+  }, [openWorkspaceMenu]);
+
+  useEffect(() => {
+    if (!topBarContextMenu.isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setTopBarContextMenu(prev => ({ ...prev, isOpen: false }));
+      }
+    };
+    const handleBlur = () => {
+      setTopBarContextMenu(prev => ({ ...prev, isOpen: false }));
+    };
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!topBarContextMenuRef.current?.contains(e.target as Node)) {
+        setTopBarContextMenu(prev => ({ ...prev, isOpen: false }));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [topBarContextMenu.isOpen]);
+
+  useEffect(() => {
+    if (isCustomizeMode) {
+      setIsMoreMenuOpen(false);
+      setIsDownloadsOpen(false);
+      setIsAdBlockerOpen(false);
+      setOpenWorkspaceMenu(null);
+      setTopBarContextMenu(prev => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+    } else {
+      setDragOverTarget(null);
+    }
+  }, [isCustomizeMode]);
+
+  useEffect(() => {
+    if (!isCustomizeMode) return;
+    const clearDrag = () => setDragOverTarget(null);
+    window.addEventListener('dragend', clearDrag);
+    return () => window.removeEventListener('dragend', clearDrag);
+  }, [isCustomizeMode]);
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
   const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('win');
@@ -1205,459 +1492,926 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     onReload();
   };
 
-  return (
-    <>
-    <header
-      style={!isIncognito ? {
-        background: 'var(--nova-tabBar-bg, var(--nova-header-bg))',
-        color: 'var(--nova-tabBar-text, inherit)',
-        borderColor: 'var(--nova-tabBar-border, var(--nova-border-subtle))',
-        borderBottomWidth: 'var(--nova-tabBar-border-width, 1px)',
-        fontFamily: 'var(--nova-font-ui, inherit)',
-      } : {
-        fontFamily: 'var(--nova-font-ui, inherit)',
-      }}
-      className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}
-    >
-      {/*
-        ROW 1: Tabs & Window Controls spacer
-      */}
-      <AnimatePresence initial={false}>
-      {!useVerticalTabs && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
-          exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
-          transition={{ duration: 0.2 }}
-          style={!isIncognito ? {
-            minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
-            backdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
-            WebkitBackdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
-          } : {
-            minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
-          }}
-          className="flex items-end px-2 pt-2.5 gap-1"
+  const handleTopBarContextMenu = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!onOpenCustomizeMode && !onToggleBookmarksBar) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, textarea, [data-tab-id], [role="menu"]')) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMoreMenuOpen(false);
+    setIsDownloadsOpen(false);
+    setIsAdBlockerOpen(false);
+    setOpenWorkspaceMenu(null);
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+    setTopBarContextMenu({
+      isOpen: true,
+      x: Math.max(8, Math.min(e.clientX, vw - 236)),
+      y: Math.max(8, Math.min(e.clientY, vh - 128)),
+    });
+  }, [onOpenCustomizeMode, onToggleBookmarksBar]);
+
+  const hasToolbarDragTypes = (types: readonly string[] | DOMStringList | undefined): boolean => {
+    if (!types) return false;
+    const list = Array.from(types as Iterable<string>);
+    return (
+      list.includes('application/x-nova-toolbar-slot') ||
+      list.includes('application/x-nova-toolbar-kind')
+    );
+  };
+
+  const handleDropAtGap = useCallback(
+    (e: React.DragEvent<HTMLElement>, rawIndex: number) => {
+      if (!isCustomizeMode) return;
+      const payload = parseToolbarDropPayload((type) => e.dataTransfer?.getData(type) || '');
+      if (!payload) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOverTarget(null);
+
+      if (payload.type === 'slot') {
+        const adjustedIndex = resolveDropInsertionIndex(
+          layoutConfig.toolbarItems,
+          payload.draggedId,
+          rawIndex
+        );
+        if (onMoveToolbarSlotToIndex) {
+          onMoveToolbarSlotToIndex(payload.draggedId, adjustedIndex);
+        } else if (onReorderToolbarSlot && layoutConfig.toolbarItems.length > 0) {
+          const fallbackTarget =
+            layoutConfig.toolbarItems[
+              Math.min(layoutConfig.toolbarItems.length - 1, Math.max(0, adjustedIndex))
+            ];
+          if (fallbackTarget && fallbackTarget.id !== payload.draggedId) {
+            onReorderToolbarSlot(payload.draggedId, fallbackTarget.id);
+          }
+        }
+      } else if (payload.type === 'kind') {
+        onInsertToolbarSlot?.(payload.kind, rawIndex);
+      }
+    },
+    [
+      isCustomizeMode,
+      layoutConfig.toolbarItems,
+      onInsertToolbarSlot,
+      onMoveToolbarSlotToIndex,
+      onReorderToolbarSlot,
+    ]
+  );
+
+  const handleSlotDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, targetSlot: ToolbarSlotItem, idx: number) => {
+      if (!isCustomizeMode) return;
+      const payload = parseToolbarDropPayload((type) => e.dataTransfer?.getData(type) || '');
+      if (!payload) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOverTarget(null);
+
+      if (payload.type === 'slot') {
+        if (payload.draggedId !== targetSlot.id) {
+          onReorderToolbarSlot?.(payload.draggedId, targetSlot.id);
+        }
+      } else if (payload.type === 'kind') {
+        onInsertToolbarSlot?.(payload.kind, idx);
+      }
+    },
+    [isCustomizeMode, onInsertToolbarSlot, onReorderToolbarSlot]
+  );
+
+  const iconScaleStyle: React.CSSProperties = {
+    width: 'calc(1rem * var(--nova-icon-scale, 1))',
+    height: 'calc(1rem * var(--nova-icon-scale, 1))',
+  };
+
+  const renderWorkspaceSelector = (
+    source: 'tabbar' | 'toolbar' | 'compact',
+    compact = false
+  ) => {
+    if (!workspaces || !activeWorkspace || !onSelectWorkspace) return null;
+    const isOpen = openWorkspaceMenu === source;
+    const refObj =
+      source === 'tabbar'
+        ? tabbarWorkspaceRef
+        : source === 'toolbar'
+        ? toolbarWorkspaceRef
+        : compactWorkspaceRef;
+
+    return (
+      <div
+        ref={refObj}
+        className={`relative no-drag ${source === 'tabbar' ? 'mb-1' : ''}`}
+      >
+        <button
+          type="button"
+          onClick={() => setOpenWorkspaceMenu(isOpen ? null : source)}
+          aria-haspopup="true"
+          aria-expanded={isOpen}
+          aria-label="Switch workspace"
+          className={`group flex items-center gap-1.5 h-7 ${
+            compact ? 'px-2' : 'px-2.5 mr-1'
+          } rounded-lg text-xs font-medium transition-all duration-150 border cursor-pointer select-none ${
+            isOpen
+              ? 'bg-slate-300/80 dark:bg-white/15 border-accent/40 text-slate-900 dark:text-white shadow-sm ring-2 ring-accent/20'
+              : 'bg-slate-200/60 hover:bg-slate-300/70 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] border-slate-300/60 dark:border-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white shadow-2xs'
+          }`}
         >
-          {/* macOS Traffic Lights Spacer: 88px so native traffic lights never collide with Workspace or Tabs */}
-          {isMac && (
-            <div
-              className="w-[88px] h-full shrink-0 select-none drag-region"
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-            />
-          )}
-
-          {/* Workspace Selector */}
-          {workspaces && activeWorkspace && onSelectWorkspace && (
-            <div ref={workspaceDropdownRef} className="relative no-drag mb-1">
-              <button
-                onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-                aria-haspopup="true"
-                aria-expanded={isWorkspaceDropdownOpen}
-                aria-label="Switch workspace"
-                className={`group flex items-center gap-2 h-7 px-2.5 rounded-lg text-xs font-medium transition-all duration-150 border mr-1 cursor-pointer select-none ${
-                  isWorkspaceDropdownOpen
-                    ? 'bg-slate-300/80 dark:bg-white/15 border-accent/40 text-slate-900 dark:text-white shadow-sm ring-2 ring-accent/20'
-                    : 'bg-slate-200/60 hover:bg-slate-300/70 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] border-slate-300/60 dark:border-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white shadow-2xs'
-                }`}
-              >
-                <span
-                  className="w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
-                  style={{
-                    backgroundColor: `${WORKSPACE_COLORS[activeWorkspace.color] || '#64748b'}25`,
-                    color: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b'
-                  }}
-                >
-                  {React.createElement(getWorkspaceIcon(activeWorkspace.icon, activeWorkspace.name), {
-                    className: "w-2.5 h-2.5 stroke-[2.5]"
-                  })}
-                </span>
-                <span className="font-semibold truncate max-w-[110px] tracking-tight">
-                  {activeWorkspace.name}
-                </span>
-                <ChevronDown
-                  className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform duration-200 group-hover:text-slate-600 dark:group-hover:text-slate-200 ${
-                    isWorkspaceDropdownOpen ? 'rotate-180 text-accent-hover dark:text-accent' : ''
-                  }`}
-                />
-              </button>
-              <AnimatePresence>
-              {isWorkspaceDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
-                  className="absolute top-full left-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 overflow-hidden"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      Workspaces
-                    </span>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/[0.05] dark:bg-white/5 text-slate-500 dark:text-slate-400">
-                      {workspaces.length}
-                    </span>
-                  </div>
-
-                  {/* Workspaces List */}
-                  <div className="max-h-60 overflow-y-auto no-scrollbar space-y-0.5">
-                    {workspaces.map(w => {
-                      const isCurrent = w.id === activeWorkspaceId;
-                      const IconComp = getWorkspaceIcon(w.icon, w.name);
-                      const colorHex = WORKSPACE_COLORS[w.color] || '#64748b';
-                      const count = tabs.filter(t => (t.workspaceId || 'default') === w.id).length;
-
-                      return (
-                        <button
-                          key={w.id}
-                          onClick={() => {
-                            onSelectWorkspace(w.id);
-                            setIsWorkspaceDropdownOpen(false);
-                          }}
-                          className={`w-full group/ws flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer ${
-                            isCurrent
-                              ? 'bg-accent/15 font-medium'
-                              : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06] opacity-85 hover:opacity-100'
-                          }`}
-                        >
-                          <div
-                            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover/ws:scale-105"
-                            style={{ backgroundColor: `${colorHex}22`, color: colorHex }}
-                          >
-                            <IconComp className="w-3.5 h-3.5 stroke-[2.2]" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold truncate flex items-center gap-1.5">
-                              <span>{w.name}</span>
-                              {isCurrent && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block leading-tight">
-                              {count} {count === 1 ? 'tab' : 'tabs'}
-                            </span>
-                          </div>
-                          {isCurrent && (
-                            <Check className="w-4 h-4 text-accent-hover dark:text-accent shrink-0 stroke-[2.5]" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Quick Actions Footer */}
-                  <div className="border-t border-slate-100 dark:border-white/5 mt-1.5 pt-1.5 grid grid-cols-2 gap-1">
-                    <button
-                      onClick={() => {
-                        setIsWorkspaceDropdownOpen(false);
-                        window.dispatchEvent(new CustomEvent('open-workspace-manager', { detail: { mode: 'create' } }));
-                      }}
-                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/5 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-accent" />
-                      <span>New Space</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsWorkspaceDropdownOpen(false);
-                        window.dispatchEvent(new CustomEvent('open-workspace-manager'));
-                      }}
-                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/5 transition-colors cursor-pointer"
-                    >
-                      <Settings className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Manage</span>
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-              </AnimatePresence>
-            </div>
-          )}
-
-        {/* Tabs */}
-        <div className="flex-1 relative flex items-center min-w-0">
-          <AnimatePresence>
-            {canScrollLeft && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.15 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => scrollTabs('left')}
-                className={`absolute left-0 z-30 p-1 rounded-r-lg shadow-md no-drag transition-colors ${
-                  isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
-                }`}
-                title="Scroll Left"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          <Reorder.Group
-            as="div"
-            axis="x"
-            values={visibleTabs}
-            onReorder={(newTabs) => {
-              if (visibleTabs.length <= 1) return;
-              if (onReorderFullList) {
-                const full: Tab[] = [];
-                const seenIds = new Set<string>();
-                for (const t of newTabs) {
-                  if (!seenIds.has(t.id)) {
-                    full.push(t);
-                    seenIds.add(t.id);
-                  }
-                  if (t.splitWith) {
-                    const partner = tabs.find(p => p.id === t.splitWith);
-                    if (partner && !seenIds.has(partner.id)) {
-                      full.push(partner);
-                      seenIds.add(partner.id);
-                    }
-                  }
-                }
-                // Safety guarantee: never lose any tab belonging to this workspace
-                for (const t of tabs) {
-                  if (!seenIds.has(t.id)) {
-                    full.push(t);
-                    seenIds.add(t.id);
-                  }
-                }
-                onReorderFullList(full);
-              }
+          <span
+            className="w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+            style={{
+              backgroundColor: `${WORKSPACE_COLORS[activeWorkspace.color] || '#64748b'}25`,
+              color: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b',
             }}
-            ref={tabsContainerRef}
-            onWheel={handleWheel}
-            style={{ height: 'var(--nova-tab-height, 38px)' }}
-            className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px] relative"
           >
-            <AnimatePresence mode="popLayout" initial={hasMounted}>
-            {visibleTabs.map((tab: Tab) => {
-              const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
-              const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
-
-              return (
-                <MemoizedTabItem
-                  key={tab.id}
-                  tab={tab}
-                  activeTabId={activeTabId}
-                  index={tabs.findIndex(t => t.id === tab.id)}
-                  isActive={isActive}
-                  splitTab={splitTab}
-                  tabStyle={tabStyle}
-                  tabAnimation={tabAnimation}
-                  isIncognito={isIncognito}
-                  wasJustUnsplit={justUnsplitTabIds.has(tab.id)}
-                  onTabDragStart={onTabDragStart}
-                  onTabDrag={onTabDrag}
-                  onTabDragEnd={onTabDragEnd}
-                  onDropToSplitScreen={onDropToSplitScreen}
-                  onSelectTab={onSelectTab}
-                  onCloseSplit={onCloseSplit}
-                  onToggleMuteTab={onToggleMuteTab}
-                  onTogglePip={onTogglePip}
-                  onCloseTab={onCloseTab}
-                  tabsLength={tabs.length}
-                  onUpdateGhost={handleUpdateGhost}
-                  onTabHover={handleTabHover}
-                  onTabLeave={handleTabLeave}
-                  onOpenContextMenu={handleOpenContextMenu}
-                />
-              );
+            {React.createElement(getWorkspaceIcon(activeWorkspace.icon, activeWorkspace.name), {
+              className: 'w-2.5 h-2.5 stroke-[2.5]',
             })}
-            </AnimatePresence>
-
-            {/* Action Buttons Container (New Tab & Private Tab) */}
-            <motion.div
-              layout="position"
-              transition={
-                tabAnimation === 'smooth'
-                  ? { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
-                  : tabAnimation === 'snappy'
-                  ? { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
-                  : tabAnimation === 'none'
-                  ? { duration: 0 }
-                  : { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
-              }
-              className="flex items-center shrink-0 mb-1 gap-0.5 no-drag z-10"
-            >
-              {/* New Tab Button */}
-              <motion.button
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.92 }}
-                transition={{
-                  duration: 0.15,
-                  ease: [0.4, 0, 0.2, 1]
-                }}
-                onClick={() => onNewTab()}
-                className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-                  isIncognito
-                    ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
-                    : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
-                }`}
-                title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
-              >
-                <Plus className="w-4 h-4" />
-              </motion.button>
-
-              {/* New Incognito Tab Button */}
-              <motion.button
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.92 }}
-                transition={{
-                  duration: 0.15,
-                  ease: [0.4, 0, 0.2, 1]
-                }}
-                onClick={onNewIncognitoTab}
-                className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-                  isIncognito
-                    ? 'text-slate-300 hover:bg-slate-700/80 hover:text-white'
-                    : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
-                }`}
-                title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
-              >
-                <ShieldOff className="w-4 h-4" />
-              </motion.button>
-            </motion.div>
-          </Reorder.Group>
-
-          <AnimatePresence>
-            {canScrollRight && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.15 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => scrollTabs('right')}
-                className={`absolute right-0 z-30 p-1 rounded-l-lg shadow-md no-drag transition-colors ${
-                  isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
-                }`}
-                title="Scroll Right"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Spacer for Windows controls */}
-        {isWindows && (
-          <div
-            className="w-[140px] shrink-0 select-none drag-region"
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          </span>
+          <span
+            className={`font-semibold truncate tracking-tight ${
+              compact ? 'max-w-[72px]' : 'max-w-[110px]'
+            }`}
+          >
+            {activeWorkspace.name}
+          </span>
+          <ChevronDown
+            className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform duration-200 group-hover:text-slate-600 dark:group-hover:text-slate-200 ${
+              isOpen ? 'rotate-180 text-accent-hover dark:text-accent' : ''
+            }`}
           />
+        </button>
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.96 }}
+              transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
+              className="absolute top-full left-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Workspaces
+                </span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/[0.05] dark:bg-white/5 text-slate-500 dark:text-slate-400">
+                  {workspaces.length}
+                </span>
+              </div>
+
+              {/* Workspaces List */}
+              <div className="max-h-60 overflow-y-auto no-scrollbar space-y-0.5">
+                {workspaces.map((w) => {
+                  const isCurrent = w.id === activeWorkspaceId;
+                  const IconComp = getWorkspaceIcon(w.icon, w.name);
+                  const colorHex = WORKSPACE_COLORS[w.color] || '#64748b';
+                  const count = tabs.filter((t) => (t.workspaceId || 'default') === w.id).length;
+
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectWorkspace(w.id);
+                        setOpenWorkspaceMenu(null);
+                      }}
+                      className={`w-full group/ws flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'bg-accent/15 font-medium'
+                          : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06] opacity-85 hover:opacity-100'
+                      }`}
+                    >
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover/ws:scale-105"
+                        style={{ backgroundColor: `${colorHex}22`, color: colorHex }}
+                      >
+                        <IconComp className="w-3.5 h-3.5 stroke-[2.2]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold truncate flex items-center gap-1.5">
+                          <span>{w.name}</span>
+                          {isCurrent && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block leading-tight">
+                          {count} {count === 1 ? 'tab' : 'tabs'}
+                        </span>
+                      </div>
+                      {isCurrent && (
+                        <Check className="w-4 h-4 text-accent-hover dark:text-accent shrink-0 stroke-[2.5]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Quick Actions Footer */}
+              <div className="border-t border-slate-100 dark:border-white/5 mt-1.5 pt-1.5 grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenWorkspaceMenu(null);
+                    window.dispatchEvent(new CustomEvent('open-workspace-manager', { detail: { mode: 'create' } }));
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-accent" />
+                  <span>New Space</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenWorkspaceMenu(null);
+                    window.dispatchEvent(new CustomEvent('open-workspace-manager'));
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium opacity-80 hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Manage</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  const renderTabStrip = (compactMode: boolean) => (
+    <div
+      className={
+        compactMode
+          ? 'flex-[1.15] min-w-[160px] relative flex items-center'
+          : 'flex-1 relative flex items-center min-w-0'
+      }
+    >
+      <AnimatePresence>
+        {canScrollLeft && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.15 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => scrollTabs('left')}
+            className={`absolute left-0 z-30 p-1 rounded-r-lg shadow-md no-drag transition-colors ${
+              isIncognito
+                ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
+                : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
+            }`}
+            title="Scroll Left"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </motion.button>
         )}
-      </motion.div>
-      )}
       </AnimatePresence>
 
-      {/*
-        ROW 2: Toolbar (Nav, Omnibox, Extensions)
-      */}
-      <div
-        style={!isIncognito ? {
-          background: 'transparent',
-          color: 'var(--nova-toolbar-text, inherit)',
-          borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
-          borderBottomWidth: 'var(--nova-toolbar-border-width, 1px)',
-          minHeight: 'var(--nova-toolbar-height, 44px)',
-          paddingTop: 'var(--nova-density-pad-y, 6px)',
-          paddingBottom: 'var(--nova-density-pad-y, 6px)',
-          paddingLeft: 'var(--nova-density-pad-x, 12px)',
-          paddingRight: 'var(--nova-density-pad-x, 12px)',
-          boxShadow: 'var(--nova-toolbar-shadow, none)',
-        } : {
-          minHeight: 'var(--nova-toolbar-height, 44px)',
+      <Reorder.Group
+        as="div"
+        axis="x"
+        values={visibleTabs}
+        onReorder={(newTabs) => {
+          if (visibleTabs.length <= 1) return;
+          if (onReorderFullList) {
+            const full: Tab[] = [];
+            const seenIds = new Set<string>();
+            for (const t of newTabs) {
+              if (!seenIds.has(t.id)) {
+                full.push(t);
+                seenIds.add(t.id);
+              }
+              if (t.splitWith) {
+                const partner = tabs.find((p) => p.id === t.splitWith);
+                if (partner && !seenIds.has(partner.id)) {
+                  full.push(partner);
+                  seenIds.add(partner.id);
+                }
+              }
+            }
+            for (const t of tabs) {
+              if (!seenIds.has(t.id)) {
+                full.push(t);
+                seenIds.add(t.id);
+              }
+            }
+            onReorderFullList(full);
+          }
         }}
-        className={`relative flex items-center px-3 py-1.5 gap-3 no-drag ${isIncognito ? 'bg-slate-800 border-b border-slate-700' : 'bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700'}`}
+        ref={tabsContainerRef}
+        onWheel={handleWheel}
+        style={{ height: compactMode ? 'var(--nova-tab-height, 36px)' : 'var(--nova-tab-height, 38px)' }}
+        className={`flex-1 flex ${
+          compactMode ? 'items-center' : 'items-end h-[38px]'
+        } gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region relative`}
       >
-        {/* Dedicated backdrop layer keeps backdrop-filter off the toolbar container so fixed popovers stay viewport-anchored */}
-        {!isIncognito && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-white/95 dark:bg-slate-800/95"
-            style={{
-              background: 'var(--nova-toolbar-bg, var(--nova-card-bg))',
-              backdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
-              WebkitBackdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
+        <AnimatePresence mode="popLayout" initial={hasMounted}>
+          {visibleTabs.map((tab: Tab) => {
+            const splitTab = tab.splitWith ? tabs.find((t) => t.id === tab.splitWith) : null;
+            const isActive =
+              tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
+
+            return (
+              <MemoizedTabItem
+                key={tab.id}
+                tab={tab}
+                activeTabId={activeTabId}
+                index={tabs.findIndex((t) => t.id === tab.id)}
+                isActive={isActive}
+                splitTab={splitTab}
+                tabStyle={tabStyle}
+                tabAnimation={layoutConfig.reduceMotion ? 'none' : tabAnimation}
+                isIncognito={isIncognito}
+                wasJustUnsplit={justUnsplitTabIds.has(tab.id)}
+                onTabDragStart={onTabDragStart}
+                onTabDrag={onTabDrag}
+                onTabDragEnd={onTabDragEnd}
+                onDropToSplitScreen={onDropToSplitScreen}
+                onSelectTab={onSelectTab}
+                onCloseSplit={onCloseSplit}
+                onToggleMuteTab={onToggleMuteTab}
+                onTogglePip={onTogglePip}
+                onCloseTab={onCloseTab}
+                tabsLength={tabs.length}
+                onUpdateGhost={handleUpdateGhost}
+                onTabHover={handleTabHover}
+                onTabLeave={handleTabLeave}
+                onOpenContextMenu={handleOpenContextMenu}
+              />
+            );
+          })}
+        </AnimatePresence>
+
+        {/* Action Buttons Container (New Tab & Private Tab) */}
+        <motion.div
+          layout="position"
+          transition={
+            layoutConfig.reduceMotion
+              ? { duration: 0 }
+              : tabAnimation === 'smooth'
+              ? { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
+              : tabAnimation === 'snappy'
+              ? { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
+              : tabAnimation === 'none'
+              ? { duration: 0 }
+              : { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
+          }
+          className={`flex items-center shrink-0 gap-0.5 no-drag z-10 ${compactMode ? '' : 'mb-1'}`}
+        >
+          {/* New Tab Button */}
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{
+              duration: layoutConfig.reduceMotion ? 0 : 0.15,
+              ease: [0.4, 0, 0.2, 1],
             }}
-          />
+            onClick={() => onNewTab()}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
+              isIncognito
+                ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
+                : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
+            }`}
+            title={isMac ? 'New Tab (⌘T)' : 'New Tab (Ctrl+T)'}
+          >
+            <Plus className="w-4 h-4" />
+          </motion.button>
+
+          {/* New Incognito Tab Button */}
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{
+              duration: layoutConfig.reduceMotion ? 0 : 0.15,
+              ease: [0.4, 0, 0.2, 1],
+            }}
+            onClick={onNewIncognitoTab}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
+              isIncognito
+                ? 'text-slate-300 hover:bg-slate-700/80 hover:text-white'
+                : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
+            }`}
+            title={
+              isMac
+                ? 'New Private / Incognito Tab (⇧⌘N)'
+                : 'New Private / Incognito Tab (Ctrl+Shift+N)'
+            }
+          >
+            <ShieldOff className="w-4 h-4" />
+          </motion.button>
+        </motion.div>
+      </Reorder.Group>
+
+      <AnimatePresence>
+        {canScrollRight && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.15 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => scrollTabs('right')}
+            className={`absolute right-0 z-30 p-1 rounded-l-lg shadow-md no-drag transition-colors ${
+              isIncognito
+                ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700'
+                : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
+            }`}
+            title="Scroll Right"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </motion.button>
         )}
+      </AnimatePresence>
+    </div>
+  );
 
-        {/* Navigation Buttons */}
-        <div className="relative flex items-center gap-1">
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoBack} disabled={!activeTab?.canGoBack} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="Go Back">
-            <ArrowLeft className="w-4 h-4" />
-          </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoForward} disabled={!activeTab?.canGoForward} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="Go Forward">
-            <ArrowRight className="w-4 h-4" />
-          </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="Reload Page">
-            <RotateCw className={`w-4 h-4 transition-transform duration-500 active:rotate-180 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
-          </motion.button>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onNavigate('nova://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`} title="New Tab Page">
-            <Home className="w-4 h-4" />
-          </motion.button>
-        </div>
+  const hasVisibleSpacer = useMemo(
+    () =>
+      layoutConfig.toolbarItems.some(
+        (s) => s.kind === 'spacer' && (isCustomizeMode || s.visible)
+      ),
+    [layoutConfig.toolbarItems, isCustomizeMode]
+  );
 
-        {/* Omnibox / Address Bar */}
-        <OmniboxBar
-          activeTab={activeTab}
-          isIncognito={isIncognito}
-          searchEngine={searchEngine}
-          bookmarks={bookmarks}
-          useVerticalTabs={useVerticalTabs}
-          onNavigate={onNavigate}
-          onToggleReaderMode={onToggleReaderMode}
-          onTogglePip={onTogglePip && activeTab ? () => onTogglePip(activeTab.id) : undefined}
-          onToggleBookmark={onToggleBookmark}
-          onResetZoom={onResetZoom}
-          isBookmarked={isBookmarked}
-          permissionRequests={permissionRequests}
-          onRespondPermission={onRespondPermission}
-          onDismissPermission={onDismissPermission}
-        />
+  const hasVisibleWorkspacesSlot = useMemo(
+    () =>
+      layoutConfig.toolbarItems.some(
+        (s) => s.kind === 'workspaces' && (isCustomizeMode || s.visible)
+      ),
+    [layoutConfig.toolbarItems, isCustomizeMode]
+  );
 
-        {/* Extensions / Action Controls / More Menu */}
-        <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
-          {/* Assistant toggle */}
+  const renderMoreMenu = () => {
+    const showLabel = layoutConfig.toolbarShowLabels;
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+          className={`rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+            showLabel ? 'px-2 py-1 text-[11px] font-medium' : 'p-1.5'
+          } ${
+            isMoreMenuOpen
+              ? 'bg-black/[0.08] dark:bg-white/15 text-accent'
+              : isIncognito
+              ? 'hover:bg-slate-700 text-slate-300'
+              : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+          }`}
+          title="More Options"
+          aria-label="More Options"
+        >
+          <Menu className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+          {showLabel && <span className="whitespace-nowrap leading-none">Menu</span>}
+        </button>
+
+        <AnimatePresence>
+          {isMoreMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsMoreMenuOpen(false)} />
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.15 }}
+                style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
+                className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
+              >
+                {/* Nova Account Header inside menu */}
+                {onOpenAccount && (
+                  <div className="p-1">
+                    <button
+                      onClick={() => {
+                        onOpenAccount();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] rounded-lg transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {syncStatus.isLoggedIn && syncStatus.user ? (
+                          <div className="w-6 h-6 rounded-full bg-accent text-accent-text font-semibold text-xs flex items-center justify-center shrink-0 uppercase">
+                            {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
+                          </div>
+                        ) : (
+                          <div className="p-1 rounded-lg bg-accent/15 text-accent-hover dark:text-accent">
+                            <Cloud className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <span className="text-xs font-semibold block truncate">
+                            {syncStatus.isLoggedIn ? syncStatus.syncCode || 'Nova Sync' : 'Nova Sync'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 truncate block">
+                            {syncStatus.isLoggedIn
+                              ? 'Encrypted Sync Active'
+                              : 'Sign in to sync across devices'}
+                          </span>
+                        </div>
+                      </div>
+                      {syncStatus.isLoggedIn ? (
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      ) : (
+                        <span className="text-[10px] font-semibold text-accent-hover dark:text-accent bg-accent/10 px-2 py-0.5 rounded-md shrink-0">
+                          Sync
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* View & Layout Section */}
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      onToggleSplitView();
+                      setIsMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Columns className="w-4 h-4 text-accent" />
+                      <span>Split View (Side-by-Side)</span>
+                    </div>
+                    {isSplitView && (
+                      <span className="text-[10px] font-bold bg-accent/20 text-accent-hover dark:text-accent px-1.5 py-0.5 rounded">
+                        ON
+                      </span>
+                    )}
+                  </button>
+
+                  {onToggleVpn && (
+                    <button
+                      onClick={() => {
+                        onToggleVpn();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Network className="w-4 h-4 text-accent" />
+                        <span>VPN (Secure Proxy)</span>
+                      </div>
+                      {isVpnEnabled ? (
+                        <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">
+                          ACTIVE
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">OFF</span>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      onNavigate('nova://settings#mcp');
+                      setIsMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Cpu className="w-4 h-4 text-accent" />
+                      <span>MCP AI Tools Server</span>
+                    </div>
+                    {mcpRunning ? (
+                      <span className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        ONLINE
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">OFFLINE</span>
+                    )}
+                  </button>
+
+                  {onOpenCustomizeMode && (
+                    <button
+                      onClick={() => {
+                        onOpenCustomizeMode();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <SlidersHorizontal className="w-4 h-4 text-accent" />
+                        <span>Customize Browser...</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {isMac ? '⇧⌘E' : 'Ctrl+Shift+E'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Tools Section */}
+                <div className="py-1">
+                  <div className="flex items-center justify-between px-3 py-1.5">
+                    <span className="text-xs font-medium opacity-85">Zoom</span>
+                    <div className="flex items-center gap-1 bg-black/[0.05] dark:bg-white/[0.08] rounded-lg p-0.5 border border-slate-200/50 dark:border-white/5">
+                      <button
+                        onClick={onZoomOut}
+                        className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-[11px] font-bold px-1.5">
+                        {Math.round((activeTab?.zoomFactor || 1) * 100)}%
+                      </span>
+                      <button
+                        onClick={onZoomIn}
+                        className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {onTakeScreenshot && (
+                    <button
+                      onClick={() => {
+                        onTakeScreenshot();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                    >
+                      <Camera className="w-4 h-4 text-slate-400" /> Screenshot
+                    </button>
+                  )}
+                  {onOpenShare && (
+                    <button
+                      onClick={() => {
+                        onOpenShare();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                    >
+                      <Share2 className="w-4 h-4 text-slate-400" /> Share Link
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      onOpenFindInPage();
+                      setIsMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                  >
+                    <Search className="w-4 h-4 text-slate-400" /> Find in Page
+                  </button>
+                </div>
+
+                {/* Navigation / Library */}
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      onOpenDownloads();
+                      setIsMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Download className="w-4 h-4 text-slate-400" /> Downloads
+                    </div>
+                    {(activeDownloadsCount || 0) > 0 && (
+                      <span className="bg-accent text-accent-text text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                        {activeDownloadsCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenHistory();
+                      setIsMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                  >
+                    <Clock className="w-4 h-4 text-slate-400" /> History
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenSettings();
+                      setIsMoreMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                  >
+                    <Settings className="w-4 h-4 text-slate-400" /> Settings
+                  </button>
+                  {onOpenHelp && (
+                    <button
+                      onClick={() => {
+                        onOpenHelp();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left"
+                    >
+                      <HelpCircle className="w-4 h-4 text-slate-400" /> Help & Support
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  const renderToolbarItem = (slot: ToolbarSlotItem, idx: number, compactSingleRow: boolean) => {
+    if (!isCustomizeMode && !slot.visible) {
+      return null;
+    }
+
+    const showLabel = layoutConfig.toolbarShowLabels;
+    const btnHover = isIncognito
+      ? 'hover:bg-slate-700 text-slate-300'
+      : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100';
+    const btnActive =
+      'bg-accent/15 text-accent-hover dark:text-accent ring-1 ring-accent/30';
+    const iconBtnClass = `rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-default ${
+      showLabel ? 'px-2 py-1 text-[11px] font-medium' : 'p-1.5'
+    }`;
+
+    let content: React.ReactNode = null;
+    let outerClassName = 'relative flex items-center shrink-0';
+    let wrapperClassName = '';
+
+    switch (slot.kind) {
+      case 'back':
+        content = (
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={layoutConfig.reduceMotion ? { duration: 0 } : undefined}
+            onClick={onGoBack}
+            disabled={!activeTab?.canGoBack}
+            className={`${iconBtnClass} ${btnHover}`}
+            title="Go Back"
+            aria-label="Go Back"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">Back</span>}
+          </motion.button>
+        );
+        break;
+
+      case 'forward':
+        content = (
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={layoutConfig.reduceMotion ? { duration: 0 } : undefined}
+            onClick={onGoForward}
+            disabled={!activeTab?.canGoForward}
+            className={`${iconBtnClass} ${btnHover}`}
+            title="Go Forward"
+            aria-label="Go Forward"
+          >
+            <ArrowRight className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">Forward</span>}
+          </motion.button>
+        );
+        break;
+
+      case 'reload':
+        content = (
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={layoutConfig.reduceMotion ? { duration: 0 } : undefined}
+            onClick={onReload}
+            className={`${iconBtnClass} ${btnHover}`}
+            title="Reload Page"
+            aria-label="Reload Page"
+          >
+            <RotateCw
+              className={`w-4 h-4 shrink-0 transition-transform duration-500 active:rotate-180 ${
+                activeTab?.isLoading ? 'animate-spin' : ''
+              }`}
+              style={iconScaleStyle}
+            />
+            {showLabel && <span className="whitespace-nowrap leading-none">Reload</span>}
+          </motion.button>
+        );
+        break;
+
+      case 'home':
+        content = (
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={layoutConfig.reduceMotion ? { duration: 0 } : undefined}
+            onClick={() => onNavigate('nova://newtab')}
+            className={`${iconBtnClass} ${btnHover}`}
+            title="New Tab Page"
+            aria-label="New Tab Page"
+          >
+            <Home className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">Home</span>}
+          </motion.button>
+        );
+        break;
+
+      case 'workspaces':
+        if (workspaces && activeWorkspace && onSelectWorkspace) {
+          content = renderWorkspaceSelector('toolbar', compactSingleRow);
+        } else if (isCustomizeMode) {
+          content = (
+            <button
+              type="button"
+              disabled
+              className="flex items-center gap-1.5 h-7 px-2 rounded-lg text-xs font-medium border border-slate-300/60 dark:border-white/10 opacity-60"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Workspaces</span>
+            </button>
+          );
+        } else {
+          return null;
+        }
+        break;
+
+      case 'omnibox': {
+        const widthCap = getOmniboxWidthClass(layoutConfig.omniboxMaxWidth);
+        const minW = compactSingleRow ? 'min-w-[120px]' : 'min-w-[160px]';
+        if (hasVisibleSpacer) {
+          outerClassName = `relative flex-1 ${minW} ${widthCap} flex items-center`;
+          wrapperClassName = 'w-full flex items-center';
+        } else {
+          outerClassName = `relative flex-1 ${minW} flex items-center justify-center`;
+          wrapperClassName = `w-full ${widthCap} flex items-center`;
+        }
+        content = (
+          <OmniboxBar
+            activeTab={activeTab}
+            isIncognito={isIncognito}
+            searchEngine={searchEngine}
+            bookmarks={bookmarks}
+            useVerticalTabs={layoutConfig.isVerticalChrome}
+            onNavigate={onNavigate}
+            onToggleReaderMode={onToggleReaderMode}
+            onTogglePip={omniboxTogglePip}
+            onToggleBookmark={onToggleBookmark}
+            onResetZoom={onResetZoom}
+            isBookmarked={isBookmarked}
+            permissionRequests={permissionRequests}
+            onRespondPermission={onRespondPermission}
+            onDismissPermission={onDismissPermission}
+          />
+        );
+        break;
+      }
+
+      case 'ai':
+        content = (
           <button
             type="button"
             onClick={onToggleAIAssistant}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium cursor-pointer ${
               isAIAssistantOpen
-                ? 'bg-accent/15 text-accent-hover dark:text-accent ring-1 ring-accent/30'
+                ? btnActive
                 : isIncognito
                 ? 'text-slate-400 hover:text-white hover:bg-slate-800'
                 : 'opacity-75 hover:opacity-100 hover:bg-black/[0.06] dark:hover:bg-white/10'
             }`}
-            title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
+            title={isMac ? 'Nova AI Assistant (⌘I)' : 'Nova AI Assistant (Ctrl+I)'}
+            aria-label="Nova AI Assistant"
           >
             <NovaAssistantIcon size={14} active={isAIAssistantOpen} />
             <span className="text-[11px] font-medium leading-none">AI</span>
           </button>
+        );
+        break;
 
-          <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-0.5" />
-
-          {/* Ad Blocker Shield */}
+      case 'shield':
+        content = (
           <div className="relative">
             <button
+              type="button"
               ref={adBlockerBtnRef}
               onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
-              className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`}
-              title={!privacyShield ? 'Privacy Shield Disabled' : isWhitelisted ? 'Ad Shield Paused on this site' : 'Privacy & Ad Shield'}
+              className={`${iconBtnClass} relative ${btnHover}`}
+              title={
+                !privacyShield
+                  ? 'Privacy Shield Disabled'
+                  : isWhitelisted
+                  ? 'Ad Shield Paused on this site'
+                  : 'Privacy & Ad Shield'
+              }
+              aria-label="Privacy & Ad Shield"
             >
               {!isShieldActiveOnPage ? (
-                <ShieldOff className="w-4 h-4 text-slate-400" />
+                <ShieldOff className="w-4 h-4 text-slate-400 shrink-0" style={iconScaleStyle} />
               ) : (
-                <Shield className="w-4 h-4 text-accent" />
+                <Shield className="w-4 h-4 text-accent shrink-0" style={iconScaleStyle} />
               )}
-              {(isShieldActiveOnPage && (activeTab?.blockedAdsCount || 0) > 0) && (
+              {showLabel && <span className="whitespace-nowrap leading-none">Shield</span>}
+              {isShieldActiveOnPage && (activeTab?.blockedAdsCount || 0) > 0 && (
                 <span className="absolute -top-1 -right-1 bg-accent text-accent-text text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
                   {activeTab?.blockedAdsCount ?? 0}
                 </span>
@@ -1676,22 +2430,29 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               />
             )}
           </div>
+        );
+        break;
 
-          {/* Downloads Button & Popover */}
+      case 'downloads':
+        content = (
           <div className="relative flex items-center">
             <button
+              type="button"
               ref={downloadsBtnRef}
               onClick={() => setIsDownloadsOpen(!isDownloadsOpen)}
-              className={`p-1.5 rounded-lg transition-colors relative cursor-pointer ${
+              className={`${iconBtnClass} relative ${
                 (activeDownloadsCount || 0) > 0
                   ? 'text-accent-hover dark:text-accent bg-accent/10 hover:bg-accent/20 shadow-xs'
-                  : isIncognito
-                    ? 'hover:bg-slate-700 text-slate-300'
-                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                  : btnHover
               }`}
               title="Downloads"
+              aria-label="Downloads"
             >
-              <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'text-accent' : ''}`} />
+              <Download
+                className={`w-4 h-4 shrink-0 ${(activeDownloadsCount || 0) > 0 ? 'text-accent' : ''}`}
+                style={iconScaleStyle}
+              />
+              {showLabel && <span className="whitespace-nowrap leading-none">Downloads</span>}
               {(activeDownloadsCount || 0) > 0 && (
                 <span className="absolute -top-1 -right-1 bg-accent text-accent-text text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs">
                   {activeDownloadsCount}
@@ -1700,10 +2461,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
             <DownloadsPopover
               // Shared empty array so the downloads popover can be handed a stable
-  // reference while closed. The main process broadcasts progress every 250ms;
-  // passing the live array straight through would invalidate the TopBar memo
-  // ~4x/second and repaint the whole (framer-motion animated) tab strip.
-  downloads={isDownloadsOpen ? downloads : EMPTY_DOWNLOADS}
+              // reference while closed. The main process broadcasts progress every 250ms;
+              // passing the live array straight through would invalidate the TopBar memo
+              // ~4x/second and repaint the whole (framer-motion animated) tab strip.
+              downloads={isDownloadsOpen ? downloads : EMPTY_DOWNLOADS}
               isOpen={isDownloadsOpen}
               onClose={() => setIsDownloadsOpen(false)}
               onClearDownloads={onClearDownloads || (() => {})}
@@ -1711,236 +2472,523 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               buttonRef={downloadsBtnRef}
             />
           </div>
+        );
+        break;
 
-          {/* Active Extension Toolbar Buttons */}
-          {extensions && extensions.filter(ext => ext.enabled !== false).slice(0, 5).map(ext => (
+      case 'extensions':
+        content = (
+          <div className="flex items-center gap-1">
+            {effectiveExtensions.slice(0, 5).map((ext) => (
+              <button
+                key={ext.id}
+                type="button"
+                onClick={(e) =>
+                  handleOpenToolbarExtension(ext, e.currentTarget.getBoundingClientRect())
+                }
+                className={`p-1.5 rounded-lg transition-colors flex items-center justify-center relative cursor-pointer ${btnHover}`}
+                title={`${ext.name}${ext.popupUrl ? ' (Click to open popup)' : ''}`}
+              >
+                {ext.iconData ? (
+                  <img
+                    src={ext.iconData}
+                    alt={ext.name}
+                    className="w-4 h-4 object-contain rounded-xs"
+                  />
+                ) : (
+                  <div className="w-4 h-4 rounded-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[10px] font-semibold uppercase">
+                    {ext.name ? ext.name.charAt(0) : 'E'}
+                  </div>
+                )}
+              </button>
+            ))}
             <button
-              key={ext.id}
-              onClick={e => handleOpenToolbarExtension(ext, e.currentTarget.getBoundingClientRect())}
-              className={`p-1.5 rounded-lg transition-colors flex items-center justify-center relative cursor-pointer ${
-                isIncognito
-                  ? 'hover:bg-slate-700 text-slate-300'
-                  : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
-              }`}
-              title={`${ext.name}${ext.popupUrl ? ' (Click to open popup)' : ''}`}
+              type="button"
+              onClick={onOpenExtensions}
+              className={`${iconBtnClass} ${btnHover}`}
+              title="Extensions"
+              aria-label="Extensions"
             >
-              {ext.iconData ? (
-                <img src={ext.iconData} alt={ext.name} className="w-4 h-4 object-contain rounded-xs" />
-              ) : (
-                <div className="w-4 h-4 rounded-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[10px] font-semibold uppercase">
-                  {ext.name ? ext.name.charAt(0) : 'E'}
-                </div>
-              )}
+              <Puzzle className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+              {showLabel && <span className="whitespace-nowrap leading-none">Extensions</span>}
             </button>
-          ))}
-
-          {/* Extensions Manager Button */}
-          <button
-            onClick={onOpenExtensions}
-            className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'}`}
-            title="Extensions"
-          >
-            <Puzzle className="w-4 h-4" />
-          </button>
-
-          {/* Nova Account & Sync Button */}
-          {onOpenAccount && (
-            <button
-              onClick={onOpenAccount}
-              className={`p-1.5 rounded-lg transition-colors relative flex items-center justify-center ${
-                isIncognito
-                  ? 'hover:bg-slate-700 text-slate-300'
-                  : syncStatus.isLoggedIn
-                    ? 'hover:bg-accent/10 text-accent-hover dark:text-accent'
-                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
-              }`}
-              title={syncStatus.isLoggedIn ? `Nova Account (${syncStatus.user?.displayName || syncStatus.user?.email})` : 'Sign In to Nova Sync'}
-            >
-              {syncStatus.isLoggedIn && syncStatus.user ? (
-                <div className="w-5 h-5 rounded-full bg-accent text-accent-text font-semibold text-[10px] flex items-center justify-center shadow-xs uppercase">
-                  {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
-                </div>
-              ) : (
-                <User className="w-4 h-4" />
-              )}
-              {syncStatus.isLoggedIn && (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-0.5 right-0.5 border border-white dark:border-slate-900" />
-              )}
-            </button>
-          )}
-
-          {/* More Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isMoreMenuOpen
-                  ? 'bg-black/[0.08] dark:bg-white/15 text-accent'
-                  : isIncognito
-                    ? 'hover:bg-slate-700 text-slate-300'
-                    : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
-              }`}
-              title="More Options"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-
-            <AnimatePresence>
-              {isMoreMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsMoreMenuOpen(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: -4, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.96 }}
-                    transition={{ duration: 0.15 }}
-                    style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
-                    className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
-                  >
-                    {/* Nova Account Header inside menu */}
-                    {onOpenAccount && (
-                      <div className="p-1">
-                        <button
-                          onClick={() => { onOpenAccount(); setIsMoreMenuOpen(false); }}
-                          className="w-full flex items-center justify-between px-3 py-2 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] rounded-lg transition-colors text-left"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {syncStatus.isLoggedIn && syncStatus.user ? (
-                              <div className="w-6 h-6 rounded-full bg-accent text-accent-text font-semibold text-xs flex items-center justify-center shrink-0 uppercase">
-                                {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
-                              </div>
-                            ) : (
-                              <div className="p-1 rounded-lg bg-accent/15 text-accent-hover dark:text-accent">
-                                <Cloud className="w-4 h-4" />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <span className="text-xs font-semibold block truncate">
-                                {syncStatus.isLoggedIn ? (syncStatus.syncCode || 'Nova Sync') : 'Nova Sync'}
-                              </span>
-                              <span className="text-[10px] text-slate-400 truncate block">
-                                {syncStatus.isLoggedIn ? 'Encrypted Sync Active' : 'Sign in to sync across devices'}
-                              </span>
-                            </div>
-                          </div>
-                          {syncStatus.isLoggedIn ? (
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                          ) : (
-                            <span className="text-[10px] font-semibold text-accent-hover dark:text-accent bg-accent/10 px-2 py-0.5 rounded-md shrink-0">Sync</span>
-                          )}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* View & Layout Section */}
-                    <div className="py-1">
-                      <button
-                        onClick={() => { onToggleSplitView(); setIsMoreMenuOpen(false); }}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Columns className="w-4 h-4 text-accent" />
-                          <span>Split View (Side-by-Side)</span>
-                        </div>
-                        {isSplitView && <span className="text-[10px] font-bold bg-accent/20 text-accent-hover dark:text-accent px-1.5 py-0.5 rounded">ON</span>}
-                      </button>
-
-                      {onToggleVpn && (
-                        <button
-                          onClick={() => { onToggleVpn(); setIsMoreMenuOpen(false); }}
-                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Network className="w-4 h-4 text-accent" />
-                            <span>VPN (Secure Proxy)</span>
-                          </div>
-                          {isVpnEnabled ? (
-                            <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">ACTIVE</span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400">OFF</span>
-                          )}
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => { onNavigate('nova://settings#mcp'); setIsMoreMenuOpen(false); }}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Cpu className="w-4 h-4 text-accent" />
-                          <span>MCP AI Tools Server</span>
-                        </div>
-                        {mcpRunning ? (
-                          <span className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            ONLINE
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">OFFLINE</span>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Tools Section */}
-                    <div className="py-1">
-                      <div className="flex items-center justify-between px-3 py-1.5">
-                        <span className="text-xs font-medium opacity-85">Zoom</span>
-                        <div className="flex items-center gap-1 bg-black/[0.05] dark:bg-white/[0.08] rounded-lg p-0.5 border border-slate-200/50 dark:border-white/5">
-                          <button onClick={onZoomOut} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
-                          <span className="text-[11px] font-bold px-1.5">{Math.round((activeTab?.zoomFactor || 1) * 100)}%</span>
-                          <button onClick={onZoomIn} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
-                        </div>
-                      </div>
-                      {onTakeScreenshot && (
-                        <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                          <Camera className="w-4 h-4 text-slate-400" /> Screenshot
-                        </button>
-                      )}
-                      {onOpenShare && (
-                        <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                          <Share2 className="w-4 h-4 text-slate-400" /> Share Link
-                        </button>
-                      )}
-                      <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                        <Search className="w-4 h-4 text-slate-400" /> Find in Page
-                      </button>
-                    </div>
-
-                    {/* Navigation / Library */}
-                    <div className="py-1">
-                      <button onClick={() => { onOpenDownloads(); setIsMoreMenuOpen(false); }} className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                        <div className="flex items-center gap-2.5">
-                          <Download className="w-4 h-4 text-slate-400" /> Downloads
-                        </div>
-                        {(activeDownloadsCount || 0) > 0 && <span className="bg-accent text-accent-text text-[10px] px-1.5 py-0.5 rounded-full font-bold">{activeDownloadsCount}</span>}
-                      </button>
-                      <button onClick={() => { onOpenHistory(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                        <Clock className="w-4 h-4 text-slate-400" /> History
-                      </button>
-                      <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                        <Settings className="w-4 h-4 text-slate-400" /> Settings
-                      </button>
-                      {onOpenHelp && (
-                        <button onClick={() => { onOpenHelp(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] text-xs font-medium rounded-xl transition-colors text-left">
-                          <HelpCircle className="w-4 h-4 text-slate-400" /> Help & Support
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
           </div>
+        );
+        break;
 
-          {/* Spacer for Windows controls when vertical tabs are active */}
-          {isWindows && useVerticalTabs && (
-            <div
-              className="w-[140px] shrink-0 select-none drag-region"
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      case 'bookmarksToggle': {
+        const isActiveBm = onToggleBookmarksBar ? showBookmarksBar : isBookmarked;
+        const handleBmClick = () => {
+          if (onToggleBookmarksBar) {
+            onToggleBookmarksBar();
+          } else {
+            onToggleBookmark(activeTab || undefined);
+          }
+        };
+        content = (
+          <button
+            type="button"
+            onClick={handleBmClick}
+            className={`${iconBtnClass} ${isActiveBm ? btnActive : btnHover}`}
+            title={
+              onToggleBookmarksBar
+                ? showBookmarksBar
+                  ? 'Hide Bookmarks Bar'
+                  : 'Show Bookmarks Bar'
+                : isBookmarked
+                ? 'Remove Bookmark'
+                : 'Bookmark Page'
+            }
+            aria-label="Bookmarks"
+            aria-pressed={Boolean(isActiveBm)}
+          >
+            <Star
+              className={`w-4 h-4 shrink-0 ${isActiveBm ? 'fill-accent text-accent' : ''}`}
+              style={iconScaleStyle}
             />
-          )}
-        </div>
+            {showLabel && <span className="whitespace-nowrap leading-none">Bookmarks</span>}
+          </button>
+        );
+        break;
+      }
+
+      case 'splitView':
+        content = (
+          <button
+            type="button"
+            onClick={onToggleSplitView}
+            className={`${iconBtnClass} ${isSplitView ? btnActive : btnHover}`}
+            title="Split View"
+            aria-label="Split View"
+            aria-pressed={Boolean(isSplitView)}
+          >
+            <Columns2 className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">Split</span>}
+          </button>
+        );
+        break;
+
+      case 'pip':
+        content = (
+          <button
+            type="button"
+            onClick={() => {
+              if (activeTab && onTogglePip) onTogglePip(activeTab.id);
+            }}
+            disabled={!onTogglePip || !activeTab}
+            className={`${iconBtnClass} ${activeTab?.isInPip ? btnActive : btnHover}`}
+            title={activeTab?.isInPip ? 'Exit Picture in Picture' : 'Picture in Picture'}
+            aria-label="Picture in Picture"
+            aria-pressed={Boolean(activeTab?.isInPip)}
+          >
+            <PictureInPicture2 className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">PiP</span>}
+          </button>
+        );
+        break;
+
+      case 'screenshot':
+        content = (
+          <button
+            type="button"
+            onClick={() => onTakeScreenshot?.()}
+            disabled={!onTakeScreenshot}
+            className={`${iconBtnClass} ${btnHover}`}
+            title="Take Screenshot"
+            aria-label="Take Screenshot"
+          >
+            <Camera className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">Screenshot</span>}
+          </button>
+        );
+        break;
+
+      case 'account':
+        if (!onOpenAccount && !isCustomizeMode) {
+          return null;
+        }
+        content = (
+          <button
+            type="button"
+            onClick={() => onOpenAccount?.()}
+            disabled={!onOpenAccount}
+            className={`${iconBtnClass} relative justify-center ${
+              isIncognito
+                ? 'hover:bg-slate-700 text-slate-300'
+                : syncStatus.isLoggedIn
+                ? 'hover:bg-accent/10 text-accent-hover dark:text-accent'
+                : 'hover:bg-black/[0.06] dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+            }`}
+            title={
+              syncStatus.isLoggedIn
+                ? `Nova Account (${syncStatus.user?.displayName || syncStatus.user?.email})`
+                : 'Sign In to Nova Sync'
+            }
+            aria-label="Account & Sync"
+          >
+            {syncStatus.isLoggedIn && syncStatus.user ? (
+              <div className="w-5 h-5 rounded-full bg-accent text-accent-text font-semibold text-[10px] flex items-center justify-center shadow-xs uppercase shrink-0">
+                {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
+              </div>
+            ) : (
+              <User className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            )}
+            {showLabel && (
+              <span className="whitespace-nowrap leading-none max-w-[72px] truncate">
+                {syncStatus.isLoggedIn && syncStatus.user?.displayName
+                  ? syncStatus.user.displayName
+                  : 'Account'}
+              </span>
+            )}
+            {syncStatus.isLoggedIn && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-0.5 right-0.5 border border-white dark:border-slate-900" />
+            )}
+          </button>
+        );
+        break;
+
+      case 'customize':
+        content = (
+          <button
+            type="button"
+            onClick={() => onOpenCustomizeMode?.()}
+            className={`${iconBtnClass} ${isCustomizeMode ? btnActive : btnHover}`}
+            title={
+              isMac ? 'Customize Browser (⇧⌘E)' : 'Customize Browser (Ctrl+Shift+E)'
+            }
+            aria-label="Customize Browser"
+            aria-pressed={Boolean(isCustomizeMode)}
+          >
+            <SlidersHorizontal className="w-4 h-4 shrink-0" style={iconScaleStyle} />
+            {showLabel && <span className="whitespace-nowrap leading-none">Customize</span>}
+          </button>
+        );
+        break;
+
+      case 'menu':
+        content = renderMoreMenu();
+        break;
+
+      case 'spacer':
+        outerClassName = 'relative flex-1 min-w-4 flex items-center';
+        wrapperClassName = 'w-full h-full flex items-center';
+        content = (
+          <div
+            aria-hidden="true"
+            className={
+              isCustomizeMode
+                ? 'flex-1 min-w-4 h-6 rounded border border-dashed border-slate-300 dark:border-white/25 flex items-center justify-center text-[10px] text-slate-400 dark:text-slate-500 italic select-none px-2'
+                : 'flex-1 min-w-4 h-6'
+            }
+          >
+            {isCustomizeMode ? 'Space' : null}
+          </div>
+        );
+        break;
+
+      case 'divider':
+        content = (
+          <div
+            aria-hidden="true"
+            className={
+              isCustomizeMode
+                ? 'px-1.5 py-1 flex items-center justify-center'
+                : 'flex items-center justify-center'
+            }
+          >
+            <div className="w-px h-4 mx-0.5 shrink-0 bg-slate-200 dark:bg-white/15" />
+          </div>
+        );
+        break;
+
+      default: {
+        const meta = getToolbarItemMeta(slot.kind);
+        const FallbackIcon = meta.icon;
+        content = (
+          <button
+            type="button"
+            disabled
+            className={`${iconBtnClass} ${btnHover}`}
+            title={meta.label}
+          >
+            <FallbackIcon className="w-4 h-4 shrink-0" />
+          </button>
+        );
+        break;
+      }
+    }
+
+    const isDragTarget = isCustomizeMode && dragOverTarget === slot.id;
+
+    return (
+      <div
+        data-toolbar-slot-id={slot.id}
+        data-toolbar-kind={slot.kind}
+        className={`${outerClassName} ${
+          isDragTarget ? 'ring-2 ring-[var(--nova-accent,#3b82f6)] rounded-md' : ''
+        }`}
+      >
+        <CustomizeSlotWrapper
+          item={slot}
+          isCustomizeMode={isCustomizeMode}
+          onToggleVisibility={onToggleToolbarSlotVisibility}
+          onRemove={onRemoveToolbarSlot}
+          onDragOver={(_, item) => {
+            if (isCustomizeMode && dragOverTarget !== item.id) {
+              setDragOverTarget(item.id);
+            }
+          }}
+          onDrop={(e, item) => handleSlotDrop(e, item, idx)}
+          className={wrapperClassName}
+        >
+          {content}
+        </CustomizeSlotWrapper>
       </div>
+    );
+  };
+
+  const renderDropZone = (atIndex: number, zoneKey: string, isEnd = false) => {
+    const isOver = dragOverTarget === zoneKey;
+    return (
+      <div
+        data-toolbar-dropzone={isEnd ? 'end' : String(atIndex)}
+        onDragOver={(e) => {
+          if (!isCustomizeMode) return;
+          if (hasToolbarDragTypes(e.dataTransfer?.types)) {
+            e.preventDefault();
+            if (dragOverTarget !== zoneKey) {
+              setDragOverTarget(zoneKey);
+            }
+          }
+        }}
+        onDragLeave={() => {
+          if (dragOverTarget === zoneKey) {
+            setDragOverTarget(null);
+          }
+        }}
+        onDrop={(e) => handleDropAtGap(e, atIndex)}
+        className={
+          isEnd
+            ? `min-w-[28px] h-7 px-2 rounded-md border border-dashed shrink-0 flex items-center justify-center text-[10px] font-medium transition-colors select-none ${
+                isOver
+                  ? 'border-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/15 text-[var(--nova-accent,#3b82f6)]'
+                  : 'border-slate-300/70 dark:border-white/15 text-slate-400 dark:text-slate-500'
+              }`
+            : `h-7 shrink-0 rounded-full transition-all ${
+                isOver
+                  ? 'w-5 mx-0.5 bg-[var(--nova-accent,#3b82f6)]/25 border border-dashed border-[var(--nova-accent,#3b82f6)]'
+                  : 'w-1.5 -mx-0.5'
+              }`
+        }
+        title={isEnd ? 'Drop toolbar item here' : undefined}
+      >
+        {isEnd ? '+' : null}
+      </div>
+    );
+  };
+
+  const renderToolbarSlots = (compactSingleRow: boolean) => (
+    <>
+      {layoutConfig.toolbarItems.map((slot, idx) => (
+        <React.Fragment key={slot.id}>
+          {isCustomizeMode && renderDropZone(idx, `gap-${idx}`)}
+          {renderToolbarItem(slot, idx, compactSingleRow)}
+        </React.Fragment>
+      ))}
+      {isCustomizeMode && renderDropZone(layoutConfig.toolbarItems.length, 'gap-end', true)}
+    </>
+  );
+
+  const renderWindowDragSpacer = (side: 'mac' | 'windows') => (
+    <div
+      className={`relative ${
+        side === 'mac' ? 'w-[88px]' : 'w-[140px]'
+      } self-stretch min-h-[28px] shrink-0 select-none drag-region`}
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    />
+  );
+
+  const toolbarRowStyle: React.CSSProperties = !isIncognito
+    ? {
+        background: 'transparent',
+        color: 'var(--nova-toolbar-text, inherit)',
+        borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
+        borderBottomWidth: 'var(--nova-toolbar-border-width, 1px)',
+        minHeight: 'var(--nova-toolbar-height, 44px)',
+        paddingTop: 'var(--nova-density-pad-y, 6px)',
+        paddingBottom: 'var(--nova-density-pad-y, 6px)',
+        paddingLeft: 'var(--nova-density-pad-x, 12px)',
+        paddingRight: 'var(--nova-density-pad-x, 12px)',
+        boxShadow: 'var(--nova-toolbar-shadow, none)',
+      }
+    : {
+        minHeight: 'var(--nova-toolbar-height, 44px)',
+      };
+
+  const renderToolbarBackdropLayer = () =>
+    !isIncognito ? (
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-white/95 dark:bg-slate-800/95"
+        style={{
+          background: 'var(--nova-toolbar-bg, var(--nova-card-bg))',
+          backdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
+          WebkitBackdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
+        }}
+      />
+    ) : null;
+
+  const renderTabBarRow = (isTopMostRow: boolean) => (
+    <AnimatePresence key="classic-tabbar-presence" initial={false}>
+      <motion.div
+        key="classic-tabbar-row"
+        data-topbar-row="tabbar"
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
+        exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
+        transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.2 }}
+        style={
+          !isIncognito
+            ? {
+                minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
+                backdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
+                WebkitBackdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
+              }
+            : {
+                minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
+              }
+        }
+        className={`flex items-end px-2 ${isTopMostRow ? 'pt-2.5' : 'pt-1.5'} gap-1`}
+      >
+        {/* macOS Traffic Lights Spacer when TabBar is top-most */}
+        {isMac && isTopMostRow && renderWindowDragSpacer('mac')}
+
+        {/* Workspace Selector */}
+        {renderWorkspaceSelector('tabbar', false)}
+
+        {/* Tabs */}
+        {renderTabStrip(false)}
+
+        {/* Spacer for Windows controls when TabBar is top-most */}
+        {isWindows && isTopMostRow && renderWindowDragSpacer('windows')}
+      </motion.div>
+    </AnimatePresence>
+  );
+
+  const renderToolbarRow = (isTopMostRow: boolean) => (
+    <div
+      key="classic-toolbar-row"
+      data-topbar-row="toolbar"
+      onDragOver={(e) => {
+        if (!isCustomizeMode) return;
+        if (hasToolbarDragTypes(e.dataTransfer?.types)) {
+          e.preventDefault();
+        }
+      }}
+      onDrop={(e) => {
+        if (!isCustomizeMode || e.defaultPrevented) return;
+        handleDropAtGap(e, layoutConfig.toolbarItems.length);
+      }}
+      style={toolbarRowStyle}
+      className={`relative flex items-center px-3 py-1.5 gap-2 no-drag ${
+        isIncognito
+          ? 'bg-slate-800 border-b border-slate-700'
+          : 'bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700'
+      }`}
+    >
+      {/* Dedicated backdrop layer keeps backdrop-filter off the toolbar container so fixed popovers stay viewport-anchored */}
+      {renderToolbarBackdropLayer()}
+
+      {/* macOS Traffic Lights Spacer when Toolbar is top-most */}
+      {isMac && !layoutConfig.isVerticalChrome && isTopMostRow && renderWindowDragSpacer('mac')}
+
+      <div className="relative flex-1 min-w-0 flex items-center gap-1.5">
+        {renderToolbarSlots(false)}
+      </div>
+
+      {/* Windows controls spacer when Toolbar is top-most or vertical tabs are active */}
+      {isWindows &&
+        ((isTopMostRow && !layoutConfig.isVerticalChrome) || layoutConfig.isVerticalChrome) &&
+        renderWindowDragSpacer('windows')}
+    </div>
+  );
+
+  const renderCompactSingleRow = () => (
+    <div
+      key="compact-single-row"
+      data-topbar-row="compact"
+      onDragOver={(e) => {
+        if (!isCustomizeMode) return;
+        if (hasToolbarDragTypes(e.dataTransfer?.types)) {
+          e.preventDefault();
+        }
+      }}
+      onDrop={(e) => {
+        if (!isCustomizeMode || e.defaultPrevented) return;
+        handleDropAtGap(e, layoutConfig.toolbarItems.length);
+      }}
+      style={toolbarRowStyle}
+      className={`relative flex items-center px-2.5 py-1 gap-2 no-drag ${
+        isIncognito
+          ? 'bg-slate-800 border-b border-slate-700'
+          : 'bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700'
+      }`}
+    >
+      {/* Dedicated backdrop layer keeps backdrop-filter off the container so fixed popovers stay viewport-anchored */}
+      {renderToolbarBackdropLayer()}
+
+      {/* macOS Traffic Lights Spacer */}
+      {isMac && renderWindowDragSpacer('mac')}
+
+      {/* Compact Workspace Pill (when workspaces slot isn't explicitly placed in toolbar) */}
+      {!hasVisibleWorkspacesSlot && workspaces && activeWorkspace && onSelectWorkspace && (
+        <div className="relative shrink-0">{renderWorkspaceSelector('compact', true)}</div>
+      )}
+
+      {/* Scrollable Compact Tab Strip */}
+      {renderTabStrip(true)}
+
+      <div className="relative w-px h-5 bg-slate-200 dark:bg-white/10 shrink-0" />
+
+      {/* Modular Toolbar Slots */}
+      <div className="relative flex-1 min-w-[200px] flex items-center gap-1">
+        {renderToolbarSlots(true)}
+      </div>
+
+      {/* Windows Caption Controls Spacer */}
+      {isWindows && renderWindowDragSpacer('windows')}
+    </div>
+  );
+
+  return (
+    <>
+    <header
+      onContextMenu={handleTopBarContextMenu}
+      style={!isIncognito ? {
+        background: 'var(--nova-tabBar-bg, var(--nova-header-bg))',
+        color: 'var(--nova-tabBar-text, inherit)',
+        borderColor: 'var(--nova-tabBar-border, var(--nova-border-subtle))',
+        borderBottomWidth: 'var(--nova-tabBar-border-width, 1px)',
+        fontFamily: 'var(--nova-font-ui, inherit)',
+      } : {
+        fontFamily: 'var(--nova-font-ui, inherit)',
+      }}
+      className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}
+    >
+      {layoutConfig.isVerticalChrome ? (
+        renderToolbarRow(true)
+      ) : layoutConfig.isCompactSingleRow ? (
+        renderCompactSingleRow()
+      ) : layoutConfig.tabBarPosition === 'below-toolbar' ? (
+        <>
+          {renderToolbarRow(true)}
+          {renderTabBarRow(false)}
+        </>
+      ) : (
+        <>
+          {renderTabBarRow(true)}
+          {renderToolbarRow(false)}
+        </>
+      )}
 
       {/*
         ROW 3: Bookmarks Bar
@@ -1989,6 +3037,74 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         </div>
       )}
     </header>
+
+    {/* TopBar Right-Click Context Menu */}
+    {topBarContextMenu.isOpen &&
+      typeof document !== 'undefined' &&
+      createPortal(
+        <div
+          ref={topBarContextMenuRef}
+          role="menu"
+          aria-label="Toolbar context menu"
+          style={{
+            position: 'fixed',
+            left: topBarContextMenu.x,
+            top: topBarContextMenu.y,
+            zIndex: 99999,
+            ...(!isIncognito ? POPOVER_SURFACE_STYLE : {}),
+          }}
+          className={`min-w-[220px] rounded-xl shadow-xl border p-1.5 flex flex-col gap-0.5 select-none ${
+            isIncognito
+              ? 'bg-slate-900 border-slate-700 text-slate-100'
+              : 'bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-white/10 text-slate-800 dark:text-slate-100'
+          }`}
+        >
+          {onOpenCustomizeMode && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setTopBarContextMenu(prev => ({ ...prev, isOpen: false }));
+                onOpenCustomizeMode();
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors text-left cursor-pointer"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span>Customize Browser...</span>
+              <span className="ml-auto text-[10px] opacity-55 font-mono">
+                {isMac ? '⇧⌘E' : 'Ctrl+Shift+E'}
+              </span>
+            </button>
+          )}
+          {onToggleBookmarksBar && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setTopBarContextMenu(prev => ({ ...prev, isOpen: false }));
+                onToggleBookmarksBar();
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors text-left cursor-pointer"
+            >
+              <Star className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>{showBookmarksBar ? 'Hide Bookmarks Bar' : 'Show Bookmarks Bar'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setTopBarContextMenu(prev => ({ ...prev, isOpen: false }));
+              onNewTab();
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors text-left cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>New Tab</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
     {/* Drag to Split Screen Ghost Tab */}
     {createPortal(
@@ -2062,81 +3178,4 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     />
     </>
   );
-}, (prevProps, nextProps) => {
-  // Compare only rendered fields — tabs array identity changes on every webview
-  // event. Callback props are stable useCallback references from App.
-
-  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
-  if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
-  if (prevProps.activeDownloadsCount !== nextProps.activeDownloadsCount) return false;
-  if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
-  if (prevProps.showBookmarksBar !== nextProps.showBookmarksBar) return false;
-  if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;
-  if (prevProps.isSplitView !== nextProps.isSplitView) return false;
-  if (prevProps.tabStyle !== nextProps.tabStyle) return false;
-  if (prevProps.tabAnimation !== nextProps.tabAnimation) return false;
-  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
-  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
-  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
-  if (prevProps.isVpnEnabled !== nextProps.isVpnEnabled) return false;
-  if (prevProps.splitTabId !== nextProps.splitTabId) return false;
-  // Drives the AI pill's active state and sparkle; toggling the assistant only
-  // flips this prop, so without the check the pill never repainted.
-  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
-
-  // Array-valued props compared by reference (state arrays from App; stable
-  // unless actually changed)
-  if (prevProps.workspaces !== nextProps.workspaces) return false;
-  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
-  // `downloads` now arrives as a stable reference while the popover is closed
-  // (see EMPTY_DOWNLOADS), so a plain reference check no longer repaints the
-  // strip on every progress broadcast. The badge only needs the count.
-  if (prevProps.downloads !== nextProps.downloads) return false;
-  if ((prevProps.activeDownloadsCount || 0) !== (nextProps.activeDownloadsCount || 0)) return false;
-  if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
-
-  // Tabs: length + order-sensitive per-field comparison of every field the
-  // strip or the active-tab-derived UI reads:
-  //   strip items: id, url, title, favicon, isLoading, isMuted, isPinned,
-  //                isPlayingAudio, isSuspended, splitWith, isIncognito
-  //   active tab:  canGoBack, canGoForward, zoomFactor, blockedAdsCount,
-  //                webContentsId (+ url/title/favicon/id above)
-  const prevTabs = prevProps.tabs;
-  const nextTabs = nextProps.tabs;
-  if (prevTabs === nextTabs) return true;
-  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
-  for (let i = 0; i < prevTabs.length; i++) {
-    const a = prevTabs[i];
-    const b = nextTabs[i];
-    if (a === b) continue;
-    if (
-      a.id !== b.id ||
-      a.url !== b.url ||
-      a.title !== b.title ||
-      a.favicon !== b.favicon ||
-      a.isLoading !== b.isLoading ||
-      a.isMuted !== b.isMuted ||
-      a.isPinned !== b.isPinned ||
-      a.isIncognito !== b.isIncognito ||
-      a.isPlayingAudio !== b.isPlayingAudio ||
-      a.isInPip !== b.isInPip ||
-      a.isSuspended !== b.isSuspended ||
-      a.isTranslated !== b.isTranslated ||
-      a.splitWith !== b.splitWith
-    ) {
-      return false;
-    }
-    if (a.id === nextProps.activeTabId) {
-      if (
-        a.canGoBack !== b.canGoBack ||
-        a.canGoForward !== b.canGoForward ||
-        a.zoomFactor !== b.zoomFactor ||
-        a.blockedAdsCount !== b.blockedAdsCount ||
-        a.webContentsId !== b.webContentsId
-      ) {
-        return false;
-      }
-    }
-  }
-  return true;
-});
+}, topBarPropsEqual);
