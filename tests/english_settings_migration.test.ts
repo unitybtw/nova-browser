@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { defaultSettings } from '../src/types/browser';
 import { safeParseObjectWithBackup } from '../src/utils/safeStorage';
+import { registerPendingLegacyCustomAiApiKey, sanitizeSettingsForPersistence } from '../src/services/aiSecretStore';
 
 // Execute the real settings hook with a synchronous state adapter. This covers
 // local startup and the shared setter used by disk restore, backup and sync.
@@ -17,6 +18,7 @@ const imports: Record<string, any> = {
   },
   '../types/browser': { defaultSettings },
   '../utils/safeStorage': { safeParseObjectWithBackup },
+  '../services/aiSecretStore': { registerPendingLegacyCustomAiApiKey, sanitizeSettingsForPersistence },
 };
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useSettings.ts', 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },

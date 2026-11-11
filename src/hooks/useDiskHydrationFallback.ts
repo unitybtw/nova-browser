@@ -3,6 +3,7 @@ import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/br
 import { getElectronAPI } from '../utils/electronBridge';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { logger } from '../utils/logger';
+import { loadCustomAiApiKey, registerPendingLegacyCustomAiApiKey, sanitizeSettingsForPersistence } from '../services/aiSecretStore';
 
 export interface UseDiskHydrationFallbackOptions {
   isDemo?: boolean;
@@ -58,14 +59,20 @@ export function useDiskHydrationFallback({
             try {
               const parsed = JSON.parse(diskSettings);
               if (parsed && typeof parsed === 'object') {
-                setSettings(prev => ({ ...prev, ...parsed }));
-                localStorage.setItem('user_settings', diskSettings);
+                if (typeof parsed.aiCustomApiKey === 'string' && parsed.aiCustomApiKey.trim().length > 0) {
+                  registerPendingLegacyCustomAiApiKey(parsed.aiCustomApiKey);
+                }
+                const scrubbed = sanitizeSettingsForPersistence(parsed);
+                setSettings(prev => ({ ...prev, ...scrubbed, aiCustomApiKey: '' }));
+                localStorage.setItem('user_settings', JSON.stringify(scrubbed));
               }
             } catch (err) {
               logger.warn('App:Storage', 'Failed to parse diskSettings from storage', err);
             }
           }
         }
+        // Migrate any legacy plaintext AI API key into OS safeStorage on boot
+        void loadCustomAiApiKey();
 
         // Restore workspaces if missing
         if (isMissingOrEmpty(localStorage.getItem('workspaces_session'))) {

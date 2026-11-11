@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -35,6 +35,7 @@ import {
   type AIProviderPreset
 } from '../../services/openAiCompatibleClient';
 import { aiAgent } from '../../services/aiAgent';
+import { getCachedCustomAiApiKey, loadCustomAiApiKey, saveCustomAiApiKey } from '../../services/aiSecretStore';
 
 export interface AISectionProps {
   settings: UserSettings;
@@ -149,6 +150,20 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>('all');
   const [showApiKey, setShowApiKey] = useState(false);
   const [modelSearchQuery, setModelSearchQuery] = useState('');
+  const [customApiKeyInput, setCustomApiKeyInput] = useState<string>(() => getCachedCustomAiApiKey());
+  const hasEditedApiKeyRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadCustomAiApiKey().then((loaded) => {
+      if (!cancelled && !hasEditedApiKeyRef.current) {
+        setCustomApiKeyInput(loaded);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isWebGPU = (settings.aiProvider ?? 'webgpu') === 'webgpu';
   const presetId = settings.aiProviderPreset || 'ollama';
@@ -160,7 +175,7 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
   const activeModel = isWebGPU
     ? aiAgent.getModelDisplayName()
     : settings.aiCustomModel || preset.defaultModel || 'Server default';
-  const needsKey = !isWebGPU && preset.requiresApiKey && !(settings.aiCustomApiKey || '').trim();
+  const needsKey = !isWebGPU && preset.requiresApiKey && !customApiKeyInput.trim();
 
   /* ----------------------------- backend sync ----------------------------- */
 
@@ -177,7 +192,7 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
       overrides.provider ?? settings.aiProvider ?? 'webgpu',
       overrides.endpoint ?? settings.aiCustomEndpoint,
       overrides.model ?? settings.aiCustomModel,
-      overrides.apiKey ?? settings.aiCustomApiKey,
+      overrides.apiKey ?? customApiKeyInput,
       overrides.preset ?? settings.aiProviderPreset ?? 'ollama',
       overrides.temperature ?? temperature,
       overrides.persona ?? persona
@@ -204,11 +219,17 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
   };
 
   const handleFieldChange = (field: 'aiCustomEndpoint' | 'aiCustomModel' | 'aiCustomApiKey', val: string) => {
+    if (field === 'aiCustomApiKey') {
+      hasEditedApiKeyRef.current = true;
+      setCustomApiKeyInput(val);
+      void saveCustomAiApiKey(val);
+      syncBackend({ apiKey: val });
+      return;
+    }
     onUpdateSettings({ [field]: val });
     syncBackend({
       endpoint: field === 'aiCustomEndpoint' ? val : undefined,
-      model: field === 'aiCustomModel' ? val : undefined,
-      apiKey: field === 'aiCustomApiKey' ? val : undefined
+      model: field === 'aiCustomModel' ? val : undefined
     });
   };
 
@@ -227,7 +248,7 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
     setTestingConnection(true);
     setTestResult(null);
     try {
-      const res = await testOpenAIConnection(endpoint, settings.aiCustomApiKey, settings.aiCustomModel);
+      const res = await testOpenAIConnection(endpoint, customApiKeyInput, settings.aiCustomModel);
       if (res.ok) {
         const count = res.models?.length ?? 0;
         setTestResult({
@@ -573,7 +594,7 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
                   type={showApiKey ? 'text' : 'password'}
                   spellCheck={false}
                   autoComplete="off"
-                  value={settings.aiCustomApiKey ?? ''}
+                  value={customApiKeyInput}
                   onChange={(e) => handleFieldChange('aiCustomApiKey', e.target.value)}
                   placeholder={preset.apiKeyPlaceholder || (preset.requiresApiKey ? 'Paste your API key' : 'Not needed for most local servers')}
                   className={`${inputClass} pl-8 pr-10 ${needsKey ? 'border-amber-300 dark:border-amber-700/70' : ''}`}

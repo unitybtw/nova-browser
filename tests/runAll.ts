@@ -110,3 +110,4 @@ import './download_actions.test';
 import './newtab_collection_recovery.test';
 
 import './privacy_boundary_fixes.test';
+import './security_hardening_fixes.test';

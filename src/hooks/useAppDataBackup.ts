@@ -4,6 +4,7 @@ import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { generateId } from '../utils/idGenerator';
 import { showAlert } from '../utils/confirmDialog';
 import { mergeSyncedCollection, normalizeBookmarkUrl, mergeSyncedHistory } from '../services/syncService';
+import { sanitizeSettingsForPersistence } from '../services/aiSecretStore';
 
 export interface UseAppDataBackupOptions {
   /**
@@ -34,7 +35,7 @@ export function useAppDataBackup({
       timestamp: Date.now(),
       bookmarks: bookmarkRows,
       history,
-      settings
+      settings: sanitizeSettingsForPersistence(settings)
     };
     const jsonStr = JSON.stringify(backup, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });

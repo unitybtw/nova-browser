@@ -14,13 +14,11 @@
  *                                               asar packaging confirmed: package.json
  *                                               "build" does not disable asar and
  *                                               electron-builder defaults to asar:true)
- *   - EnableEmbeddedAsarIntegrityValidation -> opt-in (NOVA_ENABLE_ASAR_INTEGRITY_FUSE=1):
- *                                               requires code signing to embed/verify
- *                                               ASAR integrity data. The Windows NSIS
- *                                               target has no signing config, so
- *                                               enabling it unconditionally would break
- *                                               unsigned builds. Turn it on for signed
- *                                               release builds.
+ *   - EnableEmbeddedAsarIntegrityValidation -> enabled by default on macOS & Windows
+ *                                               when ASAR integrity metadata is embedded by
+ *                                               electron-builder (opt out via
+ *                                               NOVA_ENABLE_ASAR_INTEGRITY_FUSE=0). Left OFF
+ *                                               on Linux (not supported by Electron on Linux).
  *
  * Non-matching platforms no-op gracefully with an explanation.
  */
@@ -60,7 +58,17 @@ async function defaultExport(context) {
   const { flipFuses, FuseV1Options, FuseVersion } = require('@electron/fuses');
 
   const asarEnabled = context?.packager?.config?.asar !== false;
-  const enableAsarIntegrity = asarEnabled && process.env.NOVA_ENABLE_ASAR_INTEGRITY_FUSE === '1';
+  const supportsAsarIntegrity = platform === 'darwin' || platform === 'mas' || platform === 'win32';
+  const disableAsarIntegrityConfig = context?.packager?.config?.disableAsarIntegrity === true;
+  const optOutAsarIntegrity = process.env.NOVA_ENABLE_ASAR_INTEGRITY_FUSE === '0';
+  let enableAsarIntegrity = asarEnabled && supportsAsarIntegrity && !disableAsarIntegrityConfig && !optOutAsarIntegrity;
+  if (enableAsarIntegrity && (platform === 'darwin' || platform === 'mas')) {
+    const infoPlistPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, 'Contents', 'Info.plist');
+    if (!fs.existsSync(infoPlistPath) || !fs.readFileSync(infoPlistPath, 'utf8').includes('ElectronAsarIntegrity')) {
+      console.warn('[apply-fuses] Warning: Info.plist missing ElectronAsarIntegrity — leaving EnableEmbeddedAsarIntegrityValidation OFF.');
+      enableAsarIntegrity = false;
+    }
+  }
 
   const plan = [
     ['RunAsNode', FuseV1Options.RunAsNode, false],
@@ -121,7 +129,7 @@ async function defaultExport(context) {
   }
 
   if (!enableAsarIntegrity) {
-    console.log('[apply-fuses] Note: EnableEmbeddedAsarIntegrityValidation left OFF (requires code-signed builds). Set NOVA_ENABLE_ASAR_INTEGRITY_FUSE=1 to enable.');
+    console.log('[apply-fuses] Note: EnableEmbeddedAsarIntegrityValidation left OFF (platform unsupported, ASAR disabled, or NOVA_ENABLE_ASAR_INTEGRITY_FUSE=0).');
   }
 }
 

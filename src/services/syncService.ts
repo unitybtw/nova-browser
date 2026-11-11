@@ -1097,6 +1097,10 @@ export function mergeSettingsLastWriteWins(
   allKeys.forEach(key => {
     if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
     if (!Object.prototype.hasOwnProperty.call(defaultSettings, key)) return;
+    if (key === 'aiCustomApiKey') {
+      merged[key] = '';
+      return;
+    }
 
     const localTs = stamps[key] || 0;
     const remoteTs = (typeof remoteStamps[key] === 'number' ? remoteStamps[key] : fallbackRemoteTs) as number;
@@ -2777,7 +2781,7 @@ export class NovaSyncService {
       encryptedPasswords: encryptedPassPayload?.ciphertext,
       passwordsSalt: encryptedPassPayload?.salt,
       passwordsIv: encryptedPassPayload?.iv,
-      settings: prefs.syncSettings ? mergedSettings : undefined,
+      settings: prefs.syncSettings ? { ...mergedSettings, aiCustomApiKey: '' } : undefined,
       settingsTimestamps: prefs.syncSettings ? this.getSettingsTimestamps() : undefined,
       workspaces: prefs.syncWorkspaces ? capSyncedCollection(mergedWorkspaces, MAX_SYNCED_WORSPACES) : undefined
     };

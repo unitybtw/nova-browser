@@ -832,14 +832,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
           // Sanitize and strip hardcoded inline colors/backgrounds for true dark mode and security
           const rawCleanHtml = sanitizeReaderContent(article.content, isIncognito);
-          // Harden links against tabnabbing: force rel + blank target.
-          const linkHost = document.createElement('div');
-          linkHost.innerHTML = rawCleanHtml;
-          linkHost.querySelectorAll('a').forEach((a) => {
+          // Harden links against tabnabbing using an inert DOMParser document (avoids innerHTML DOM preloads).
+          const parsedDoc = new DOMParser().parseFromString(rawCleanHtml, 'text/html');
+          parsedDoc.querySelectorAll('a').forEach((a) => {
             a.setAttribute('rel', 'noopener noreferrer');
             a.setAttribute('target', '_blank');
           });
-          setContent(linkHost.innerHTML);
+          setContent(sanitizeReaderContent(parsedDoc.body.innerHTML, isIncognito));
         } else {
           setError('The text content on this page is not suitable for reader mode.');
         }

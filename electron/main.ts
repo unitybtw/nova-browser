@@ -788,8 +788,8 @@ function createWindow() {
       const isDev = isDevLocalhost || !app.isPackaged;
       responseHeaders['Content-Security-Policy'] = [
         isDev
-          ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https: https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
-          : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https: https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
+          ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http://localhost:*; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com https://www.bing.com https://openrouter.ai https://api.groq.com https://api.openai.com https://api.deepseek.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+          : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com https://www.bing.com https://openrouter.ai https://api.groq.com https://api.openai.com https://api.deepseek.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
       ];
       responseHeaders['X-Content-Type-Options'] = ['nosniff'];
     }
@@ -2388,17 +2388,20 @@ app.whenReady().then(async () => {
       return { success: false, error: 'Update package does not exist on disk' };
     }
 
-    if (latestReleaseDownloadInfo?.expectedSha256) {
-      try {
-        const actualSha = await computeFileSha256Stream(resolvedFilePath);
-        if (actualSha !== latestReleaseDownloadInfo.expectedSha256.toLowerCase()) {
-          console.error(`[Security] Update checksum mismatch! Expected ${latestReleaseDownloadInfo.expectedSha256}, got ${actualSha}`);
-          return { success: false, error: 'Update package checksum verification failed' };
-        }
-      } catch (hashErr) {
-        console.error('[Security] Failed to verify update checksum:', hashErr);
-        return { success: false, error: 'Failed to verify update integrity' };
+    if (!latestReleaseDownloadInfo?.expectedSha256 || !/^[a-fA-F0-9]{64}$/.test(latestReleaseDownloadInfo.expectedSha256)) {
+      console.error('[Security] Refusing to install update without a valid expected SHA-256 checksum');
+      return { success: false, error: 'Update package checksum verification failed: missing or invalid expected SHA-256' };
+    }
+
+    try {
+      const actualSha = await computeFileSha256Stream(resolvedFilePath);
+      if (actualSha !== latestReleaseDownloadInfo.expectedSha256.toLowerCase()) {
+        console.error(`[Security] Update checksum mismatch! Expected ${latestReleaseDownloadInfo.expectedSha256}, got ${actualSha}`);
+        return { success: false, error: 'Update package checksum verification failed' };
       }
+    } catch (hashErr) {
+      console.error('[Security] Failed to verify update checksum:', hashErr);
+      return { success: false, error: 'Failed to verify update integrity' };
     }
 
     console.log('[Updater] Starting self-update and relaunch with package:', resolvedFilePath);
@@ -3101,15 +3104,20 @@ fi
           const actualSha = hash.digest('hex').toLowerCase();
           let hashVerified = false;
 
-          if (expectedSha256) {
-            if (actualSha !== expectedSha256.toLowerCase()) {
-              try { fs.unlinkSync(tempDest); } catch (_) {}
-              console.error(`[Updater] Checksum mismatch! Expected ${expectedSha256}, got ${actualSha}`);
-              resolve({ success: false, error: 'Update checksum mismatch', hashVerified: false });
-              return;
-            }
-            hashVerified = true;
+          if (!expectedSha256 || !/^[a-fA-F0-9]{64}$/.test(expectedSha256)) {
+            try { fs.unlinkSync(tempDest); } catch (_) {}
+            console.error('[Updater] Checksum missing or invalid format! Rejecting unverified update package.');
+            resolve({ success: false, error: 'Update package rejected: missing expected checksum', hashVerified: false });
+            return;
           }
+
+          if (actualSha !== expectedSha256.toLowerCase()) {
+            try { fs.unlinkSync(tempDest); } catch (_) {}
+            console.error(`[Updater] Checksum mismatch! Expected ${expectedSha256}, got ${actualSha}`);
+            resolve({ success: false, error: 'Update checksum mismatch', hashVerified: false });
+            return;
+          }
+          hashVerified = true;
 
           try {
             if (fs.existsSync(destPath)) {

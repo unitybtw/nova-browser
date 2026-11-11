@@ -3,6 +3,7 @@ import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/br
 import { getElectronAPI } from '../utils/electronBridge';
 import { logger } from '../utils/logger';
 import { recordPersistedSettings } from '../services/syncService';
+import { sanitizeSettingsForPersistence } from '../services/aiSecretStore';
 
 /**
  * Tab fields that represent durable state and must therefore trigger a
@@ -135,13 +136,14 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     if (isDemo || !isHydrated) return;
     const timer = setTimeout(() => {
       try {
-        const serialized = JSON.stringify(settings);
+        const cleanSettings = sanitizeSettingsForPersistence(settings);
+        const serialized = JSON.stringify(cleanSettings);
         localStorage.setItem('user_settings', serialized);
         getElectronAPI()?.storeSet?.('user_settings', serialized);
         // Per-field LWW needs the time of the WRITE, and this write site is the
         // only place that knows it. Without the stamp a local edit is always
         // older than the remote value and the field is frozen forever.
-        recordPersistedSettings(settings);
+        recordPersistedSettings(cleanSettings);
         lastFlushedSettingsJson.current = serialized;
       } catch (err) {
         logger.warn('App:Settings', 'Failed to persist user_settings to storage', err);
@@ -185,11 +187,12 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
           lastFlushedFoldersJson.current = serializedFolders;
         }
 
-        const serializedSettings = JSON.stringify(settingsRef.current);
+        const cleanSettings = sanitizeSettingsForPersistence(settingsRef.current);
+        const serializedSettings = JSON.stringify(cleanSettings);
         if (serializedSettings !== lastFlushedSettingsJson.current) {
           localStorage.setItem('user_settings', serializedSettings);
           getElectronAPI()?.storeSet?.('user_settings', serializedSettings);
-          recordPersistedSettings(settingsRef.current);
+          recordPersistedSettings(cleanSettings);
           lastFlushedSettingsJson.current = serializedSettings;
         }
 

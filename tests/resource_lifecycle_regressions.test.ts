@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { computeLiveAndSuspendedTabs } from '../src/utils/tabManager';
 import type { Tab } from '../src/types/browser';
+import { sanitizeSettingsForPersistence } from '../src/services/aiSecretStore';
 
 // Execute the shipped hooks with controlled clocks and deferred React updates.
 // Effect dependencies and cleanup are retained across simulated renders.
@@ -106,6 +107,7 @@ function persistenceHarness() {
     '../utils/electronBridge': { getElectronAPI: () => undefined },
     '../utils/logger': { logger: { warn: () => {} } },
     '../services/syncService': { recordPersistedSettings: () => {} },
+    '../services/aiSecretStore': { sanitizeSettingsForPersistence },
   }, { localStorage: storage, window: { addEventListener() {}, removeEventListener() {} }, document: { addEventListener() {}, removeEventListener() {} } });
   const tabs = [tab('a')];
   const options: any = { tabs, settings: {}, activeTabId: 'a', tabsRef: { current: tabs }, activeTabIdRef: { current: 'a' }, foldersRef: { current: [] }, settingsRef: { current: {} }, bookmarksRef: { current: [] }, workspacesRef: { current: [] }, activeWorkspaceIdRef: { current: 'default' }, flushHistory() {}, flushBookmarks() {} };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { defaultSettings, type UserSettings } from '../types/browser';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
+import { registerPendingLegacyCustomAiApiKey, sanitizeSettingsForPersistence } from '../services/aiSecretStore';
 
 export interface UseSettingsOptions {
   isDemo?: boolean;
@@ -39,13 +40,18 @@ export function useSettings(options: UseSettingsOptions = {}) {
 
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('user_settings') : null;
     const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
+    if (typeof parsed.aiCustomApiKey === 'string' && parsed.aiCustomApiKey.trim().length > 0) {
+      registerPendingLegacyCustomAiApiKey(parsed.aiCustomApiKey);
+    }
+    const sanitizedParsed = sanitizeSettingsForPersistence(parsed);
     const merged: UserSettings = {
       ...initialSettings,
-      ...parsed,
+      ...sanitizedParsed,
+      aiCustomApiKey: '',
       language: 'en',
       shortcuts: {
         ...initialSettings.shortcuts,
-        ...(parsed.shortcuts || {})
+        ...(sanitizedParsed.shortcuts || {})
       }
     };
     // Migration: ensure macOS users have shift: true for downloads shortcut if they had the legacy default shift: false
@@ -71,7 +77,8 @@ export function useSettings(options: UseSettingsOptions = {}) {
   const setSettings: Dispatch<SetStateAction<UserSettings>> = useCallback(update => {
     setSettingsState(prev => {
       const next = typeof update === 'function' ? update(prev) : update;
-      return next.language === 'en' ? next : { ...next, language: 'en' };
+      const clean = next.aiCustomApiKey ? { ...next, aiCustomApiKey: '' } : next;
+      return clean.language === 'en' ? clean : { ...clean, language: 'en' };
     });
   }, []);
 

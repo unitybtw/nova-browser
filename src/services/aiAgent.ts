@@ -6,6 +6,12 @@ import { orchestrator } from "./agentOrchestrator";
 import { generateId } from "../utils/idGenerator";
 import { logger } from "../utils/logger";
 import { getLocale } from "./i18n";
+import {
+  captureLegacyCustomAiApiKeySync,
+  getCachedCustomAiApiKey,
+  loadCustomAiApiKey,
+  setCachedCustomAiApiKey
+} from "./aiSecretStore";
 
 // ---------------------------------------------------------------------------
 // Security: Prompt injection sanitizer
@@ -747,18 +753,9 @@ class AIAgent {
     temperature: number;
     personality: 'balanced' | 'creative' | 'code' | 'concise';
   } {
-    let resolvedApiKey = this.customApiKey;
-    if (!resolvedApiKey && typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('user_settings');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && typeof parsed.aiCustomApiKey === 'string') {
-            resolvedApiKey = parsed.aiCustomApiKey;
-            this.customApiKey = resolvedApiKey;
-          }
-        }
-      } catch {}
+    let resolvedApiKey = this.customApiKey || getCachedCustomAiApiKey() || captureLegacyCustomAiApiKeySync();
+    if (resolvedApiKey && !this.customApiKey) {
+      this.customApiKey = resolvedApiKey;
     }
 
     if (typeof localStorage === 'undefined') {
@@ -792,6 +789,7 @@ class AIAgent {
   ): Promise<void> {
     if (apiKey !== undefined) {
       this.customApiKey = apiKey;
+      setCachedCustomAiApiKey(apiKey);
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('nova_ai_backend', backend);
@@ -1480,6 +1478,12 @@ CRITICAL RULES:
     try {
       const backend = this.getBackend();
       if (backend === 'custom') {
+        if (!this.customApiKey) {
+          const hydratedKey = await loadCustomAiApiKey();
+          if (hydratedKey) {
+            this.customApiKey = hydratedKey;
+          }
+        }
         const { endpoint, model, apiKey } = this.getCustomConfig();
         const msg = model ? `Connecting to custom backend (${model})...` : 'Connecting to custom endpoint (LiteLLM / Ollama)...';
         if (onProgress) onProgress(50, msg);
@@ -2973,7 +2977,8 @@ CRITICAL RULES:
 
       else if (functionName === "click_element") {
         const { ai_id, fallback_text } = args;
-        const colorHex = this.getThemeColor();
+        const rawColor = this.getThemeColor();
+        const colorHex = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#3b82f6';
         // Escape all user-controlled values for safe JS template literal interpolation
         const safeAiId = escapeForJSTemplate(JSON.stringify(ai_id));
         const safeFallbackText = escapeForJSTemplate(JSON.stringify(fallback_text ?? ''));
@@ -3005,7 +3010,7 @@ CRITICAL RULES:
               const centerY = rect.top + rect.height / 2;
               const color = '${safeColorHex}';
 
-              // 1. Setup Cursor
+              // 1. Setup Cursor using DOM APIs (avoids innerHTML / Trusted Types issues)
               const cursor = document.createElement('div');
               cursor.style.position = 'fixed';
               cursor.style.top = (window.innerHeight + 50) + 'px';
@@ -3015,7 +3020,20 @@ CRITICAL RULES:
               cursor.style.zIndex = '2147483647';
               cursor.style.pointerEvents = 'none';
               cursor.style.transition = 'top 0.6s cubic-bezier(0.22, 1, 0.36, 1), left 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.2s ease, opacity 0.3s ease';
-              cursor.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));"><path d="M4.68114 2.85243C4.24647 2.21323 3.32839 2.45784 3.20816 3.24584L1.07724 17.1994C0.97034 17.8997 1.70613 18.4239 2.34863 18.106L8.14088 15.2415C8.36737 15.1295 8.63155 15.1274 8.85974 15.2359L15.3406 18.3188C15.986 18.6258 16.7118 18.082 16.5911 17.3813L14.2882 4.02008C14.1528 3.23438 13.2209 2.99343 12.7885 3.63319L4.68114 2.85243Z" fill="' + color + '" stroke="white" stroke-width="1.5"/></svg>';
+              const svgNs = 'http://www.w3.org/2000/svg';
+              const svgEl = document.createElementNS(svgNs, 'svg');
+              svgEl.setAttribute('width', '28');
+              svgEl.setAttribute('height', '28');
+              svgEl.setAttribute('viewBox', '0 0 24 24');
+              svgEl.setAttribute('fill', 'none');
+              svgEl.style.filter = 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))';
+              const pathEl = document.createElementNS(svgNs, 'path');
+              pathEl.setAttribute('d', 'M4.68114 2.85243C4.24647 2.21323 3.32839 2.45784 3.20816 3.24584L1.07724 17.1994C0.97034 17.8997 1.70613 18.4239 2.34863 18.106L8.14088 15.2415C8.36737 15.1295 8.63155 15.1274 8.85974 15.2359L15.3406 18.3188C15.986 18.6258 16.7118 18.082 16.5911 17.3813L14.2882 4.02008C14.1528 3.23438 13.2209 2.99343 12.7885 3.63319L4.68114 2.85243Z');
+              pathEl.setAttribute('fill', color);
+              pathEl.setAttribute('stroke', 'white');
+              pathEl.setAttribute('stroke-width', '1.5');
+              svgEl.appendChild(pathEl);
+              cursor.appendChild(svgEl);
               document.body.appendChild(cursor);
 
               // 2. Setup Target Highlight Box
@@ -3085,7 +3103,8 @@ CRITICAL RULES:
 
       else if (functionName === "fill_input") {
         const { ai_id, value, submit } = args;
-        const colorHex = this.getThemeColor();
+        const rawColor = this.getThemeColor();
+        const colorHex = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#3b82f6';
         // Escape all user-controlled values for safe JS template literal interpolation
         const safeAiId = escapeForJSTemplate(JSON.stringify(ai_id));
         const safeValue = escapeForJSTemplate(JSON.stringify(value));
@@ -3131,7 +3150,7 @@ CRITICAL RULES:
             highlight.style.boxShadow = '0 0 15px ' + color + '40';
             document.body.appendChild(highlight);
 
-            // Cursor
+            // Cursor using DOM APIs (avoids innerHTML / Trusted Types issues)
             const cursor = document.createElement('div');
             cursor.style.position = 'fixed';
             cursor.style.top = (window.innerHeight + 50) + 'px';
@@ -3141,7 +3160,20 @@ CRITICAL RULES:
             cursor.style.zIndex = '2147483647';
             cursor.style.pointerEvents = 'none';
             cursor.style.transition = 'top 0.6s cubic-bezier(0.22, 1, 0.36, 1), left 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease';
-            cursor.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));"><path d="M4.68114 2.85243C4.24647 2.21323 3.32839 2.45784 3.20816 3.24584L1.07724 17.1994C0.97034 17.8997 1.70613 18.4239 2.34863 18.106L8.14088 15.2415C8.36737 15.1295 8.63155 15.1274 8.85974 15.2359L15.3406 18.3188C15.986 18.6258 16.7118 18.082 16.5911 17.3813L14.2882 4.02008C14.1528 3.23438 13.2209 2.99343 12.7885 3.63319L4.68114 2.85243Z" fill="' + color + '" stroke="white" stroke-width="1.5"/></svg>';
+            const svgNs = 'http://www.w3.org/2000/svg';
+            const svgEl = document.createElementNS(svgNs, 'svg');
+            svgEl.setAttribute('width', '28');
+            svgEl.setAttribute('height', '28');
+            svgEl.setAttribute('viewBox', '0 0 24 24');
+            svgEl.setAttribute('fill', 'none');
+            svgEl.style.filter = 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))';
+            const pathEl = document.createElementNS(svgNs, 'path');
+            pathEl.setAttribute('d', 'M4.68114 2.85243C4.24647 2.21323 3.32839 2.45784 3.20816 3.24584L1.07724 17.1994C0.97034 17.8997 1.70613 18.4239 2.34863 18.106L8.14088 15.2415C8.36737 15.1295 8.63155 15.1274 8.85974 15.2359L15.3406 18.3188C15.986 18.6258 16.7118 18.082 16.5911 17.3813L14.2882 4.02008C14.1528 3.23438 13.2209 2.99343 12.7885 3.63319L4.68114 2.85243Z');
+            pathEl.setAttribute('fill', color);
+            pathEl.setAttribute('stroke', 'white');
+            pathEl.setAttribute('stroke-width', '1.5');
+            svgEl.appendChild(pathEl);
+            cursor.appendChild(svgEl);
             document.body.appendChild(cursor);
 
             // Move cursor
@@ -3185,7 +3217,7 @@ CRITICAL RULES:
             if (!document.getElementById('ai-blink-style')) {
               const style = document.createElement('style');
               style.id = 'ai-blink-style';
-              style.innerHTML = '@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }';
+              style.textContent = '@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }';
               document.head.appendChild(style);
             }
 
