@@ -756,7 +756,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           variants={shouldAnimate ? containerVariants : undefined}
           initial={shouldAnimate ? "hidden" : false}
           animate="visible"
-          className="w-full max-w-[560px] flex flex-col items-center gap-10 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="w-full max-w-[560px] my-auto flex flex-col items-center gap-10 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
         >
           <motion.div variants={shouldAnimate ? itemVariants : undefined} className="flex flex-col items-center text-center">
             <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-sm">
@@ -1120,7 +1120,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         variants={shouldAnimate ? containerVariants : undefined}
         initial={shouldAnimate ? "hidden" : false}
         animate="visible"
-        className="w-full max-w-[560px] flex flex-col items-center gap-8 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="w-full max-w-[560px] my-auto flex flex-col items-center gap-8 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
       >
         {/* Clock & Greeting */}
         <Clock

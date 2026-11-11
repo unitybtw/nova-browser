@@ -476,16 +476,15 @@ button:active:not(:disabled) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 32px;
-  padding-top: clamp(28px, 8vh, 88px);
-  padding-bottom: 48px;
+  justify-content: center;
+  padding-block: 40px;
 }
 @container (min-width: 1320px) {
   .nova-tasks-widget {
     position: absolute;
     right: 32px;
-    top: clamp(28px, 8vh, 88px);
+    top: 50%;
+    transform: translateY(-50%);
     margin: 0;
   }
 }
