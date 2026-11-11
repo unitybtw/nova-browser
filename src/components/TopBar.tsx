@@ -436,7 +436,7 @@ const MemoizedTabItem = React.memo(
           ? isActive
             ? {
                 background: 'var(--nova-activeTab-bg, var(--nova-active-tab-bg))',
-                color: 'var(--nova-activeTab-text)',
+                color: 'var(--nova-activeTab-text, inherit)',
                 borderColor: 'var(--nova-activeTab-border, var(--nova-border-subtle))',
                 borderTopColor: 'var(--nova-accent, #3b82f6)',
                 backdropFilter: 'blur(var(--nova-activeTab-blur, 0px))',
@@ -444,7 +444,7 @@ const MemoizedTabItem = React.memo(
                 boxShadow: 'var(--nova-activeTab-shadow, 0 1px 2px rgba(0, 0, 0, 0.05))',
               }
             : {
-                color: 'var(--nova-inactiveTab-text)',
+                color: 'var(--nova-inactiveTab-text, inherit)',
                 borderColor: 'var(--nova-inactiveTab-border, transparent)',
               }
           : {}),
@@ -1210,7 +1210,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     <header
       style={!isIncognito ? {
         background: 'var(--nova-tabBar-bg, var(--nova-header-bg))',
-        color: 'var(--nova-tabBar-text)',
+        color: 'var(--nova-tabBar-text, inherit)',
         borderColor: 'var(--nova-tabBar-border, var(--nova-border-subtle))',
         borderBottomWidth: 'var(--nova-tabBar-border-width, 1px)',
         fontFamily: 'var(--nova-font-ui, inherit)',
@@ -1561,7 +1561,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       */}
       <div
         style={!isIncognito ? {
-          color: 'var(--nova-toolbar-text)',
+          background: 'transparent',
+          color: 'var(--nova-toolbar-text, inherit)',
           borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
           borderBottomWidth: 'var(--nova-toolbar-border-width, 1px)',
           minHeight: 'var(--nova-toolbar-height, 44px)',
@@ -1579,7 +1580,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         {!isIncognito && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
+            className="pointer-events-none absolute inset-0 bg-white/95 dark:bg-slate-800/95"
             style={{
               background: 'var(--nova-toolbar-bg, var(--nova-card-bg))',
               backdropFilter: 'blur(var(--nova-toolbar-blur, 0px))',
@@ -1948,7 +1949,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         <div
           style={!isIncognito ? {
             background: 'var(--nova-toolbar-bg)',
-            color: 'var(--nova-toolbar-text)',
+            color: 'var(--nova-toolbar-text, inherit)',
             borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
             borderTopWidth: 'var(--nova-toolbar-border-width, 1px)',
           } : undefined}
