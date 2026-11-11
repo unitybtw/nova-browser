@@ -143,6 +143,27 @@ const withDivider1 = insertToolbarItem(existingAiList, 'divider', 0, 501);
 const withDivider2 = insertToolbarItem(withDivider1, 'divider', 2, 502);
 assert.equal(withDivider2.filter(i => i.kind === 'divider').length, 2);
 
+// Invalid / unlisted kind strings are rejected (no-op)
+const invalidKindResult = insertToolbarItem(existingAiList, 'invalid-kind-string' as any);
+assert.strictEqual(invalidKindResult, existingAiList);
+assert.equal(invalidKindResult.length, existingAiList.length);
+
+// Rapid same-tick insertions without nonce produce unique slot IDs
+let rapidList = existingAiList;
+for (let i = 0; i < 50; i++) {
+  rapidList = insertToolbarItem(rapidList, i % 2 === 0 ? 'spacer' : 'divider');
+}
+const rapidSpacers = rapidList.filter(i => i.kind === 'spacer');
+assert.equal(rapidSpacers.length, 25);
+const rapidDividers = rapidList.filter(i => i.kind === 'divider');
+assert.equal(rapidDividers.length, 25);
+const allRapidIds = new Set(rapidList.map(s => s.id));
+assert.equal(allRapidIds.size, rapidList.length);
+
+// Explicit nonce determinism remains preserved
+const explicitNonceResult = insertToolbarItem(existingAiList, 'spacer', 0, 789);
+assert.equal(explicitNonceResult[0].id, `slot-spacer-${(789).toString(36)}`);
+
 // ============================================================================
 // 6. Edge Cases: getPaletteToolbarItems
 // ============================================================================

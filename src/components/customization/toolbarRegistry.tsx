@@ -287,16 +287,14 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
         aria-label={`Slot controls for ${spec.label}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle */}
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={`Drag to reorder ${spec.label}`}
+        {/* Drag handle indicator */}
+        <span
+          aria-hidden="true"
           title={`Drag to reorder ${spec.label}`}
-          className="p-0.5 rounded hover:bg-white/20 active:bg-white/30 cursor-grab active:cursor-grabbing text-neutral-300 hover:text-white transition-colors"
+          className="p-0.5 text-neutral-300 select-none cursor-grab active:cursor-grabbing flex items-center justify-center"
         >
           <GripVertical className="w-2.5 h-2.5" />
-        </button>
+        </span>
 
         {/* Visibility Toggle Button */}
         <button

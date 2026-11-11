@@ -4,6 +4,8 @@ import { ALLOWED_TOOLBAR_KINDS } from './designDefaults';
 export const REPEATABLE_TOOLBAR_KINDS: ReadonlySet<ToolbarItemKind> = new Set(['spacer', 'divider']);
 export const REPEATABLE_KINDS = REPEATABLE_TOOLBAR_KINDS;
 
+let autoNonceCounter = 0;
+
 export function reorderToolbarItems(
   items: ToolbarSlotItem[],
   draggedId: string,
@@ -45,13 +47,29 @@ export function insertToolbarItem(
   items: ToolbarSlotItem[],
   kind: ToolbarItemKind,
   atIndex?: number,
-  nonce: number = Date.now()
+  nonce?: number
 ): ToolbarSlotItem[] {
+  if (!ALLOWED_TOOLBAR_KINDS.includes(kind)) {
+    return items;
+  }
   if (!REPEATABLE_TOOLBAR_KINDS.has(kind) && items.some(i => i.kind === kind)) {
     return items;
   }
+
+  let id: string;
+  if (nonce !== undefined) {
+    id = `slot-${kind}-${nonce.toString(36)}`;
+  } else {
+    const base = `slot-${kind}-${Date.now().toString(36)}`;
+    let candidate = base;
+    while (items.some(i => i.id === candidate)) {
+      candidate = `${base}-${(++autoNonceCounter).toString(36)}`;
+    }
+    id = candidate;
+  }
+
   const newItem: ToolbarSlotItem = {
-    id: `slot-${kind}-${nonce.toString(36)}`,
+    id,
     kind,
     visible: true,
   };
