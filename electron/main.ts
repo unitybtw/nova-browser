@@ -322,8 +322,11 @@ if (process.platform === 'linux') {
   } catch (_) {}
 }
 
-// Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+// Bound V8 max heap size dynamically based on available system memory
+// Prevents out-of-memory crashes and thrashing on low-RAM (<= 8GB) host systems
+const totalHostMemMb = Math.floor(os.totalmem() / (1024 * 1024));
+const maxOldSpaceMb = Math.max(1024, Math.min(4096, Math.floor(totalHostMemMb * 0.35)));
+app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${maxOldSpaceMb}`);
 
 // Prevent Network Service crash on macOS if user cancels Keychain prompt during dev
 if (!app.isPackaged) {
@@ -3434,10 +3437,10 @@ fi
     const cachePath = path.join(app.getPath('userData'), 'changelog_cache.json');
     const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-    // 1. Read cached releases if valid and not forcing refresh
-    if (!forceRefresh && fs.existsSync(cachePath)) {
+    // 1. Read cached releases if valid and not forcing refresh (non-blocking async)
+    if (!forceRefresh) {
       try {
-        const cachedRaw = fs.readFileSync(cachePath, 'utf8');
+        const cachedRaw = await fs.promises.readFile(cachePath, 'utf8');
         const cached = JSON.parse(cachedRaw);
         if (cached && Array.isArray(cached.releases) && (Date.now() - (cached.timestamp || 0) < CACHE_TTL_MS)) {
           return cached.releases;
@@ -3453,12 +3456,10 @@ fi
       });
 
       if (!res.ok) {
-        if (fs.existsSync(cachePath)) {
-          try {
-            const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-            if (cached && Array.isArray(cached.releases)) return cached.releases;
-          } catch (_) {}
-        }
+        try {
+          const cached = JSON.parse(await fs.promises.readFile(cachePath, 'utf8'));
+          if (cached && Array.isArray(cached.releases)) return cached.releases;
+        } catch (_) {}
         return null;
       }
 
@@ -3571,20 +3572,18 @@ fi
         });
       }
 
-      // Cache the parsed releases
+      // Cache the parsed releases asynchronously
       try {
-        fs.writeFileSync(cachePath, JSON.stringify({ timestamp: Date.now(), releases: parsedReleases }, null, 2), 'utf8');
+        await fs.promises.writeFile(cachePath, JSON.stringify({ timestamp: Date.now(), releases: parsedReleases }, null, 2), 'utf8');
       } catch (_) {}
 
       return parsedReleases;
     } catch (err) {
       console.warn('[Changelog] Failed to fetch live releases from GitHub:', err);
-      if (fs.existsSync(cachePath)) {
-        try {
-          const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-          if (cached && Array.isArray(cached.releases)) return cached.releases;
-        } catch (_) {}
-      }
+      try {
+        const cached = JSON.parse(await fs.promises.readFile(cachePath, 'utf8'));
+        if (cached && Array.isArray(cached.releases)) return cached.releases;
+      } catch (_) {}
       return null;
     }
   });
@@ -5119,11 +5118,11 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
         try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
       } else {
         console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
-        const getFallbackKey = (): Buffer => {
+        const getFallbackKey = async (): Promise<Buffer> => {
           const secretPath = path.join(app.getPath('userData'), '.machine_secret');
           let secret: Buffer;
           try {
-            secret = fs.readFileSync(secretPath);
+            secret = await fs.promises.readFile(secretPath);
             if (secret.length !== 32) {
               throw new Error(
                 `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
@@ -5133,9 +5132,9 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
           } catch (err: any) {
             if (err?.code === 'ENOENT') {
               secret = crypto.randomBytes(32);
-              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+              await fs.promises.writeFile(secretPath, secret, { mode: 0o600 });
               if (process.platform !== 'win32') {
-                try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+                try { await fs.promises.chmod(secretPath, 0o600); } catch (_) {}
               }
             } else {
               throw err;
@@ -5145,7 +5144,7 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
           const machineSalt = getMachineSalt('nova-secure-salt');
           return getMemoizedScryptKey(secret, machineSalt);
         };
-        const keyBuf = getFallbackKey();
+        const keyBuf = await getFallbackKey();
         const iv = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
         const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
@@ -5195,8 +5194,8 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
         if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
           try {
             const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-            if (fs.existsSync(secretPath)) {
-              const secret = fs.readFileSync(secretPath);
+            try {
+              const secret = await fs.promises.readFile(secretPath);
               if (secret.length !== 32) return null;
               const machineSalt = getMachineSalt('nova-secure-salt');
               const keyBuf = getMemoizedScryptKey(secret, machineSalt);
@@ -5206,7 +5205,7 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
               const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
               decipher.setAuthTag(tag);
               return decipher.update(enc) + decipher.final('utf8');
-            }
+            } catch (_) {}
           } catch (_) {}
         }
         // K-4: Fail closed: do NOT read unauthenticated plaintext
@@ -5459,14 +5458,16 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
       // Store encrypted with safeStorage / AES-256-GCM machine secret (avoids plaintext & protects on Windows)
       const payload = JSON.stringify({ enabled: true, proxyRules: rawProxyUrl });
       const encrypted = encryptDataWithFallback(payload, app.getPath('userData'), safeStorage);
-      fs.writeFileSync(vpnConfigPath, encrypted, { mode: 0o600 });
+      await fs.promises.writeFile(vpnConfigPath, encrypted, { mode: 0o600 });
       if (process.platform !== 'win32') {
-        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+        try { await fs.promises.chmod(vpnConfigPath, 0o600); } catch (_) {}
       }
-    } else if (fs.existsSync(vpnConfigPath)) {
-      fs.unlinkSync(vpnConfigPath);
+    } else {
+      try { await fs.promises.unlink(vpnConfigPath); } catch (_) {}
     }
-  } catch (_) {}
+  } catch (vpnErr) {
+    console.warn('[VPN] Failed to persist vpn proxy configuration:', vpnErr);
+  }
   return true;
 });
 

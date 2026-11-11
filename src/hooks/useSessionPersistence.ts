@@ -112,6 +112,23 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     isHydrated = true,
   } = options;
 
+  // Dirty-tracking refs to prevent redundant write cascades on beforeunload/visibilitychange
+  const lastPersistedTabsSignature = useRef<string | null>(null);
+  const scheduledTabsSignature = useRef<string | null>(null);
+  const pendingTabsWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFlushedFoldersJson = useRef<string | null>(null);
+  const lastFlushedSettingsJson = useRef<string | null>(null);
+  const lastFlushedBookmarksJson = useRef<string | null>(null);
+  const lastFlushedWorkspacesJson = useRef<string | null>(null);
+  const lastFlushedActiveWorkspace = useRef<string | null>(null);
+  const lastFlushedActiveTabId = useRef<string | null>(null);
+
+  useEffect(() => () => {
+    if (pendingTabsWrite.current !== null) clearTimeout(pendingTabsWrite.current);
+    pendingTabsWrite.current = null;
+    scheduledTabsSignature.current = null;
+  }, []);
+
   // Sync settings with local storage and backend (debounced 500ms like tabs:
   // color picker drags must not write localStorage / IPC per pixel)
   useEffect(() => {
@@ -125,6 +142,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
         // only place that knows it. Without the stamp a local edit is always
         // older than the remote value and the field is frozen forever.
         recordPersistedSettings(settings);
+        lastFlushedSettingsJson.current = serialized;
       } catch (err) {
         logger.warn('App:Settings', 'Failed to persist user_settings to storage', err);
       }
@@ -139,38 +157,61 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   }, [settings, isDemo, isHydrated]);
 
   // Immediate flush on beforeunload to prevent session loss on abrupt browser close
-  // (also flushes debounced settings/bookmarks/workspaces stores)
+  // (also flushes debounced settings/bookmarks/workspaces stores with dirty-checking)
   useEffect(() => {
     if (isDemo) return;
     const handleBeforeUnload = () => {
       try {
         const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
-        const serializedTabs = JSON.stringify(sessionTabs);
-        localStorage.setItem('nova_session_tabs', serializedTabs);
-        getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
+        const currentTabsSig = buildTabSignature(sessionTabs);
+        if (currentTabsSig !== lastPersistedTabsSignature.current) {
+          const serializedTabs = JSON.stringify(sessionTabs);
+          localStorage.setItem('nova_session_tabs', serializedTabs);
+          getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
+          lastPersistedTabsSignature.current = currentTabsSig;
+        }
+
         const activeTabObj = tabsRef.current.find(t => t.id === activeTabIdRef.current);
-        if (activeTabIdRef.current && !activeTabObj?.isIncognito) {
+        if (activeTabIdRef.current && !activeTabObj?.isIncognito && activeTabIdRef.current !== lastFlushedActiveTabId.current) {
           localStorage.setItem('active_tab_session', activeTabIdRef.current);
           getElectronAPI()?.storeSet?.('active_tab_session', activeTabIdRef.current);
+          lastFlushedActiveTabId.current = activeTabIdRef.current;
         }
+
         const serializedFolders = JSON.stringify(foldersRef.current);
-        localStorage.setItem('folders_session', serializedFolders);
-        getElectronAPI()?.storeSet?.('folders_session', serializedFolders);
+        if (serializedFolders !== lastFlushedFoldersJson.current) {
+          localStorage.setItem('folders_session', serializedFolders);
+          getElectronAPI()?.storeSet?.('folders_session', serializedFolders);
+          lastFlushedFoldersJson.current = serializedFolders;
+        }
 
         const serializedSettings = JSON.stringify(settingsRef.current);
-        localStorage.setItem('user_settings', serializedSettings);
-        getElectronAPI()?.storeSet?.('user_settings', serializedSettings);
-        recordPersistedSettings(settingsRef.current);
+        if (serializedSettings !== lastFlushedSettingsJson.current) {
+          localStorage.setItem('user_settings', serializedSettings);
+          getElectronAPI()?.storeSet?.('user_settings', serializedSettings);
+          recordPersistedSettings(settingsRef.current);
+          lastFlushedSettingsJson.current = serializedSettings;
+        }
 
         const serializedBookmarks = JSON.stringify(bookmarksRef.current);
-        localStorage.setItem('bookmarks', serializedBookmarks);
-        getElectronAPI()?.storeSet?.('bookmarks', serializedBookmarks);
+        if (serializedBookmarks !== lastFlushedBookmarksJson.current) {
+          localStorage.setItem('bookmarks', serializedBookmarks);
+          getElectronAPI()?.storeSet?.('bookmarks', serializedBookmarks);
+          lastFlushedBookmarksJson.current = serializedBookmarks;
+        }
 
         const serializedWorkspaces = JSON.stringify(workspacesRef.current);
-        localStorage.setItem('workspaces_session', serializedWorkspaces);
-        getElectronAPI()?.storeSet?.('workspaces_session', serializedWorkspaces);
+        if (serializedWorkspaces !== lastFlushedWorkspacesJson.current) {
+          localStorage.setItem('workspaces_session', serializedWorkspaces);
+          getElectronAPI()?.storeSet?.('workspaces_session', serializedWorkspaces);
+          lastFlushedWorkspacesJson.current = serializedWorkspaces;
+        }
 
-        localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
+        if (activeWorkspaceIdRef.current !== lastFlushedActiveWorkspace.current) {
+          localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
+          lastFlushedActiveWorkspace.current = activeWorkspaceIdRef.current;
+        }
+
         flushBookmarks();
         flushHistory();
       } catch (err) {
@@ -213,15 +254,6 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   // transient-only update in between would otherwise match the recorded
   // signature, return early, and drop the pending write forever (the session
   // then silently stops persisting until a *durable* change occurs).
-  const lastPersistedTabsSignature = useRef<string | null>(null);
-  const scheduledTabsSignature = useRef<string | null>(null);
-  const pendingTabsWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (pendingTabsWrite.current !== null) clearTimeout(pendingTabsWrite.current);
-    pendingTabsWrite.current = null;
-    scheduledTabsSignature.current = null;
-  }, []);
-
   useEffect(() => {
     if (isDemo || !isHydrated) {
       if (pendingTabsWrite.current !== null) clearTimeout(pendingTabsWrite.current);

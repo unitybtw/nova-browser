@@ -1182,7 +1182,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               e.stopPropagation();
               onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
             }}
-            className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold text-sm transition-all shadow-md shadow-cyan-950/50 flex items-center gap-2 group-hover:scale-[1.02] cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold text-sm transition-[background-color,transform,box-shadow] shadow-md shadow-cyan-950/50 flex items-center gap-2 group-hover:scale-[1.02] cursor-pointer"
           >
             <Zap className="w-4 h-4" />
             Reload Tab
@@ -1461,7 +1461,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   href={tab.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs flex items-center gap-1.5 shadow-xl transition-all backdrop-blur-sm"
+                  className="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs flex items-center gap-1.5 shadow-xl transition-colors backdrop-blur-sm"
                 >
                   <span>Open in new tab</span>
                   <span className="text-[10px]">↗</span>
