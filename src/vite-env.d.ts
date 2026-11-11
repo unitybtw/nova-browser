@@ -102,6 +102,9 @@ interface ElectronExtensionPopupTabInfo {
 export interface ElectronAPI {
   // Theme / privacy
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  setWindowMaterial?: (material: 'opaque' | 'glass-vibrancy') => void;
+  onToggleCustomizeMode?: (callback: () => void) => () => void;
+  onResetAppearanceDefault?: (callback: () => void) => () => void;
   setPrivacyShield: (enabled: boolean) => Promise<boolean>;
   setDoNotTrack: (enabled: boolean) => Promise<void>;
   getSuggestions: (query: string, engine?: string, locale?: string, sequenceId?: number) => Promise<string[]>;

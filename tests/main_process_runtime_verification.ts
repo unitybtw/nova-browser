@@ -84,6 +84,7 @@ async function verifyMainProcessRuntime() {
     'set-privacy-shield',
     'set-do-not-track',
     'set-theme',
+    'set-window-material',
     'capture-tab-thumbnail',
     'pause-download',
     'resume-download',
@@ -127,6 +128,46 @@ async function verifyMainProcessRuntime() {
       console.error(`[FAIL] Missing expected IPC channel binding in main.cjs: ${handler}`);
       errorsCount++;
     }
+  }
+
+  // STEP 4b: Auditing Window Material IPC & Customization Accelerators
+  console.log('\n--- Step 4b: Auditing Window Material IPC & Customization Accelerators ---');
+  if (!mainCjsContent.includes('set-window-material')) {
+    console.error('[FAIL] set-window-material IPC handler missing from main.cjs');
+    errorsCount++;
+  } else {
+    console.log('[PASS] set-window-material handler present in main.cjs');
+  }
+
+  const setWindowMaterialBlock = mainCjsContent.match(/["']set-window-material["'][\s\S]{1,300}/)?.[0] || '';
+  if (!setWindowMaterialBlock.includes('isTrustedSender')) {
+    console.error('[FAIL] isTrustedSender guard missing from set-window-material IPC handler');
+    errorsCount++;
+  } else {
+    console.log('[PASS] isTrustedSender guard verified on set-window-material handler');
+  }
+
+  if (!mainCjsContent.includes('Shift+CmdOrCtrl+E') || !mainCjsContent.includes('toggle-customize-mode')) {
+    console.error('[FAIL] Customize Browser accelerator (Shift+CmdOrCtrl+E) missing from main.cjs');
+    errorsCount++;
+  } else {
+    console.log('[PASS] Customize Browser accelerator (Shift+CmdOrCtrl+E) verified in main.cjs');
+  }
+
+  if (!mainCjsContent.includes('Shift+CmdOrCtrl+0') || !mainCjsContent.includes('reset-appearance-default')) {
+    console.error('[FAIL] Reset Appearance accelerator (Shift+CmdOrCtrl+0) missing from main.cjs');
+    errorsCount++;
+  } else {
+    console.log('[PASS] Reset Appearance accelerator (Shift+CmdOrCtrl+0) verified in main.cjs');
+  }
+
+  const preloadCjsPath = path.join(distElectronDir, 'preload.cjs');
+  const preloadCjsContent = fs.readFileSync(preloadCjsPath, 'utf8');
+  if (!preloadCjsContent.includes('set-window-material') || !preloadCjsContent.includes('setWindowMaterial')) {
+    console.error('[FAIL] setWindowMaterial missing from preload.cjs');
+    errorsCount++;
+  } else {
+    console.log('[PASS] setWindowMaterial bridge exposed in preload.cjs');
   }
 
   // STEP 5: Security Configurations in Main Process Bundle

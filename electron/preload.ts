@@ -4,6 +4,31 @@ import type { TabOpenRequest } from '../src/types/browser';
 contextBridge.exposeInMainWorld('electronAPI', {
   // Theme
   setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.send('set-theme', theme),
+  setWindowMaterial: (material: 'opaque' | 'glass-vibrancy') => ipcRenderer.send('set-window-material', material),
+  onToggleCustomizeMode: (callback: () => void) => {
+    const shortcutHandler = (_event: any, command: string) => {
+      if (command === 'toggle-customize-mode') callback();
+    };
+    const directHandler = () => callback();
+    ipcRenderer.on('shortcut', shortcutHandler);
+    ipcRenderer.on('toggle-customize-mode', directHandler);
+    return () => {
+      ipcRenderer.removeListener('shortcut', shortcutHandler);
+      ipcRenderer.removeListener('toggle-customize-mode', directHandler);
+    };
+  },
+  onResetAppearanceDefault: (callback: () => void) => {
+    const shortcutHandler = (_event: any, command: string) => {
+      if (command === 'reset-appearance-default') callback();
+    };
+    const directHandler = () => callback();
+    ipcRenderer.on('shortcut', shortcutHandler);
+    ipcRenderer.on('reset-appearance-default', directHandler);
+    return () => {
+      ipcRenderer.removeListener('shortcut', shortcutHandler);
+      ipcRenderer.removeListener('reset-appearance-default', directHandler);
+    };
+  },
   setPrivacyShield: (enabled: boolean) => ipcRenderer.invoke('set-privacy-shield', enabled),
   setDoNotTrack: (enabled: boolean) => ipcRenderer.invoke('set-do-not-track', enabled),
   getSuggestions: (query: string, engine?: string, locale?: string, sequenceId?: number) =>

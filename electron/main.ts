@@ -335,6 +335,7 @@ if (!app.isPackaged) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let currentWindowMaterial: 'opaque' | 'glass-vibrancy' = 'opaque';
 let applyStrictSecurityToSession: (targetSession: Electron.Session) => void = () => {};
 let applyPrivacyHeadersToSession: (targetSession: Electron.Session) => void = () => {};
 const sessionsWithPrivacyHeaders = new WeakSet<Electron.Session>();
@@ -344,14 +345,20 @@ const sessionsWithPrivacyHeaders = new WeakSet<Electron.Session>();
 // createWindow() stacked one listener per window recreation (macOS re-enters
 // createWindow via app.on('activate')).
 nativeTheme.on('updated', () => {
-  if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
-    try {
-      mainWindow.setTitleBarOverlay({
-        color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
-        symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
-        height: 44
-      });
-    } catch (_) {}
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (process.platform === 'win32') {
+      try {
+        mainWindow.setTitleBarOverlay({
+          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+          height: 44
+        });
+      } catch (_) {}
+    } else if (process.platform === 'darwin' && currentWindowMaterial === 'opaque') {
+      try {
+        mainWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc');
+      } catch (_) {}
+    }
   }
 });
 
@@ -686,6 +693,7 @@ function createWindow() {
   // effects never run, so anything the renderer owned must be reclaimed here.
   mainWindow.on('closed', () => {
     mainWindow = null;
+    currentWindowMaterial = 'opaque';
     disposePrivateDownloads('incognito');
     // Incognito tabs are never persisted, so their partition names can never be
     // reused. Without this sweep every close/reopen cycle orphans a live
@@ -1214,6 +1222,21 @@ function setupApplicationMenu() {
           accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I',
           click: () => {
             sendToMainWindow('shortcut', 'devtools');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Customize Browser...',
+          accelerator: 'Shift+CmdOrCtrl+E',
+          click: () => {
+            sendToMainWindow('shortcut', 'toggle-customize-mode');
+          }
+        },
+        {
+          label: 'Reset Appearance to Default',
+          accelerator: 'Shift+CmdOrCtrl+0',
+          click: () => {
+            sendToMainWindow('shortcut', 'reset-appearance-default');
           }
         }
       ]
@@ -4284,15 +4307,44 @@ ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
   if (!isTrustedSender(event)) return;
   if (theme === 'light' || theme === 'dark' || theme === 'system') {
     nativeTheme.themeSource = theme;
-    if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
-      try {
-        mainWindow.setTitleBarOverlay({
-          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
-          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
-          height: 44
-        });
-      } catch (_) {}
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (process.platform === 'win32') {
+        try {
+          mainWindow.setTitleBarOverlay({
+            color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+            symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+            height: 44
+          });
+        } catch (_) {}
+      } else if (process.platform === 'darwin' && currentWindowMaterial === 'opaque') {
+        try {
+          mainWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc');
+        } catch (_) {}
+      }
     }
+  }
+});
+
+// Window vibrancy and material styling
+ipcMain.on('set-window-material', (event, material: 'opaque' | 'glass-vibrancy') => {
+  if (!isTrustedSender(event)) return;
+  if (material !== 'opaque' && material !== 'glass-vibrancy') return;
+  currentWindowMaterial = material;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (process.platform === 'darwin') {
+      if (material === 'glass-vibrancy') {
+        mainWindow.setBackgroundColor('#00000000');
+        mainWindow.setVibrancy('under-window');
+      } else {
+        mainWindow.setVibrancy(null);
+        mainWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc');
+      }
+    } else if (process.platform === 'win32' && typeof (mainWindow as any).setBackgroundMaterial === 'function') {
+      (mainWindow as any).setBackgroundMaterial(material === 'glass-vibrancy' ? 'acrylic' : 'none');
+    }
+  } catch {
+    // Platform or OS compositor unsupported; renderer CSS backdrop fallback handles translucency cleanly.
   }
 });
 

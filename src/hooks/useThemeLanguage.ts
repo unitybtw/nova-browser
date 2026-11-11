@@ -614,7 +614,7 @@ export function useThemeLanguage(
     const windowMaterial = effectiveDesign.effects.windowMaterial;
     if (lastWindowMaterialRef.current !== windowMaterial) {
       lastWindowMaterialRef.current = windowMaterial;
-      (getElectronAPI() as any)?.setWindowMaterial?.(windowMaterial);
+      getElectronAPI()?.setWindowMaterial?.(windowMaterial);
     }
 
     // Apply to Electron nativeTheme for webviews
