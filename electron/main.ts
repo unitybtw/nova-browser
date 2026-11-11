@@ -2028,6 +2028,60 @@ app.whenReady().then(async () => {
     return result;
   });
 
+  // IPC: set remembered permission for a specific site origin (used by SiteInfoPopover)
+  ipcMain.handle('set-site-permission', (event, origin: unknown, key: unknown, state: unknown) => {
+    if (!isTrustedSender(event)) return false;
+    if (typeof origin !== 'string' || typeof key !== 'string') return false;
+    const siteOrigin = permissionOrigin(origin);
+    if (!siteOrigin) return false;
+    let sitePerms = rememberedPermissions.get(siteOrigin);
+    if (state === 'ask' || state === 'reset' || state === null || state === undefined) {
+      if (sitePerms) {
+        sitePerms.delete(key);
+        if (sitePerms.size === 0) rememberedPermissions.delete(siteOrigin);
+        saveRememberedPermissionsToDisk();
+      }
+      return true;
+    }
+    const allow = state === 'allow' || state === true;
+    if (!sitePerms) {
+      sitePerms = new Map();
+      rememberedPermissions.set(siteOrigin, sitePerms);
+    }
+    sitePerms.set(key, { allow, ts: Date.now() });
+    saveRememberedPermissionsToDisk();
+    return true;
+  });
+
+  // IPC: reset all remembered permissions for a site origin (used by SiteInfoPopover)
+  ipcMain.handle('reset-site-permissions', (event, origin: unknown) => {
+    if (!isTrustedSender(event)) return false;
+    if (typeof origin !== 'string') return false;
+    const siteOrigin = permissionOrigin(origin);
+    if (!siteOrigin) return false;
+    rememberedPermissions.delete(siteOrigin);
+    saveRememberedPermissionsToDisk();
+    return true;
+  });
+
+  // IPC: clear cookies & site data for a specific site origin (used by SiteInfoPopover)
+  ipcMain.handle('clear-site-data', async (event, origin: unknown) => {
+    if (!isTrustedSender(event)) return false;
+    if (typeof origin !== 'string') return false;
+    const siteOrigin = permissionOrigin(origin);
+    if (!siteOrigin) return false;
+    try {
+      await session.defaultSession.clearStorageData({
+        origin: siteOrigin,
+        storages: ['cookies', 'localstorage', 'indexdb', 'serviceworkers', 'cachestorage']
+      });
+      return true;
+    } catch (err) {
+      console.error('[Storage] Error clearing site data:', err);
+      return false;
+    }
+  });
+
   // IPC: check microphone permission status cross-platform
   ipcMain.handle('check-microphone-permission', async (event) => {
     if (!isTrustedSender(event)) return { status: 'denied', canAsk: false, platform: process.platform };

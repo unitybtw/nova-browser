@@ -118,6 +118,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resetRememberedPermissions: () => ipcRenderer.invoke('reset-remembered-permissions'),
   getRememberedPermissionsCount: () => ipcRenderer.invoke('get-remembered-permissions-count'),
   getSitePermissions: (origin: string) => ipcRenderer.invoke('get-site-permissions', origin),
+  setSitePermission: (origin: string, key: string, state: 'allow' | 'block' | 'ask') =>
+    ipcRenderer.invoke('set-site-permission', origin, key, state),
+  resetSitePermissions: (origin: string) => ipcRenderer.invoke('reset-site-permissions', origin),
+  clearSiteData: (origin: string) => ipcRenderer.invoke('clear-site-data', origin),
   clearAiModelsCache: () => ipcRenderer.invoke('clear-ai-models-cache'),
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),

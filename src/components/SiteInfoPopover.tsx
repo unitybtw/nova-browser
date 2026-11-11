@@ -10,11 +10,10 @@ import {
   Mic, 
   Bell, 
   MapPin, 
-  ExternalLink, 
   X, 
   Check, 
-  Info,
-  Layers
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import {
@@ -31,6 +30,13 @@ interface SiteInfoPopoverProps {
   buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
+const PERMISSIONS_LIST = [
+  { key: 'media:video', label: 'Camera', icon: Camera },
+  { key: 'media:audio', label: 'Microphone', icon: Mic },
+  { key: 'notifications', label: 'Notifications', icon: Bell },
+  { key: 'geolocation', label: 'Location', icon: MapPin },
+];
+
 export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   isOpen,
   onClose,
@@ -39,6 +45,10 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   buttonRef
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [sitePerms, setSitePerms] = useState<Record<string, { allow: boolean; ts: number }>>({});
+  const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
+  const [isClearingData, setIsClearingData] = useState(false);
+  const [isDataCleared, setIsDataCleared] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -83,9 +93,6 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   const isInternal = sec.level === 'internal' || url.startsWith('nova://') || url.startsWith('about:');
   const isSecure = sec.level === 'secure' || (!isDangerous && !isHttp && !isInternal && !isFile && protocol === 'https:');
 
-  const [sitePerms, setSitePerms] = useState<Record<string, { allow: boolean; ts: number }>>({});
-  const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
-
   useEffect(() => {
     setSitePerms({});
     if (!isOpen || isInternal || !domain) return;
@@ -126,13 +133,57 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
 
   const isSiteWhitelisted = !isInternal && isDomainWhitelisted(url, adblockWhitelist);
 
-  const getPermStatus = (key: string) => {
+  const getPermState = (key: string): 'allow' | 'block' | 'ask' => {
     const p = sitePerms[key];
-    if (!p) return { label: 'Ask', color: 'text-slate-400' };
-    return p.allow 
-      ? { label: 'Allowed', color: 'text-emerald-500 font-semibold' }
-      : { label: 'Blocked', color: 'text-rose-500 font-semibold' };
+    if (!p) return 'ask';
+    return p.allow ? 'allow' : 'block';
   };
+
+  const handleUpdatePerm = async (key: string, state: 'allow' | 'block' | 'ask') => {
+    if (!origin) return;
+    setSitePerms(prev => {
+      const next = { ...prev };
+      if (state === 'ask') {
+        delete next[key];
+      } else {
+        next[key] = { allow: state === 'allow', ts: Date.now() };
+      }
+      return next;
+    });
+
+    const api = (window as any).electronAPI;
+    if (api?.setSitePermission) {
+      await api.setSitePermission(origin, key, state);
+    }
+  };
+
+  const handleResetAllPermissions = async () => {
+    if (!origin) return;
+    setSitePerms({});
+    const api = (window as any).electronAPI;
+    if (api?.resetSitePermissions) {
+      await api.resetSitePermissions(origin);
+    }
+  };
+
+  const handleClearSiteData = async () => {
+    if (!origin || isClearingData) return;
+    setIsClearingData(true);
+    const api = (window as any).electronAPI;
+    try {
+      if (api?.clearSiteData) {
+        await api.clearSiteData(origin);
+      }
+      setIsDataCleared(true);
+      setTimeout(() => setIsDataCleared(false), 2400);
+    } catch (err) {
+      console.error('[SiteInfo] Failed to clear site data:', err);
+    } finally {
+      setIsClearingData(false);
+    }
+  };
+
+  const hasCustomPerms = Object.keys(sitePerms).length > 0;
 
   return (
     <AnimatePresence>
@@ -142,128 +193,203 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
           initial={{ opacity: 0, y: -6, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6, scale: 0.96 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute top-11 left-2 z-[99999] w-80 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 rounded-xl shadow-xl p-4 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default"
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute top-11 left-2 z-[99999] w-[356px] bg-white/95 dark:bg-[#16161f]/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-4 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default"
         >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100 dark:border-white/10">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-2 rounded-xl shrink-0 ${
-              isDangerous ? 'bg-rose-500/10 text-rose-500' :
-              isInternal ? 'bg-cyan-500/10 text-cyan-500' :
-              isSecure ? 'bg-emerald-500/10 text-emerald-500' :
-              'bg-amber-500/10 text-amber-500'
-            }`}>
-              {isDangerous ? <ShieldAlert className="w-4 h-4" /> :
-               isInternal ? <ShieldCheck className="w-4 h-4" /> :
-               isSecure ? <Lock className="w-4 h-4" /> :
-               <Unlock className="w-4 h-4" />}
-            </div>
-            <div className="min-w-0">
-              <div className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate" title={domain}>
-                {domain}
+          {/* Header: Site Identity */}
+          <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-white/5">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                isDangerous ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                isInternal ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-500' :
+                isSecure ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
+                'bg-amber-500/10 border-amber-500/20 text-amber-500'
+              }`}>
+                {isDangerous ? <ShieldAlert className="w-4 h-4 stroke-[2.2]" /> :
+                 isInternal ? <ShieldCheck className="w-4 h-4 stroke-[2.2]" /> :
+                 isSecure ? <Lock className="w-4 h-4 stroke-[2.2]" /> :
+                 <Unlock className="w-4 h-4 stroke-[2.2]" />}
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                {isDangerous ? (sec.tooltip || 'Phishing or dangerous site blocked') :
-                 isInternal ? 'Internal Nova System Page' :
-                 isFile ? 'Local Filesystem Resource' :
-                 isSecure ? 'Connection is secure (Encrypted TLS)' :
-                 'Connection is not secure (Unencrypted HTTP)'}
+              <div className="min-w-0">
+                <div className="font-semibold text-sm text-slate-900 dark:text-white truncate tracking-tight" title={domain}>
+                  {domain}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isDangerous ? 'bg-rose-500' :
+                    isInternal ? 'bg-cyan-500' :
+                    isSecure ? 'bg-emerald-500' :
+                    'bg-amber-500'
+                  }`} />
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                    {isDangerous ? (sec.tooltip || 'Phishing or malicious site blocked') :
+                     isInternal ? 'Internal Nova System Page' :
+                     isFile ? 'Local Filesystem' :
+                     isSecure ? 'Connection is secure (TLS)' :
+                     'Connection is not secure (HTTP)'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors shrink-0"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Security & Certificate Details */}
-        <div className="py-3 space-y-2 border-b border-slate-100 dark:border-white/10">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <ShieldCheck className={`w-3.5 h-3.5 ${isDangerous ? 'text-rose-500' : isSecure ? 'text-emerald-500' : 'text-amber-500'}`} />
-              Certificate
-            </span>
-            <span className={`font-semibold ${isDangerous ? 'text-rose-500' : isSecure ? 'text-slate-700 dark:text-slate-200' : 'text-amber-500'}`}>
-              {isDangerous ? 'Blocked / Untrusted' :
-               isInternal ? 'Built-in (Verified)' :
-               isFile ? 'Local origin' :
-               isSecure ? 'Valid & Encrypted' :
-               'None (Unencrypted)'}
-            </span>
+            <button 
+              onClick={onClose}
+              aria-label="Close"
+              className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors shrink-0 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <Cookie className="w-3.5 h-3.5 text-amber-500" />
-              Cookies & Site Data
-            </span>
-            <span className="font-semibold text-slate-700 dark:text-slate-200">
-              {isInternal ? 'None' : 'Protected in Partition'}
-            </span>
-          </div>
-
-          {(isSiteWhitelisted || blockedAdsCount > 0) && (
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <ShieldAlert className={`w-3.5 h-3.5 ${isSiteWhitelisted ? 'text-slate-400' : 'text-cyan-500'}`} />
-                Trackers & Ads Blocked
+          {/* Grouped Security & Storage Card */}
+          <div className="my-3 rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/[0.06] divide-y divide-slate-100 dark:divide-white/[0.04] overflow-hidden">
+            {/* Certificate Row */}
+            <div className="p-2.5 flex items-center justify-between text-[11.5px]">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${isDangerous ? 'text-rose-500' : isSecure ? 'text-emerald-500' : 'text-amber-500'}`} />
+                <span className="font-medium">Certificate</span>
+              </div>
+              <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-md ${
+                isDangerous ? 'bg-rose-500/10 text-rose-500' :
+                isInternal ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' :
+                isSecure ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+              }`}>
+                {isDangerous ? 'Blocked' : isInternal ? 'Built-in' : isFile ? 'Local' : isSecure ? 'Valid & Encrypted' : 'Unencrypted'}
               </span>
-              {isSiteWhitelisted ? (
-                <span className="font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">
-                  Paused on this site
-                </span>
-              ) : (
-                <span className="font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md">
-                  {blockedAdsCount} blocked
-                </span>
+            </div>
+
+            {/* Cookies & Site Data Row with Direct Action */}
+            <div className="p-2.5 flex items-center justify-between text-[11.5px]">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 min-w-0">
+                <Cookie className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-medium leading-tight">Cookies & Site Data</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+                    {isInternal ? 'No persistent storage' : 'Protected in partition'}
+                  </span>
+                </div>
+              </div>
+              {!isInternal && (
+                <button
+                  type="button"
+                  onClick={handleClearSiteData}
+                  disabled={isClearingData}
+                  className="px-2 py-1 rounded-md text-[11px] font-medium transition-all text-slate-600 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 hover:bg-rose-500/10 border border-slate-200/60 dark:border-white/10 hover:border-rose-500/20 flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  {isDataCleared ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-500 stroke-[2.5]" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Cleared</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3 h-3 text-slate-400" />
+                      <span>Clear Data</span>
+                    </>
+                  )}
+                </button>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Permissions */}
-        {!isInternal && (
-          <div className="pt-3 space-y-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Permissions for this site
-            </div>
-            
-            <div className="grid grid-cols-2 gap-1.5">
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Camera className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="text-[11px] truncate">Camera:</span>
+            {/* Trackers Row (if present) */}
+            {(isSiteWhitelisted || blockedAdsCount > 0) && (
+              <div className="p-2.5 flex items-center justify-between text-[11.5px]">
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <ShieldAlert className={`w-3.5 h-3.5 shrink-0 ${isSiteWhitelisted ? 'text-slate-400' : 'text-cyan-500'}`} />
+                  <span className="font-medium">Tracker Protection</span>
                 </div>
-                <span className={`text-[11px] shrink-0 ${getPermStatus('media:video').color}`}>{getPermStatus('media:video').label}</span>
+                {isSiteWhitelisted ? (
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-200/50 dark:bg-white/5 px-2 py-0.5 rounded-md">
+                    Paused on this site
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">
+                    {blockedAdsCount} blocked
+                  </span>
+                )}
               </div>
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Mic className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="text-[11px] truncate">Microphone:</span>
-                </div>
-                <span className={`text-[11px] shrink-0 ${getPermStatus('media:audio').color}`}>{getPermStatus('media:audio').label}</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Bell className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="text-[11px] truncate">Notifications:</span>
-                </div>
-                <span className={`text-[11px] shrink-0 ${getPermStatus('notifications').color}`}>{getPermStatus('notifications').label}</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <div className="flex items-center gap-1.5 truncate">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="text-[11px] truncate">Location:</span>
-                </div>
-                <span className={`text-[11px] shrink-0 ${getPermStatus('geolocation').color}`}>{getPermStatus('geolocation').label}</span>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+
+          {/* Real Interactive Permissions Section */}
+          {!isInternal && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Permissions
+                </span>
+                {hasCustomPerms && (
+                  <button
+                    type="button"
+                    onClick={handleResetAllPermissions}
+                    className="text-[10.5px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Reset all permissions to Ask"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    <span>Reset all</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {PERMISSIONS_LIST.map(item => {
+                  const current = getPermState(item.key);
+                  const IconComp = item.icon;
+
+                  return (
+                    <div
+                      key={item.key}
+                      className="flex items-center justify-between p-2 rounded-xl bg-slate-50/60 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 hover:border-slate-200/80 dark:hover:border-white/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <IconComp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {item.label}
+                        </span>
+                      </div>
+
+                      {/* 3-State Segmented Control: Ask | Allow | Block */}
+                      <div className="flex items-center p-0.5 rounded-lg bg-slate-200/60 dark:bg-white/5 border border-slate-200 dark:border-white/5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdatePerm(item.key, 'ask')}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                            current === 'ask'
+                              ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-2xs font-semibold'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Ask
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdatePerm(item.key, 'allow')}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                            current === 'allow'
+                              ? 'bg-emerald-500 text-white shadow-2xs font-semibold'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400'
+                          }`}
+                        >
+                          Allow
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdatePerm(item.key, 'block')}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+                            current === 'block'
+                              ? 'bg-rose-500 text-white shadow-2xs font-semibold'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400'
+                          }`}
+                        >
+                          Block
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

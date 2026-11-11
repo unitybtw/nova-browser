@@ -181,6 +181,9 @@ export interface ElectronAPI {
   resetRememberedPermissions: () => Promise<boolean>;
   getRememberedPermissionsCount: () => Promise<number>;
   getSitePermissions: (origin: string) => Promise<Record<string, { allow: boolean; ts: number }>>;
+  setSitePermission: (origin: string, key: string, state: 'allow' | 'block' | 'ask') => Promise<boolean>;
+  resetSitePermissions: (origin: string) => Promise<boolean>;
+  clearSiteData: (origin: string) => Promise<boolean>;
   clearAiModelsCache: () => Promise<boolean>;
   purgeSystemMemory: () => Promise<boolean>;
   secureStoreSet: (key: string, value: string) => Promise<boolean>;

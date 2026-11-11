@@ -327,6 +327,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           <button
             type="button"
             ref={siteInfoBtnRef}
+            data-site-info-button="true"
             aria-label={t('security.siteInfo')}
             aria-expanded={isSiteInfoOpen}
             onClick={(e) => {
