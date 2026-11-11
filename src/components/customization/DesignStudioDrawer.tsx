@@ -47,6 +47,79 @@ const SURFACE_ZONE_LABELS: Record<SurfaceZoneId, string> = {
   popovers: 'Menus & Popovers',
 };
 
+export interface SafeColorTextInputProps {
+  value?: string;
+  placeholder?: string;
+  onChange: (val?: string) => void;
+  className?: string;
+  'aria-label'?: string;
+  'data-testid'?: string;
+}
+
+export const SafeColorTextInput: React.FC<SafeColorTextInputProps> = ({
+  value,
+  placeholder,
+  onChange,
+  className = '',
+  'aria-label': ariaLabel,
+  'data-testid': testId,
+}) => {
+  const [text, setText] = useState<string>(value || '');
+  const [isInvalid, setIsInvalid] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    setText(value || '');
+    setIsInvalid(false);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setText(raw);
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setIsInvalid(false);
+      onChange(undefined);
+    } else if (isSafeSurfaceColor(trimmed)) {
+      setIsInvalid(false);
+      onChange(trimmed);
+    } else {
+      setIsInvalid(true);
+    }
+  };
+
+  const handleBlur = () => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setText('');
+      setIsInvalid(false);
+      onChange(undefined);
+    } else if (isSafeSurfaceColor(trimmed)) {
+      setText(trimmed);
+      setIsInvalid(false);
+      onChange(trimmed);
+    } else {
+      setText(value || '');
+      setIsInvalid(false);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      value={text}
+      placeholder={placeholder}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      aria-label={ariaLabel}
+      aria-invalid={isInvalid ? 'true' : 'false'}
+      data-testid={testId}
+      className={`${className} ${
+        isInvalid ? 'border-amber-500/80 focus:border-amber-500' : 'border-slate-700'
+      }`}
+    />
+  );
+};
+
 export const DesignStudioDrawer: React.FC = () => {
   const {
     isCustomizeMode,
@@ -56,6 +129,7 @@ export const DesignStudioDrawer: React.FC = () => {
     draftTabAnimation,
     activeWorkspaceId,
     activeWorkspaceName,
+    hasActiveWorkspaceOverride,
     discard,
     switchScope,
     applyStarterTemplate,
@@ -116,17 +190,23 @@ export const DesignStudioDrawer: React.FC = () => {
   const currentZoneStyle: SurfaceZoneStyle = draftProfile.surfaces[selectedZone] || {};
   const cssAnalysis = sanitizeCustomCss(draftProfile.customCss.css);
 
-  const updateSelectedZone = (patch: Partial<SurfaceZoneStyle>) => {
-    updateDraft((prev) => ({
-      ...prev,
-      surfaces: {
-        ...prev.surfaces,
-        [selectedZone]: {
-          ...prev.surfaces[selectedZone],
-          ...patch,
+  const updateSelectedZone = (
+    patch: Partial<SurfaceZoneStyle>,
+    options?: { coalesceKey?: string }
+  ) => {
+    updateDraft(
+      (prev) => ({
+        ...prev,
+        surfaces: {
+          ...prev.surfaces,
+          [selectedZone]: {
+            ...prev.surfaces[selectedZone],
+            ...patch,
+          },
         },
-      },
-    }));
+      }),
+      options
+    );
   };
 
   const handleAddPaletteItem = (kind: ToolbarItemKind) => {
@@ -251,7 +331,7 @@ export const DesignStudioDrawer: React.FC = () => {
                 </button>
               </div>
 
-              {editingScope === 'workspace' && activeWorkspaceId && (
+              {editingScope === 'workspace' && activeWorkspaceId && hasActiveWorkspaceOverride && (
                 <button
                   type="button"
                   data-action="clear-workspace-override"
@@ -489,10 +569,13 @@ export const DesignStudioDrawer: React.FC = () => {
                 step={2}
                 value={draftProfile.layout.sidebarWidth}
                 onChange={(e) =>
-                  updateDraft((prev) => ({
-                    ...prev,
-                    layout: { ...prev.layout, sidebarWidth: Number(e.target.value) },
-                  }))
+                  updateDraft(
+                    (prev) => ({
+                      ...prev,
+                      layout: { ...prev.layout, sidebarWidth: Number(e.target.value) },
+                    }),
+                    { coalesceKey: 'sidebar-width' }
+                  )
                 }
                 className="w-full accent-blue-500 cursor-pointer"
               />
@@ -646,17 +729,13 @@ export const DesignStudioDrawer: React.FC = () => {
                     onChange={(e) => updateSelectedZone({ bg: e.target.value })}
                     className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
                   />
-                  <input
-                    type="text"
-                    value={currentZoneStyle.bg || ''}
+                  <SafeColorTextInput
+                    value={currentZoneStyle.bg}
                     placeholder="#1e293b or transparent"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val || isSafeSurfaceColor(val)) {
-                        updateSelectedZone({ bg: val || undefined });
-                      }
-                    }}
-                    className="w-28 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs font-mono"
+                    onChange={(val) => updateSelectedZone({ bg: val })}
+                    className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                    aria-label="Zone background color"
+                    data-testid="zone-bg-input"
                   />
                 </div>
               </div>
@@ -675,17 +754,38 @@ export const DesignStudioDrawer: React.FC = () => {
                     onChange={(e) => updateSelectedZone({ textColor: e.target.value })}
                     className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
                   />
-                  <input
-                    type="text"
-                    value={currentZoneStyle.textColor || ''}
+                  <SafeColorTextInput
+                    value={currentZoneStyle.textColor}
                     placeholder="#f8fafc"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val || isSafeSurfaceColor(val)) {
-                        updateSelectedZone({ textColor: val || undefined });
-                      }
-                    }}
-                    className="w-28 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs font-mono"
+                    onChange={(val) => updateSelectedZone({ textColor: val })}
+                    className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                    aria-label="Zone text color"
+                    data-testid="zone-text-color-input"
+                  />
+                </div>
+              </div>
+
+              {/* Muted Color */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Muted Color</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={
+                      currentZoneStyle.mutedColor && /^#[0-9a-fA-F]{6}$/.test(currentZoneStyle.mutedColor)
+                        ? currentZoneStyle.mutedColor
+                        : '#94a3b8'
+                    }
+                    onChange={(e) => updateSelectedZone({ mutedColor: e.target.value })}
+                    className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
+                  />
+                  <SafeColorTextInput
+                    value={currentZoneStyle.mutedColor}
+                    placeholder="#94a3b8"
+                    onChange={(val) => updateSelectedZone({ mutedColor: val })}
+                    className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                    aria-label="Zone muted color"
+                    data-testid="zone-muted-color-input"
                   />
                 </div>
               </div>
@@ -704,7 +804,9 @@ export const DesignStudioDrawer: React.FC = () => {
                   max={1.0}
                   step={0.05}
                   value={currentZoneStyle.opacity ?? 1}
-                  onChange={(e) => updateSelectedZone({ opacity: Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateSelectedZone({ opacity: Number(e.target.value) }, { coalesceKey: 'zone-opacity' })
+                  }
                   className="w-full accent-blue-500 cursor-pointer"
                 />
               </div>
@@ -721,7 +823,9 @@ export const DesignStudioDrawer: React.FC = () => {
                   max={32}
                   step={2}
                   value={currentZoneStyle.blur ?? 0}
-                  onChange={(e) => updateSelectedZone({ blur: Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateSelectedZone({ blur: Number(e.target.value) }, { coalesceKey: 'zone-blur' })
+                  }
                   className="w-full accent-blue-500 cursor-pointer"
                 />
               </div>
@@ -761,17 +865,13 @@ export const DesignStudioDrawer: React.FC = () => {
                       onChange={(e) => updateSelectedZone({ borderColor: e.target.value })}
                       className="w-7 h-7 rounded border-none bg-transparent cursor-pointer"
                     />
-                    <input
-                      type="text"
-                      value={currentZoneStyle.borderColor || ''}
+                    <SafeColorTextInput
+                      value={currentZoneStyle.borderColor}
                       placeholder="#334155"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val || isSafeSurfaceColor(val)) {
-                          updateSelectedZone({ borderColor: val || undefined });
-                        }
-                      }}
-                      className="w-28 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs font-mono"
+                      onChange={(val) => updateSelectedZone({ borderColor: val })}
+                      className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                      aria-label="Zone border color"
+                      data-testid="zone-border-color-input"
                     />
                   </div>
                 </div>
@@ -789,7 +889,9 @@ export const DesignStudioDrawer: React.FC = () => {
                   max={24}
                   step={1}
                   value={currentZoneStyle.radius ?? 8}
-                  onChange={(e) => updateSelectedZone({ radius: Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateSelectedZone({ radius: Number(e.target.value) }, { coalesceKey: 'zone-radius' })
+                  }
                   className="w-full accent-blue-500 cursor-pointer"
                 />
               </div>
@@ -871,10 +973,13 @@ export const DesignStudioDrawer: React.FC = () => {
                   step={0.05}
                   value={draftProfile.typography.uiScale}
                   onChange={(e) =>
-                    updateDraft((prev) => ({
-                      ...prev,
-                      typography: { ...prev.typography, uiScale: Number(e.target.value) },
-                    }))
+                    updateDraft(
+                      (prev) => ({
+                        ...prev,
+                        typography: { ...prev.typography, uiScale: Number(e.target.value) },
+                      }),
+                      { coalesceKey: 'ui-scale' }
+                    )
                   }
                   className="w-full accent-blue-500 cursor-pointer"
                 />
@@ -894,10 +999,13 @@ export const DesignStudioDrawer: React.FC = () => {
                   step={0.05}
                   value={draftProfile.typography.iconScale}
                   onChange={(e) =>
-                    updateDraft((prev) => ({
-                      ...prev,
-                      typography: { ...prev.typography, iconScale: Number(e.target.value) },
-                    }))
+                    updateDraft(
+                      (prev) => ({
+                        ...prev,
+                        typography: { ...prev.typography, iconScale: Number(e.target.value) },
+                      }),
+                      { coalesceKey: 'icon-scale' }
+                    )
                   }
                   className="w-full accent-blue-500 cursor-pointer"
                 />
@@ -1044,7 +1152,7 @@ export const DesignStudioDrawer: React.FC = () => {
                   />
                 </div>
                 {draftProfile.newTabLayout.clock.visible && (
-                  <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div className="grid grid-cols-3 gap-2 mt-1">
                     <select
                       value={draftProfile.newTabLayout.clock.format}
                       onChange={(e) =>
@@ -1078,6 +1186,23 @@ export const DesignStudioDrawer: React.FC = () => {
                       <option value="editorial">Editorial</option>
                       <option value="mono">Monospace</option>
                       <option value="pill">Pill</option>
+                    </select>
+                    <select
+                      value={draftProfile.newTabLayout.clock.align}
+                      data-testid="clock-align-select"
+                      onChange={(e) =>
+                        updateDraft((prev) => ({
+                          ...prev,
+                          newTabLayout: {
+                            ...prev.newTabLayout,
+                            clock: { ...prev.newTabLayout.clock, align: e.target.value as any },
+                          },
+                        }))
+                      }
+                      className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[11px] text-slate-200"
+                    >
+                      <option value="center">Center</option>
+                      <option value="left">Left</option>
                     </select>
                   </div>
                 )}

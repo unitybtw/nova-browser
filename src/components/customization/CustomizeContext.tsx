@@ -34,6 +34,7 @@ export interface CustomizeContextValue {
   undo: () => void;
   activeWorkspaceId?: string;
   activeWorkspaceName?: string;
+  hasActiveWorkspaceOverride: boolean;
   openCustomizeMode: (initialScope?: CustomizeScope) => void;
   commit: () => void;
   discard: () => void;
@@ -43,7 +44,10 @@ export interface CustomizeContextValue {
   clearWorkspaceOverride: () => void;
   importPack: (rawJson: string) => { success: boolean; error?: string; themeName?: string };
   exportPack: () => string;
-  updateDraft: (updater: (prev: BrowserDesignProfile) => BrowserDesignProfile) => void;
+  updateDraft: (
+    updater: (prev: BrowserDesignProfile) => BrowserDesignProfile,
+    options?: { coalesceKey?: string }
+  ) => void;
   updateDraftTabStyle: (tabStyle: 'rounded' | 'square' | 'floating') => void;
   updateDraftTabAnimation: (tabAnimation: 'chrome' | 'smooth' | 'snappy' | 'none') => void;
 }
@@ -63,6 +67,28 @@ function deepCloneProfile(profile: BrowserDesignProfile): BrowserDesignProfile {
   return JSON.parse(JSON.stringify(profile));
 }
 
+function cloneWorkspacesMap(
+  map: Record<string, BrowserDesignProfile>
+): Record<string, BrowserDesignProfile> {
+  const result: Record<string, BrowserDesignProfile> = {};
+  for (const [k, v] of Object.entries(map)) {
+    result[k] = deepCloneProfile(v);
+  }
+  return result;
+}
+
+interface CustomizeSnapshot {
+  draftGlobal: BrowserDesignProfile;
+  draftWorkspaces: Record<string, BrowserDesignProfile>;
+  editingScope: CustomizeScope;
+  pendingClearWorkspaceIds: string[];
+  modifiedWorkspaceIds: string[];
+  draftTabStyle: 'rounded' | 'square' | 'floating';
+  draftTabAnimation: 'chrome' | 'smooth' | 'snappy' | 'none';
+  timestamp: number;
+  coalesceKey?: string;
+}
+
 export function useCustomizeManager({
   settings,
   activeWorkspaceId,
@@ -72,13 +98,17 @@ export function useCustomizeManager({
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [editingScope, setEditingScope] = useState<CustomizeScope>('global');
 
-  const initialProfile = useMemo(() => {
+  const initialGlobalProfile = useMemo(() => {
     return settings.designProfile
       ? sanitizeDesignProfile(settings.designProfile)
       : createDefaultDesignProfile();
   }, [settings.designProfile]);
 
-  const [draftProfile, setDraftProfile] = useState<BrowserDesignProfile>(initialProfile);
+  const [draftGlobal, setDraftGlobal] = useState<BrowserDesignProfile>(initialGlobalProfile);
+  const [draftWorkspaces, setDraftWorkspaces] = useState<Record<string, BrowserDesignProfile>>({});
+  const [pendingClearWorkspaceIds, setPendingClearWorkspaceIds] = useState<string[]>([]);
+  const [modifiedWorkspaceIds, setModifiedWorkspaceIds] = useState<string[]>([]);
+
   const [draftTabStyle, setDraftTabStyle] = useState<'rounded' | 'square' | 'floating'>(
     settings.tabStyle || 'floating'
   );
@@ -86,9 +116,31 @@ export function useCustomizeManager({
     settings.tabAnimation || 'chrome'
   );
 
-  const [undoStack, setUndoStack] = useState<BrowserDesignProfile[]>([]);
-  const draftProfileRef = useRef(draftProfile);
-  draftProfileRef.current = draftProfile;
+  const [undoStack, setUndoStack] = useState<CustomizeSnapshot[]>([]);
+
+  const draftGlobalRef = useRef(draftGlobal);
+  draftGlobalRef.current = draftGlobal;
+
+  const draftWorkspacesRef = useRef(draftWorkspaces);
+  draftWorkspacesRef.current = draftWorkspaces;
+
+  const editingScopeRef = useRef(editingScope);
+  editingScopeRef.current = editingScope;
+
+  const pendingClearWorkspaceIdsRef = useRef(pendingClearWorkspaceIds);
+  pendingClearWorkspaceIdsRef.current = pendingClearWorkspaceIds;
+
+  const modifiedWorkspaceIdsRef = useRef(modifiedWorkspaceIds);
+  modifiedWorkspaceIdsRef.current = modifiedWorkspaceIds;
+
+  const draftTabStyleRef = useRef(draftTabStyle);
+  draftTabStyleRef.current = draftTabStyle;
+
+  const draftTabAnimationRef = useRef(draftTabAnimation);
+  draftTabAnimationRef.current = draftTabAnimation;
+
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  activeWorkspaceIdRef.current = activeWorkspaceId;
 
   const activeWorkspaceName = useMemo(() => {
     if (!activeWorkspaceId) return undefined;
@@ -96,24 +148,73 @@ export function useCustomizeManager({
     return ws?.name || activeWorkspaceId;
   }, [workspaces, activeWorkspaceId]);
 
-  const seedProfileForScope = useCallback(
-    (scope: CustomizeScope): BrowserDesignProfile => {
-      if (scope === 'workspace' && activeWorkspaceId) {
-        const wsOverride = settings.workspaceDesigns?.[activeWorkspaceId];
-        if (wsOverride && typeof wsOverride === 'object') {
-          const resolved = resolveEffectiveDesign(settings, activeWorkspaceId, false);
-          return sanitizeDesignProfile(resolved);
-        }
+  const activeDraftProfile = useMemo(() => {
+    if (editingScope === 'workspace' && activeWorkspaceId) {
+      if (draftWorkspaces[activeWorkspaceId]) {
+        return draftWorkspaces[activeWorkspaceId];
       }
-      return settings.designProfile
-        ? sanitizeDesignProfile(settings.designProfile)
-        : createDefaultDesignProfile();
-    },
-    [settings, activeWorkspaceId]
-  );
+      const wsOverride = settings.workspaceDesigns?.[activeWorkspaceId];
+      if (
+        wsOverride &&
+        typeof wsOverride === 'object' &&
+        !pendingClearWorkspaceIds.includes(activeWorkspaceId)
+      ) {
+        return sanitizeDesignProfile(resolveEffectiveDesign(settings, activeWorkspaceId, false));
+      }
+      return draftGlobal;
+    }
+    return draftGlobal;
+  }, [editingScope, activeWorkspaceId, draftWorkspaces, settings, pendingClearWorkspaceIds, draftGlobal]);
+
+  const draftProfileRef = useRef(activeDraftProfile);
+  draftProfileRef.current = activeDraftProfile;
+
+  const hasActiveWorkspaceOverride = useMemo(() => {
+    if (!activeWorkspaceId) return false;
+    if (pendingClearWorkspaceIds.includes(activeWorkspaceId)) return false;
+    const hasSaved = Boolean(
+      settings.workspaceDesigns &&
+        Object.prototype.hasOwnProperty.call(settings.workspaceDesigns, activeWorkspaceId) &&
+        settings.workspaceDesigns[activeWorkspaceId]
+    );
+    const hasDraftOverride = modifiedWorkspaceIds.includes(activeWorkspaceId);
+    return hasSaved || hasDraftOverride;
+  }, [activeWorkspaceId, pendingClearWorkspaceIds, settings.workspaceDesigns, modifiedWorkspaceIds]);
+
+  const createSnapshot = useCallback((coalesceKey?: string): CustomizeSnapshot => {
+    return {
+      draftGlobal: deepCloneProfile(draftGlobalRef.current),
+      draftWorkspaces: cloneWorkspacesMap(draftWorkspacesRef.current),
+      editingScope: editingScopeRef.current,
+      pendingClearWorkspaceIds: [...pendingClearWorkspaceIdsRef.current],
+      modifiedWorkspaceIds: [...modifiedWorkspaceIdsRef.current],
+      draftTabStyle: draftTabStyleRef.current,
+      draftTabAnimation: draftTabAnimationRef.current,
+      timestamp: Date.now(),
+      coalesceKey,
+    };
+  }, []);
 
   const openCustomizeMode = useCallback(
     (initialScope?: CustomizeScope) => {
+      const baseGlobal = settings.designProfile
+        ? sanitizeDesignProfile(settings.designProfile)
+        : createDefaultDesignProfile();
+      setDraftGlobal(baseGlobal);
+
+      const initialWsMap: Record<string, BrowserDesignProfile> = {};
+      if (activeWorkspaceId) {
+        const wsOverride = settings.workspaceDesigns?.[activeWorkspaceId];
+        if (wsOverride && typeof wsOverride === 'object') {
+          initialWsMap[activeWorkspaceId] = sanitizeDesignProfile(
+            resolveEffectiveDesign(settings, activeWorkspaceId, false)
+          );
+        }
+      }
+      setDraftWorkspaces(initialWsMap);
+      setPendingClearWorkspaceIds([]);
+      setModifiedWorkspaceIds([]);
+
       const scopeToUse: CustomizeScope =
         initialScope ||
         (activeWorkspaceId && settings.workspaceDesigns?.[activeWorkspaceId]
@@ -121,24 +222,78 @@ export function useCustomizeManager({
           : 'global');
 
       setEditingScope(scopeToUse);
-      setDraftProfile(seedProfileForScope(scopeToUse));
       setDraftTabStyle(settings.tabStyle || 'floating');
       setDraftTabAnimation(settings.tabAnimation || 'chrome');
       setUndoStack([]);
       setIsCustomizeMode(true);
     },
-    [seedProfileForScope, settings.tabStyle, settings.tabAnimation, activeWorkspaceId, settings.workspaceDesigns]
+    [settings, activeWorkspaceId]
+  );
+
+  const switchScope = useCallback(
+    (newScope: CustomizeScope) => {
+      if (newScope === editingScopeRef.current) return;
+      if (newScope === 'workspace' && activeWorkspaceId) {
+        setDraftWorkspaces((prev) => {
+          if (prev[activeWorkspaceId]) return prev;
+          const wsOverride = settings.workspaceDesigns?.[activeWorkspaceId];
+          const seeded =
+            wsOverride &&
+            typeof wsOverride === 'object' &&
+            !pendingClearWorkspaceIdsRef.current.includes(activeWorkspaceId)
+              ? sanitizeDesignProfile(resolveEffectiveDesign(settings, activeWorkspaceId, false))
+              : deepCloneProfile(draftGlobalRef.current);
+          return { ...prev, [activeWorkspaceId]: seeded };
+        });
+      }
+      setEditingScope(newScope);
+    },
+    [activeWorkspaceId, settings]
   );
 
   const updateDraft = useCallback(
-    (updater: (prev: BrowserDesignProfile) => BrowserDesignProfile) => {
-      setDraftProfile((current) => {
-        const next = sanitizeDesignProfile(updater(current));
-        setUndoStack((prevStack) => [...prevStack.slice(-(MAX_UNDO_STACK - 1)), deepCloneProfile(current)]);
-        return next;
+    (
+      updater: (prev: BrowserDesignProfile) => BrowserDesignProfile,
+      options?: { coalesceKey?: string }
+    ) => {
+      const now = Date.now();
+      const coalesceKey = options?.coalesceKey;
+
+      setUndoStack((prevStack) => {
+        const top = prevStack[prevStack.length - 1];
+        const shouldCoalesce =
+          Boolean(coalesceKey) &&
+          Boolean(top?.coalesceKey) &&
+          top.coalesceKey === coalesceKey &&
+          now - top.timestamp < 400;
+
+        if (shouldCoalesce) {
+          return prevStack;
+        }
+
+        const snap = createSnapshot(coalesceKey);
+        return [...prevStack.slice(-(MAX_UNDO_STACK - 1)), snap];
       });
+
+      if (editingScopeRef.current === 'workspace' && activeWorkspaceIdRef.current) {
+        const wsId = activeWorkspaceIdRef.current;
+        setDraftWorkspaces((prev) => {
+          const currentWs =
+            prev[wsId] ||
+            (settings.workspaceDesigns?.[wsId] &&
+            !pendingClearWorkspaceIdsRef.current.includes(wsId)
+              ? sanitizeDesignProfile(resolveEffectiveDesign(settings, wsId, false))
+              : deepCloneProfile(draftGlobalRef.current));
+          const nextWs = sanitizeDesignProfile(updater(currentWs));
+          return { ...prev, [wsId]: nextWs };
+        });
+        setModifiedWorkspaceIds((prev) => (prev.includes(wsId) ? prev : [...prev, wsId]));
+        setPendingClearWorkspaceIds((prev) => prev.filter((id) => id !== wsId));
+      } else {
+        setDraftGlobal((current) => sanitizeDesignProfile(updater(current)));
+      }
     },
-    []
+    [createSnapshot, settings]
   );
 
   const undo = useCallback(() => {
@@ -146,20 +301,41 @@ export function useCustomizeManager({
       if (prevStack.length === 0) return prevStack;
       const nextStack = [...prevStack];
       const previous = nextStack.pop()!;
-      setDraftProfile(previous);
+      setDraftGlobal(previous.draftGlobal);
+      setDraftWorkspaces(previous.draftWorkspaces);
+      setEditingScope(previous.editingScope);
+      setPendingClearWorkspaceIds(previous.pendingClearWorkspaceIds);
+      setModifiedWorkspaceIds(previous.modifiedWorkspaceIds);
+      setDraftTabStyle(previous.draftTabStyle);
+      setDraftTabAnimation(previous.draftTabAnimation);
       return nextStack;
     });
   }, []);
 
-  const switchScope = useCallback(
-    (newScope: CustomizeScope) => {
-      if (newScope === editingScope) return;
-      setEditingScope(newScope);
-      setDraftProfile(seedProfileForScope(newScope));
-      setUndoStack([]);
-    },
-    [editingScope, seedProfileForScope]
-  );
+  const clearWorkspaceOverride = useCallback(() => {
+    if (!activeWorkspaceId) return;
+
+    // Buffer removal in draft: push current snapshot onto undo stack
+    const snap = createSnapshot();
+    setUndoStack((prev) => [...prev.slice(-(MAX_UNDO_STACK - 1)), snap]);
+
+    // Mark pending clear
+    setPendingClearWorkspaceIds((prev) =>
+      prev.includes(activeWorkspaceId) ? prev : [...prev, activeWorkspaceId]
+    );
+    setModifiedWorkspaceIds((prev) => prev.filter((id) => id !== activeWorkspaceId));
+
+    // Remove uncommitted workspace draft so scope switches cleanly to live draftGlobal
+    setDraftWorkspaces((prev) => {
+      if (!prev[activeWorkspaceId]) return prev;
+      const next = { ...prev };
+      delete next[activeWorkspaceId];
+      return next;
+    });
+
+    // Cleanly switch scope back to global
+    setEditingScope('global');
+  }, [activeWorkspaceId, createSnapshot]);
 
   const applyStarterTemplate = useCallback(
     (templateId: string) => {
@@ -181,19 +357,6 @@ export function useCustomizeManager({
   const resetToDefault = useCallback(() => {
     updateDraft(() => createDefaultDesignProfile());
   }, [updateDraft]);
-
-  const clearWorkspaceOverride = useCallback(() => {
-    if (!activeWorkspaceId) return;
-    if (settings.workspaceDesigns && Object.prototype.hasOwnProperty.call(settings.workspaceDesigns, activeWorkspaceId)) {
-      const nextDesigns = { ...settings.workspaceDesigns };
-      delete nextDesigns[activeWorkspaceId];
-      onUpdateSettings({ workspaceDesigns: nextDesigns });
-    }
-    const globalBase = settings.designProfile
-      ? sanitizeDesignProfile(settings.designProfile)
-      : createDefaultDesignProfile();
-    updateDraft(() => globalBase);
-  }, [activeWorkspaceId, settings.workspaceDesigns, settings.designProfile, onUpdateSettings, updateDraft]);
 
   const importPack = useCallback(
     (rawJson: string) => {
@@ -231,37 +394,53 @@ export function useCustomizeManager({
   }, []);
 
   const commit = useCallback(() => {
-    const current = draftProfileRef.current;
+    const currentGlobal = draftGlobalRef.current;
     const isVertical =
-      current.layout.chromeMode === 'vertical-left' ||
-      current.layout.chromeMode === 'vertical-right';
-    const showTasks = Boolean(current.newTabLayout.tasksWidget.visible);
+      currentGlobal.layout.chromeMode === 'vertical-left' ||
+      currentGlobal.layout.chromeMode === 'vertical-right';
+    const showTasks = Boolean(currentGlobal.newTabLayout.tasksWidget.visible);
 
     const updates: Partial<UserSettings> = {
       useVerticalTabs: isVertical,
       showTasksWidget: showTasks,
-      tabStyle: draftTabStyle,
-      tabAnimation: draftTabAnimation,
+      tabStyle: draftTabStyleRef.current,
+      tabAnimation: draftTabAnimationRef.current,
+      designProfile: sanitizeDesignProfile(currentGlobal),
     };
 
-    if (editingScope === 'workspace' && activeWorkspaceId) {
-      const existing = settings.workspaceDesigns || {};
-      updates.workspaceDesigns = {
-        ...existing,
-        [activeWorkspaceId]: sanitizePartialDesignProfile(current),
-      };
-    } else {
-      updates.designProfile = sanitizeDesignProfile(current);
+    const existingWs: Record<string, any> = settings.workspaceDesigns
+      ? { ...settings.workspaceDesigns }
+      : {};
+
+    // 1. Delete all workspace IDs marked as pending clear
+    for (const clearedId of pendingClearWorkspaceIdsRef.current) {
+      delete existingWs[clearedId];
     }
+
+    // 2. Commit modified workspace drafts (never resurrecting cleared ones)
+    for (const wsId of modifiedWorkspaceIdsRef.current) {
+      if (
+        !pendingClearWorkspaceIdsRef.current.includes(wsId) &&
+        draftWorkspacesRef.current[wsId]
+      ) {
+        existingWs[wsId] = sanitizePartialDesignProfile(draftWorkspacesRef.current[wsId]);
+      }
+    }
+
+    updates.workspaceDesigns = existingWs;
 
     onUpdateSettings(updates);
     setIsCustomizeMode(false);
     setUndoStack([]);
-  }, [editingScope, activeWorkspaceId, settings.workspaceDesigns, draftTabStyle, draftTabAnimation, onUpdateSettings]);
+    setPendingClearWorkspaceIds([]);
+    setModifiedWorkspaceIds([]);
+  }, [settings.workspaceDesigns, onUpdateSettings]);
 
   const discard = useCallback(() => {
     setIsCustomizeMode(false);
     setUndoStack([]);
+    setPendingClearWorkspaceIds([]);
+    setModifiedWorkspaceIds([]);
   }, []);
 
   const updateDraftTabStyle = useCallback((style: 'rounded' | 'square' | 'floating') => {
@@ -286,13 +465,14 @@ export function useCustomizeManager({
   return {
     isCustomizeMode,
     editingScope,
-    draftProfile,
+    draftProfile: activeDraftProfile,
     draftTabStyle,
     draftTabAnimation,
     canUndo: undoStack.length > 0,
     undo,
     activeWorkspaceId,
     activeWorkspaceName,
+    hasActiveWorkspaceOverride,
     openCustomizeMode,
     commit,
     discard,

@@ -11,7 +11,10 @@ import {
   useCustomize,
 } from '../src/components/customization/CustomizeContext';
 import { CustomizeTopBanner } from '../src/components/customization/CustomizeTopBanner';
-import { DesignStudioDrawer } from '../src/components/customization/DesignStudioDrawer';
+import {
+  DesignStudioDrawer,
+  SafeColorTextInput,
+} from '../src/components/customization/DesignStudioDrawer';
 import { AppearanceSection } from '../src/components/settings/AppearanceSection';
 
 const require = createRequire(join(process.cwd(), 'noop.js'));
@@ -219,6 +222,209 @@ async function main() {
   console.log('[PASS] CustomizeContext state, undo, template, commit, export & import verified');
 
   // ---------------------------------------------------------------------------
+  // 1b. Draft Isolation, clearWorkspaceOverride & Dual-Scope Session Drafts
+  // ---------------------------------------------------------------------------
+  console.log('Testing clearWorkspaceOverride draft isolation (discard vs commit) and dual-scope drafts...');
+
+  // Setup saved workspace override
+  currentSettings = {
+    ...currentSettings,
+    workspaceDesigns: {
+      'work-1': {
+        meta: { name: 'Work-1 Override' },
+        layout: {
+          chromeMode: 'vertical-right',
+          tabBarPosition: 'above-toolbar',
+          omniboxMaxWidth: 'balanced',
+          showToolbarLabels: false,
+          sidebarWidth: 260,
+          sidebarSections: {
+            favorites: true,
+            pinned: true,
+            folders: true,
+            workspaces: true,
+            dockFooter: true,
+          },
+          toolbarSlots: ['back-forward', 'url-bar'],
+        },
+      },
+    },
+  };
+
+  await React.act(async () => {
+    root.render(
+      React.createElement(
+        CustomizeProvider,
+        {
+          settings: currentSettings,
+          activeWorkspaceId: 'work-1',
+          workspaces: [{ id: 'work-1', name: 'Work Space' } as any],
+          onUpdateSettings: (newSettings: Partial<UserSettings>) => {
+            currentSettings = { ...currentSettings, ...newSettings };
+          },
+        },
+        React.createElement(StateInspector)
+      )
+    );
+  });
+
+  // Test Case A: clearWorkspaceOverride() -> discard() preserves original workspace override
+  await React.act(async () => {
+    capturedState!.openCustomizeMode('workspace');
+  });
+
+  assert.strictEqual(capturedState!.editingScope, 'workspace', 'Opened in workspace scope');
+  assert.strictEqual(capturedState!.hasActiveWorkspaceOverride, true, 'hasActiveWorkspaceOverride must be true initially');
+
+  await React.act(async () => {
+    capturedState!.clearWorkspaceOverride();
+  });
+
+  // Verify settings were NOT prematurely updated
+  assert.ok(
+    currentSettings.workspaceDesigns?.['work-1'],
+    'clearWorkspaceOverride must NOT prematurely delete workspaceDesigns from persisted settings'
+  );
+  assert.strictEqual(
+    capturedState!.editingScope,
+    'global',
+    'clearWorkspaceOverride must cleanly switch scope back to global'
+  );
+  assert.strictEqual(
+    capturedState!.hasActiveWorkspaceOverride,
+    false,
+    'hasActiveWorkspaceOverride must reflect pending clear'
+  );
+
+  // Discard must keep the original workspace override 100% untouched
+  await React.act(async () => {
+    capturedState!.discard();
+  });
+
+  assert.ok(
+    currentSettings.workspaceDesigns?.['work-1'],
+    'discard() must leave original settings.workspaceDesigns intact after clearWorkspaceOverride'
+  );
+  assert.strictEqual(
+    currentSettings.workspaceDesigns?.['work-1']?.layout?.chromeMode,
+    'vertical-right',
+    'Original workspace design remains unchanged'
+  );
+
+  // Test Case B: clearWorkspaceOverride() -> commit() permanently deletes without resurrection
+  await React.act(async () => {
+    capturedState!.openCustomizeMode('workspace');
+  });
+
+  await React.act(async () => {
+    capturedState!.clearWorkspaceOverride();
+  });
+
+  // Also make a global edit while in global scope
+  await React.act(async () => {
+    capturedState!.updateDraft((prev: BrowserDesignProfile) => ({
+      ...prev,
+      layout: {
+        ...prev.layout,
+        sidebarWidth: 295,
+      },
+    }));
+  });
+
+  await React.act(async () => {
+    capturedState!.commit();
+  });
+
+  assert.strictEqual(
+    currentSettings.workspaceDesigns?.['work-1'],
+    undefined,
+    'commit() must permanently delete cleared workspace override from persisted settings'
+  );
+  assert.strictEqual(
+    currentSettings.designProfile?.layout.sidebarWidth,
+    295,
+    'commit() must persist global edits made during the same session'
+  );
+
+  // Test Case C: Switching scopes (global -> edit -> workspace -> edit -> global) retains both uncommitted edits
+  await React.act(async () => {
+    capturedState!.openCustomizeMode('global');
+  });
+
+  // Edit in global scope
+  await React.act(async () => {
+    capturedState!.updateDraft((prev: BrowserDesignProfile) => ({
+      ...prev,
+      layout: {
+        ...prev.layout,
+        sidebarWidth: 335,
+      },
+    }));
+  });
+  assert.strictEqual(capturedState!.draftProfile.layout.sidebarWidth, 335, 'Global edit applied');
+
+  // Switch to workspace scope
+  await React.act(async () => {
+    capturedState!.switchScope('workspace');
+  });
+  assert.strictEqual(capturedState!.editingScope, 'workspace', 'Switched to workspace scope');
+
+  // Edit in workspace scope
+  await React.act(async () => {
+    capturedState!.updateDraft((prev: BrowserDesignProfile) => ({
+      ...prev,
+      layout: {
+        ...prev.layout,
+        chromeMode: 'compact-single-row',
+      },
+    }));
+  });
+  assert.strictEqual(
+    capturedState!.draftProfile.layout.chromeMode,
+    'compact-single-row',
+    'Workspace edit applied'
+  );
+
+  // Switch back to global scope: global edit MUST be retained!
+  await React.act(async () => {
+    capturedState!.switchScope('global');
+  });
+  assert.strictEqual(capturedState!.editingScope, 'global', 'Switched back to global scope');
+  assert.strictEqual(
+    capturedState!.draftProfile.layout.sidebarWidth,
+    335,
+    'Global uncommitted edit must be retained after switching back from workspace scope'
+  );
+
+  // Switch back to workspace scope: workspace edit MUST be retained!
+  await React.act(async () => {
+    capturedState!.switchScope('workspace');
+  });
+  assert.strictEqual(
+    capturedState!.draftProfile.layout.chromeMode,
+    'compact-single-row',
+    'Workspace uncommitted edit must be retained after returning from global scope'
+  );
+
+  // Commit atomically saves both global profile and workspace override
+  await React.act(async () => {
+    capturedState!.commit();
+  });
+
+  assert.strictEqual(
+    currentSettings.designProfile?.layout.sidebarWidth,
+    335,
+    'commit() persists uncommitted global edit'
+  );
+  assert.strictEqual(
+    currentSettings.workspaceDesigns?.['work-1']?.layout?.chromeMode,
+    'compact-single-row',
+    'commit() persists uncommitted workspace edit'
+  );
+
+  console.log('[PASS] clearWorkspaceOverride draft isolation and dual-scope session drafts verified');
+
+  // ---------------------------------------------------------------------------
   // 2. CustomizeTopBanner Component Verification
   // ---------------------------------------------------------------------------
   console.log('Testing CustomizeTopBanner rendered controls and click actions...');
@@ -361,7 +567,97 @@ async function main() {
   const cssTextarea = drawer!.querySelector('textarea[data-control="custom-css"]') as HTMLTextAreaElement;
   assert.ok(cssTextarea, 'Custom CSS textarea must be rendered');
 
+  // Verify Clock align selector in Tab 5
+  const clockAlignSelect = drawer!.querySelector('[data-testid="clock-align-select"]') as HTMLSelectElement | null;
+  assert.ok(clockAlignSelect, 'Clock align select must be rendered in Tab 5');
+  await React.act(async () => {
+    clockAlignSelect!.value = 'left';
+    clockAlignSelect!.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  });
+  assert.strictEqual(
+    capturedState!.draftProfile.newTabLayout.clock.align,
+    'left',
+    'Clock align must be updated to left'
+  );
+
   console.log('[PASS] DesignStudioDrawer 5 tabs, palette, zones, typography and CSS verified');
+
+  // ---------------------------------------------------------------------------
+  // 3b. SafeColorTextInput Incremental Typing Verification
+  // ---------------------------------------------------------------------------
+  console.log('Testing SafeColorTextInput incremental character-by-character typing...');
+  let latestColorValue: string | undefined = undefined;
+
+  function ColorInputHarness() {
+    const [color, setColor] = React.useState<string | undefined>(undefined);
+    return React.createElement(SafeColorTextInput, {
+      value: color,
+      placeholder: '#1e293b',
+      onChange: (val: string | undefined) => {
+        latestColorValue = val;
+        setColor(val);
+      },
+      'data-testid': 'test-color-input',
+    });
+  }
+
+  await React.act(async () => {
+    root.render(React.createElement(ColorInputHarness));
+  });
+
+  const colorInput = dom.window.document.querySelector('input[data-testid="test-color-input"]') as HTMLInputElement;
+  assert.ok(colorInput, 'SafeColorTextInput must render input element');
+
+  // Incrementally type '#123456' character by character
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    dom.window.HTMLInputElement.prototype,
+    'value'
+  )?.set;
+
+  const typedSequence = ['#', '#1', '#12', '#12345', '#123456'];
+  for (const partial of typedSequence) {
+    await React.act(async () => {
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(colorInput, partial);
+      } else {
+        colorInput.value = partial;
+      }
+      colorInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+      colorInput.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    });
+    // Check that local input value is retained without resetting
+    assert.strictEqual(colorInput.value, partial, `Input must retain partial string "${partial}"`);
+    if (partial !== '#123456') {
+      assert.strictEqual(
+        colorInput.getAttribute('aria-invalid'),
+        'true',
+        `Incomplete string "${partial}" should mark aria-invalid="true"`
+      );
+    } else {
+      assert.strictEqual(
+        colorInput.getAttribute('aria-invalid'),
+        'false',
+        `Valid string "${partial}" should mark aria-invalid="false"`
+      );
+      assert.strictEqual(latestColorValue, '#123456', 'onChange must be called with valid color string');
+    }
+  }
+
+  // Test blur with invalid value restores previous valid value
+  await React.act(async () => {
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(colorInput, '#invalid');
+    } else {
+      colorInput.value = '#invalid';
+    }
+    colorInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    colorInput.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    colorInput.dispatchEvent(new dom.window.FocusEvent('focusout', { bubbles: true }));
+    colorInput.dispatchEvent(new dom.window.FocusEvent('blur', { bubbles: false }));
+  });
+  assert.strictEqual(colorInput.value, '#123456', 'Blur with invalid text must restore last valid value');
+  assert.strictEqual(colorInput.getAttribute('aria-invalid'), 'false', 'aria-invalid must be false after restoring valid value');
+  console.log('[PASS] SafeColorTextInput incremental typing and blur restoration verified');
 
   // ---------------------------------------------------------------------------
   // 4. AppearanceSection Launch Button & Sync Verification
