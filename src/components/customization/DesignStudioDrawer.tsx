@@ -15,6 +15,8 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   ChromeMode,
@@ -28,7 +30,13 @@ import {
 } from '../../types/browser';
 import { SURFACE_ZONE_IDS } from '../../utils/designDefaults';
 import { STARTER_DESIGN_TEMPLATES } from '../../utils/designTemplates';
-import { getPaletteToolbarItems, insertToolbarItem } from '../../utils/toolbarSlots';
+import {
+  getPaletteToolbarItems,
+  insertToolbarItem,
+  moveToolbarItemToIndex,
+  removeToolbarItem,
+  toggleToolbarItemVisibility,
+} from '../../utils/toolbarSlots';
 import { getToolbarItemMeta } from './toolbarRegistry';
 import { isSafeSurfaceColor, sanitizeCustomCss } from '../../utils/designSecurity';
 import { useCustomize } from './CustomizeContext';
@@ -224,12 +232,21 @@ export const DesignStudioDrawer: React.FC = () => {
     e.dataTransfer.effectAllowed = 'copyMove';
   };
 
+  const isVerticalMode =
+    draftProfile.layout.chromeMode === 'vertical-left' ||
+    draftProfile.layout.chromeMode === 'vertical-right';
+  const drawerTopClass =
+    draftProfile.layout.chromeMode === 'classic-top' ? 'top-[94px]' : 'top-14';
+
   return (
     <div
       data-design-studio-drawer="true"
-      className={`fixed top-12 bottom-4 ${
-        dockSide === 'right' ? 'right-4' : 'left-4'
-      } w-[380px] z-[995] select-none pointer-events-auto flex flex-col rounded-2xl bg-slate-900/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-xl overflow-hidden font-sans text-xs animate-in fade-in slide-in-from-${dockSide} duration-200`}
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      className={`fixed ${drawerTopClass} bottom-[72px] ${
+        dockSide === 'right'
+          ? 'right-4 slide-in-from-right-4'
+          : 'left-4 slide-in-from-left-4'
+      } w-[380px] max-w-[calc(100vw-2rem)] z-[995] select-none pointer-events-auto no-drag flex flex-col rounded-2xl bg-slate-900/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-xl overflow-hidden font-sans text-xs animate-in fade-in duration-200`}
     >
       {/* Studio Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80 shrink-0">
@@ -555,8 +572,27 @@ export const DesignStudioDrawer: React.FC = () => {
               </div>
             </div>
 
+            {/* Contextual notice when not in vertical sidebar mode */}
+            {!isVerticalMode && (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-800/40 border border-slate-700/50 text-[11px] text-slate-400">
+                <span>Sidebar options apply in Vertical Left / Right mode.</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateDraft((prev) => ({
+                      ...prev,
+                      layout: { ...prev.layout, chromeMode: 'vertical-left' },
+                    }))
+                  }
+                  className="shrink-0 px-2 py-0.5 rounded-md bg-blue-600/20 hover:bg-blue-600/35 text-blue-300 font-medium transition-colors cursor-pointer"
+                >
+                  Enable Vertical
+                </button>
+              </div>
+            )}
+
             {/* Sidebar Width Slider */}
-            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2">
+            <div className={`p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2 transition-opacity ${!isVerticalMode ? 'opacity-65' : ''}`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-200">Sidebar Width</span>
                 <span className="text-xs font-mono text-blue-400">{draftProfile.layout.sidebarWidth}px</span>
@@ -582,7 +618,7 @@ export const DesignStudioDrawer: React.FC = () => {
             </div>
 
             {/* Sidebar Sections */}
-            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2.5">
+            <div className={`p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2.5 transition-opacity ${!isVerticalMode ? 'opacity-65' : ''}`}>
               <span className="text-xs font-medium text-slate-200 block">Sidebar Sections</span>
               {(
                 [
@@ -620,6 +656,138 @@ export const DesignStudioDrawer: React.FC = () => {
                   </label>
                 );
               })}
+            </div>
+
+            {/* Active Toolbar Items Manager (Quick Reorder / Visibility / Remove) */}
+            <div data-active-toolbar-list="true">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-slate-300">Active Toolbar Items</span>
+                <span className="text-[10px] text-slate-400">
+                  {draftProfile.layout.toolbarItems.length} slots
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                {draftProfile.layout.toolbarItems.map((slot, idx) => {
+                  const meta = getToolbarItemMeta(slot.kind);
+                  const Icon = meta.icon;
+                  const isCritical = Boolean(meta.isCritical);
+                  const isFirst = idx === 0;
+                  const isLast = idx === draftProfile.layout.toolbarItems.length - 1;
+                  return (
+                    <div
+                      key={slot.id}
+                      data-active-slot-id={slot.id}
+                      data-active-slot-kind={slot.kind}
+                      className={`flex items-center justify-between px-2 py-1.5 rounded-xl bg-slate-800/50 border border-slate-700/60 transition-opacity ${
+                        !slot.visible ? 'opacity-55' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-5 h-5 rounded bg-slate-700/60 flex items-center justify-center text-slate-300 shrink-0">
+                          <Icon className="w-3 h-3" />
+                        </div>
+                        <span className="text-xs font-medium text-slate-200 truncate">{meta.label}</span>
+                        {!slot.visible && (
+                          <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 shrink-0">
+                            Hidden
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          data-action="move-slot-up"
+                          disabled={isFirst}
+                          aria-label={`Move ${meta.label} earlier`}
+                          title="Move earlier"
+                          onClick={() =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              layout: {
+                                ...prev.layout,
+                                toolbarItems: moveToolbarItemToIndex(prev.layout.toolbarItems, slot.id, idx - 1),
+                              },
+                            }))
+                          }
+                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          data-action="move-slot-down"
+                          disabled={isLast}
+                          aria-label={`Move ${meta.label} later`}
+                          title="Move later"
+                          onClick={() =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              layout: {
+                                ...prev.layout,
+                                toolbarItems: moveToolbarItemToIndex(prev.layout.toolbarItems, slot.id, idx + 1),
+                              },
+                            }))
+                          }
+                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          data-action="toggle-slot-visibility"
+                          disabled={isCritical}
+                          aria-label={slot.visible ? `Toggle hide ${meta.label}` : `Toggle show ${meta.label}`}
+                          title={
+                            isCritical
+                              ? `${meta.label} cannot be hidden`
+                              : slot.visible
+                              ? `Hide ${meta.label}`
+                              : `Show ${meta.label}`
+                          }
+                          onClick={() =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              layout: {
+                                ...prev.layout,
+                                toolbarItems: toggleToolbarItemVisibility(prev.layout.toolbarItems, slot.id),
+                              },
+                            }))
+                          }
+                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        >
+                          {slot.visible ? (
+                            <Eye className="w-3 h-3" />
+                          ) : (
+                            <EyeOff className="w-3 h-3 text-amber-400" />
+                          )}
+                        </button>
+                        {!isCritical && (
+                          <button
+                            type="button"
+                            data-action="remove-slot"
+                            aria-label={`Delete ${meta.label} from toolbar`}
+                            title={`Remove ${meta.label}`}
+                            onClick={() =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                layout: {
+                                  ...prev.layout,
+                                  toolbarItems: removeToolbarItem(prev.layout.toolbarItems, slot.id),
+                                },
+                              }))
+                            }
+                            className="p-1 rounded text-slate-400 hover:text-rose-300 hover:bg-rose-500/20 cursor-pointer transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Toolbar Item Palette */}

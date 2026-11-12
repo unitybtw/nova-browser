@@ -810,6 +810,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const activeSidebarWidth = resizingSidebarWidth ?? configuredSidebarWidth;
   const isNewTabActive = isNewTabRouteUrl(activeTab?.url);
 
+  const prevCustomizeVerticalRef = useRef(false);
+  useEffect(() => {
+    const active = isCustomizeMode && useVerticalTabs;
+    if (active && !prevCustomizeVerticalRef.current) {
+      setIsSidebarCollapsed(false);
+      setIsHoverRevealing(false);
+    }
+    prevCustomizeVerticalRef.current = active;
+  }, [isCustomizeMode, useVerticalTabs]);
+
   useEffect(() => {
     return () => {
       resizeCleanupRef.current?.();
@@ -2065,9 +2075,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               title={isMac ? "Expand Sidebar (⌘S)" : "Expand Sidebar (Ctrl+S)"}
             >
               {sidebarPosition === 'right' ? (
-                <PanelRight className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                <PanelRight className="w-3.5 h-3.5 text-accent" />
               ) : (
-                <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                <PanelLeft className="w-3.5 h-3.5 text-accent" />
               )}
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘S' : 'Ctrl+S'}</span>
             </button>
@@ -2145,8 +2155,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 useVerticalTabs={useVerticalTabs}
                 onToggleReaderMode={handleToggleReaderMode}
                 isSplitView={!!splitTabId}
-                tabStyle={settings.tabStyle}
-                tabAnimation={settings.tabAnimation}
+                tabStyle={isCustomizeMode ? customize.draftTabStyle : settings.tabStyle}
+                tabAnimation={isCustomizeMode ? customize.draftTabAnimation : settings.tabAnimation}
                 isIncognito={activeTab?.isIncognito}
                 searchEngine={settings.searchEngine}
                 privacyShield={settings.privacyShield}

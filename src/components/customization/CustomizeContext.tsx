@@ -356,6 +356,8 @@ export function useCustomizeManager({
 
   const resetToDefault = useCallback(() => {
     updateDraft(() => createDefaultDesignProfile());
+    setDraftTabStyle('floating');
+    setDraftTabAnimation('chrome');
   }, [updateDraft]);
 
   const importPack = useCallback(
@@ -443,13 +445,25 @@ export function useCustomizeManager({
     setModifiedWorkspaceIds([]);
   }, []);
 
-  const updateDraftTabStyle = useCallback((style: 'rounded' | 'square' | 'floating') => {
-    setDraftTabStyle(style);
-  }, []);
+  const updateDraftTabStyle = useCallback(
+    (style: 'rounded' | 'square' | 'floating') => {
+      if (draftTabStyleRef.current === style) return;
+      const snap = createSnapshot();
+      setUndoStack((prev) => [...prev.slice(-(MAX_UNDO_STACK - 1)), snap]);
+      setDraftTabStyle(style);
+    },
+    [createSnapshot]
+  );
 
-  const updateDraftTabAnimation = useCallback((anim: 'chrome' | 'smooth' | 'snappy' | 'none') => {
-    setDraftTabAnimation(anim);
-  }, []);
+  const updateDraftTabAnimation = useCallback(
+    (anim: 'chrome' | 'smooth' | 'snappy' | 'none') => {
+      if (draftTabAnimationRef.current === anim) return;
+      const snap = createSnapshot();
+      setUndoStack((prev) => [...prev.slice(-(MAX_UNDO_STACK - 1)), snap]);
+      setDraftTabAnimation(anim);
+    },
+    [createSnapshot]
+  );
 
   // Listen for CustomEvent 'nova-open-customize-mode'
   useEffect(() => {

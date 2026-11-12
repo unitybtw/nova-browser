@@ -566,34 +566,36 @@ const WidgetCustomizeFrame: React.FC<WidgetCustomizeFrameProps> = ({
   return (
     <div
       data-customize-widget={widgetId}
-      className={`relative group/widget rounded-2xl p-2.5 pt-3.5 transition-colors ring-1 ring-dashed ${
+      className={`relative group/widget rounded-2xl p-2.5 pt-2 transition-colors ring-1 ring-dashed ${
         useDarkCanvasStyle
           ? 'ring-cyan-400/60 hover:ring-cyan-300 bg-slate-950/20'
           : 'ring-accent/60 hover:ring-accent bg-white/45'
       } ${className}`}
     >
-      <span
-        className={`absolute -top-3 left-2 z-20 px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold text-[10px] pointer-events-none select-none shadow-xs ${
-          useDarkCanvasStyle
-            ? 'bg-slate-900/90 text-cyan-300 border border-white/15'
-            : 'bg-white/95 text-slate-700 border border-slate-300/80'
-        }`}
-      >
-        {label}
-      </span>
-      <div
-        data-widget-controls={widgetId}
-        className="absolute -top-3 right-2 z-20 flex flex-wrap items-center justify-end gap-1 text-[10px] font-medium pointer-events-auto"
-      >
-        {controls}
-        <CustomizePillButton
-          ariaLabel={hideAriaLabel}
-          useDarkCanvasStyle={useDarkCanvasStyle}
-          onClick={onHide}
+      <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+        <span
+          className={`px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold text-[10px] pointer-events-none select-none shadow-xs shrink-0 ${
+            useDarkCanvasStyle
+              ? 'bg-slate-900/90 text-cyan-300 border border-white/15'
+              : 'bg-white/95 text-slate-700 border border-slate-300/80'
+          }`}
         >
-          <EyeOff className="w-3 h-3" />
-          <span>Hide</span>
-        </CustomizePillButton>
+          {label}
+        </span>
+        <div
+          data-widget-controls={widgetId}
+          className="flex flex-wrap items-center justify-end gap-1 text-[10px] font-medium pointer-events-auto"
+        >
+          {controls}
+          <CustomizePillButton
+            ariaLabel={hideAriaLabel}
+            useDarkCanvasStyle={useDarkCanvasStyle}
+            onClick={onHide}
+          >
+            <EyeOff className="w-3 h-3" />
+            <span>Hide</span>
+          </CustomizePillButton>
+        </div>
       </div>
       {children}
     </div>

@@ -194,6 +194,43 @@ async function main() {
     'Commit must sync legacy showTasksWidget=false'
   );
 
+  // Test draftTabStyle & draftTabAnimation undo & resetToDefault support
+  await React.act(async () => {
+    capturedState!.openCustomizeMode('global');
+  });
+  const initialTabStyle = capturedState!.draftTabStyle;
+  const initialTabAnim = capturedState!.draftTabAnimation;
+  await React.act(async () => {
+    capturedState!.updateDraftTabStyle('square');
+    capturedState!.updateDraftTabAnimation('snappy');
+  });
+  assert.strictEqual(capturedState!.draftTabStyle, 'square', 'draftTabStyle updates immediately');
+  assert.strictEqual(capturedState!.draftTabAnimation, 'snappy', 'draftTabAnimation updates immediately');
+  assert.strictEqual(capturedState!.canUndo, true, 'Tab style/animation edits must push undo snapshot');
+
+  await React.act(async () => {
+    capturedState!.undo();
+  });
+  assert.strictEqual(capturedState!.draftTabAnimation, initialTabAnim, 'Undo must revert draftTabAnimation');
+
+  await React.act(async () => {
+    capturedState!.undo();
+  });
+  assert.strictEqual(capturedState!.draftTabStyle, initialTabStyle, 'Second undo must revert draftTabStyle');
+
+  await React.act(async () => {
+    capturedState!.updateDraftTabStyle('square');
+    capturedState!.updateDraftTabAnimation('none');
+  });
+  await React.act(async () => {
+    capturedState!.resetToDefault();
+  });
+  assert.strictEqual(capturedState!.draftTabStyle, 'floating', 'resetToDefault must restore floating tabStyle');
+  assert.strictEqual(capturedState!.draftTabAnimation, 'chrome', 'resetToDefault must restore chrome tabAnimation');
+  await React.act(async () => {
+    capturedState!.discard();
+  });
+
   // Test Theme Pack Export & Import
   await React.act(async () => {
     capturedState!.openCustomizeMode('global');
@@ -458,6 +495,8 @@ async function main() {
 
   banner = dom.window.document.querySelector('[data-customize-banner="true"]');
   assert.ok(banner, 'Banner must render when isCustomizeMode is true');
+  assert.ok(banner!.className.includes('bottom-4'), 'Banner must anchor at bottom-center to avoid occluding TopBar');
+  assert.ok(!banner!.className.includes('top-2'), 'Banner must not float at top-2 over TopBar');
 
   // Check banner buttons: Undo, Reset, Cancel, Save
   const undoBtn = banner!.querySelector('[data-action="undo"]') as HTMLButtonElement | null;
@@ -497,6 +536,18 @@ async function main() {
 
   const drawer = dom.window.document.querySelector('[data-design-studio-drawer="true"]');
   assert.ok(drawer, 'DesignStudioDrawer must render when isCustomizeMode is true');
+  assert.ok(
+    drawer!.className.includes('top-[94px]') || drawer!.className.includes('top-14'),
+    'DesignStudioDrawer must start below TopBar controls'
+  );
+  assert.ok(
+    drawer!.className.includes('bottom-[72px]'),
+    'DesignStudioDrawer must leave bottom clearance for CustomizeTopBanner'
+  );
+  assert.ok(
+    drawer!.className.includes('slide-in-from-right-4'),
+    'DesignStudioDrawer must use explicit Tailwind slide-in class'
+  );
 
   // Check 5 tab buttons exist
   const tabButtons = drawer!.querySelectorAll('[data-studio-tab]');
@@ -531,7 +582,23 @@ async function main() {
   const widthSlider = drawer!.querySelector('input[type="range"][data-control="sidebarWidth"]');
   assert.ok(widthSlider, 'sidebarWidth slider must exist');
 
-  // Check Palette items with + Add buttons
+  // Check Palette items with + Add buttons & Active Toolbar Items manager
+  const activeToolbarList = drawer!.querySelector('[data-active-toolbar-list="true"]');
+  assert.ok(activeToolbarList, 'Active Toolbar Items manager list must render in Tab 2');
+  const activeSlotRows = activeToolbarList!.querySelectorAll('[data-active-slot-id]');
+  assert.ok(activeSlotRows.length > 0, 'Active toolbar slots must be manageable inside Tab 2');
+  const firstSlotId = activeSlotRows[0].getAttribute('data-active-slot-id');
+  const moveDownBtn = activeSlotRows[0].querySelector('[data-action="move-slot-down"]') as HTMLButtonElement | null;
+  assert.ok(moveDownBtn, 'Active toolbar slot must expose move-down reorder button');
+  await React.act(async () => {
+    moveDownBtn!.click();
+  });
+  assert.strictEqual(
+    capturedState!.draftProfile.layout.toolbarItems[1].id,
+    firstSlotId,
+    'Clicking Move Down in Active Toolbar list must move slot from index 0 to 1'
+  );
+
   const paletteItems = drawer!.querySelectorAll('[data-palette-item]');
   assert.ok(paletteItems.length > 0, 'Palette items must be present');
   const addButtons = drawer!.querySelectorAll('[data-action="add-toolbar-item"]');

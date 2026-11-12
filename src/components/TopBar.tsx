@@ -2730,6 +2730,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         <CustomizeSlotWrapper
           item={slot}
           isCustomizeMode={isCustomizeMode}
+          controlsAlign={idx >= layoutConfig.toolbarItems.length - 2 ? 'right' : 'center'}
           onToggleVisibility={onToggleToolbarSlotVisibility}
           onRemove={onRemoveToolbarSlot}
           onDragOver={(_, item) => {
@@ -2901,7 +2902,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       {/* macOS Traffic Lights Spacer when Toolbar is top-most */}
       {isMac && !layoutConfig.isVerticalChrome && isTopMostRow && renderWindowDragSpacer('mac')}
 
-      <div className="relative flex-1 min-w-0 flex items-center gap-1.5">
+      <div
+        className="relative flex-1 min-w-0 flex items-center gap-1.5 no-drag"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
         {renderToolbarSlots(false)}
       </div>
 
@@ -2950,7 +2954,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       <div className="relative w-px h-5 bg-slate-200 dark:bg-white/10 shrink-0" />
 
       {/* Modular Toolbar Slots */}
-      <div className="relative flex-1 min-w-[200px] flex items-center gap-1">
+      <div
+        className="relative flex-1 min-w-[200px] flex items-center gap-1 no-drag"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
         {renderToolbarSlots(true)}
       </div>
 
@@ -2959,20 +2966,28 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     </div>
   );
 
+  const headerOwnsBackdrop = !(layoutConfig.isVerticalChrome || layoutConfig.isCompactSingleRow);
+
   return (
     <>
     <header
       onContextMenu={handleTopBarContextMenu}
       style={!isIncognito ? {
-        background: 'var(--nova-tabBar-bg, var(--nova-header-bg))',
+        background: headerOwnsBackdrop ? 'var(--nova-tabBar-bg, var(--nova-header-bg))' : 'transparent',
         color: 'var(--nova-tabBar-text, inherit)',
-        borderColor: 'var(--nova-tabBar-border, var(--nova-border-subtle))',
-        borderBottomWidth: 'var(--nova-tabBar-border-width, 1px)',
+        borderColor: headerOwnsBackdrop ? 'var(--nova-tabBar-border, var(--nova-border-subtle))' : 'transparent',
+        borderBottomWidth: headerOwnsBackdrop ? 'var(--nova-tabBar-border-width, 1px)' : '0px',
         fontFamily: 'var(--nova-font-ui, inherit)',
       } : {
         fontFamily: 'var(--nova-font-ui, inherit)',
       }}
-      className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}
+      className={`w-full flex flex-col select-none drag-region relative z-50 ${
+        isIncognito
+          ? 'bg-slate-900 border-b border-slate-800 text-slate-100 dark'
+          : headerOwnsBackdrop
+          ? 'bg-slate-100 border-b border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'
+          : 'text-slate-900 dark:text-slate-100'
+      }`}
     >
       {layoutConfig.isVerticalChrome ? (
         renderToolbarRow(true)

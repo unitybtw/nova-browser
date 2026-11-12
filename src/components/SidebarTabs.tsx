@@ -2073,9 +2073,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
 
           <div className="flex items-center gap-1">
-            {isCustomizeMode && (
-              <SidebarSectionCustomizeBadge sectionKey="dockFooter" label="Footer Dock" onToggle={onToggleSidebarSection} />
-            )}
             {onCreateFolder && (
               <button
                 onClick={onCreateFolder}
@@ -2093,6 +2090,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <Plus className="w-4 h-4" />
             </button>
           </div>
+          {isCustomizeMode && (
+            <div className="absolute -top-2.5 right-2 z-20">
+              <SidebarSectionCustomizeBadge sectionKey="dockFooter" label="Footer Dock" onToggle={onToggleSidebarSection} />
+            </div>
+          )}
         </div>
         ) : isCustomizeMode ? (
           <SidebarSectionHiddenCard

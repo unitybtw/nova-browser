@@ -427,6 +427,10 @@ async function main() {
     const hiddenRegion = container.querySelector('[aria-label="Toolbar slot: Home"]')!;
     assert.ok(hiddenRegion, 'hidden slot is surfaced in customize mode');
     assert.ok(hiddenRegion.className.includes('opacity-45'), 'hidden slot is dimmed in customize mode');
+    assert.ok(hiddenRegion.className.includes('no-drag'), 'slot wrapper must mark no-drag so Electron does not hijack slot drag');
+    const slotControlsBar = hiddenRegion.querySelector('[role="toolbar"]')!;
+    assert.ok(slotControlsBar.className.includes('top-full'), 'slot controls overlay must open below slot to avoid clipping/tab collision');
+    assert.ok(slotControlsBar.className.includes('opacity-0'), 'slot controls overlay stays hidden until hover/focus to prevent adjacent overlap');
     assert.ok(container.querySelector('[aria-label="Show Home"]'), 'hidden slot exposes Show control');
     assert.equal(container.querySelector('[aria-label="Remove Address & Search Bar"]'), null, 'critical omnibox cannot be removed');
 
@@ -556,7 +560,31 @@ async function main() {
       container.querySelector('header')?.className.includes('bg-slate-900'),
       'incognito isolation styling preserved'
     );
-    console.log('[PASS] Compact workspace deduplication and incognito isolation');
+
+    // Non-incognito compact-single-row delegates backdrop to compact row so header background stays transparent
+    await React.act(async () =>
+      root.render(
+        React.createElement(
+          TopBar,
+          baseProps({
+            isIncognito: false,
+            design: makeResolvedDesign({
+              chromeMode: 'compact-single-row',
+              toolbarItems: [
+                { id: 'slot-omnibox', kind: 'omnibox', visible: true },
+              ],
+            }),
+          })
+        )
+      )
+    );
+    const nonIncognitoCompactHeader = container.querySelector('header') as HTMLElement;
+    assert.equal(
+      nonIncognitoCompactHeader.style.background,
+      'transparent',
+      'compact-single-row header avoids double-painting background behind toolbar layer'
+    );
+    console.log('[PASS] Compact workspace deduplication, incognito isolation & single-backdrop header');
 
     console.log('\ntopbar_customization.test.ts passed');
   } finally {

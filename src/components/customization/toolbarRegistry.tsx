@@ -188,6 +188,7 @@ export function getToolbarItemMeta(kind: ToolbarItemKind): ToolbarItemSpec {
 export interface CustomizeSlotWrapperProps {
   item: ToolbarSlotItem;
   isCustomizeMode?: boolean;
+  controlsAlign?: 'center' | 'right';
   onToggleVisibility?: (id: string) => void;
   onRemove?: (id: string) => void;
   onDragStart?: (event: React.DragEvent<HTMLDivElement>, item: ToolbarSlotItem) => void;
@@ -201,6 +202,7 @@ export interface CustomizeSlotWrapperProps {
 export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
   item,
   isCustomizeMode = false,
+  controlsAlign = 'center',
   onToggleVisibility,
   onRemove,
   onDragStart,
@@ -273,16 +275,19 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onKeyDown={handleKeyDown}
-      className={`relative group/slot inline-flex items-center transition-all rounded-md select-none outline-none ring-1 ring-dashed ring-[var(--nova-accent,#3b82f6)]/50 hover:ring-2 hover:ring-[var(--nova-accent,#3b82f6)] focus-visible:ring-2 focus-visible:ring-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/[0.04] hover:bg-[var(--nova-accent,#3b82f6)]/[0.08] ${
+      className={`relative group/slot inline-flex items-center transition-all rounded-md select-none no-drag cursor-grab active:cursor-grabbing outline-none ring-1 ring-dashed ring-[var(--nova-accent,#3b82f6)]/50 hover:ring-2 hover:ring-[var(--nova-accent,#3b82f6)] focus-visible:ring-2 focus-visible:ring-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/[0.04] hover:bg-[var(--nova-accent,#3b82f6)]/[0.08] ${
         !item.visible ? 'opacity-45 grayscale-[50%]' : ''
       } ${className}`}
       style={{
+        WebkitAppRegion: 'no-drag',
         ...style,
-      }}
+      } as React.CSSProperties}
     >
-      {/* Chrome Pills Overlay: Drag Handle, Eye, Remove */}
+      {/* Chrome Pills Overlay: Drag Handle, Eye, Remove (revealed on hover/focus below slot to avoid adjacent collisions & top-edge clipping) */}
       <div
-        className="absolute -top-3.5 right-0 z-30 flex items-center gap-0.5 px-1 py-0.5 rounded-full shadow-sm text-[10px] bg-neutral-900/95 text-neutral-100 dark:bg-neutral-800/95 dark:text-neutral-200 border border-neutral-700/70 pointer-events-auto"
+        className={`absolute top-full mt-1.5 ${
+          controlsAlign === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2'
+        } z-30 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full shadow-md text-[10px] bg-neutral-900/95 text-neutral-100 dark:bg-neutral-800/95 dark:text-neutral-200 border border-neutral-700/70 opacity-0 pointer-events-none group-hover/slot:opacity-100 group-hover/slot:pointer-events-auto group-focus-within/slot:opacity-100 group-focus-within/slot:pointer-events-auto transition-opacity duration-150 whitespace-nowrap before:content-[''] before:absolute before:-top-2 before:inset-x-0 before:h-2`}
         role="toolbar"
         aria-label={`Slot controls for ${spec.label}`}
         onClick={(e) => e.stopPropagation()}
