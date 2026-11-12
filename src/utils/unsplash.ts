@@ -613,36 +613,8 @@ export async function fetchDaily4KWallpapers(): Promise<WallpaperPhoto[]> {
     console.warn('IPC daily wallpaper error:', err);
   }
 
-  // 2. Direct browser fetch for Bing Daily 4K Archive
-  if (fetchedResults.length === 0 && typeof fetch !== 'undefined') {
-    try {
-      const bingRes = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US');
-      if (bingRes.ok) {
-        const bingData = await bingRes.json();
-        if (bingData.images && Array.isArray(bingData.images)) {
-          for (const img of bingData.images) {
-            const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
-            const sanitized = sanitizeWallpaperPhoto({
-              id: `bing-${img.hsh || img.startdate}`,
-              title: img.title || 'Bing Daily 4K Wallpaper',
-              author: img.copyright || 'Microsoft Bing Daily',
-              authorUrl: 'https://bing.com',
-              imageUrl: uhdUrl,
-              thumbnailUrl: `https://www.bing.com${img.url}`,
-              source: 'Bing 4K UHD Daily',
-              resolution: '3840x2160',
-              date: img.startdate
-            });
-            if (sanitized) {
-              fetchedResults.push(sanitized);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Bing daily direct fetch error:', e);
-    }
-  }
+  // Renderer environments outside Electron (or when IPC returns empty) fall back cleanly
+  // to CURATED_4K_WALLPAPERS instead of calling Bing directly and causing CORS console errors.
 
   // Merge fetched results with curated wallpapers
   const finalPool: WallpaperPhoto[] = [];

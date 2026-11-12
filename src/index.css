@@ -477,7 +477,7 @@ button:active:not(:disabled) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-block: 40px;
+  padding-block: clamp(10px, 1.8vh, 20px);
 }
 @container (min-width: 1120px) {
   .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="left"] {

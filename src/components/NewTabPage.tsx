@@ -566,13 +566,13 @@ const WidgetCustomizeFrame: React.FC<WidgetCustomizeFrameProps> = ({
   return (
     <div
       data-customize-widget={widgetId}
-      className={`relative group/widget rounded-2xl p-2.5 pt-2 transition-colors ring-1 ring-dashed ${
+      className={`relative group/widget rounded-2xl p-1.5 px-2.5 transition-colors ring-1 ring-dashed ${
         useDarkCanvasStyle
           ? 'ring-cyan-400/60 hover:ring-cyan-300 bg-slate-950/20'
           : 'ring-accent/60 hover:ring-accent bg-white/45'
       } ${className}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
         <span
           className={`px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold text-[10px] pointer-events-none select-none shadow-xs shrink-0 ${
             useDarkCanvasStyle
@@ -1203,7 +1203,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const safeBgCssUrl = useMemo(() => {
     if (!isSafeBgUrl || !backgroundCustomUrl) return '';
-    return backgroundCustomUrl.replace(/["'\\]/g, '');
+    return backgroundCustomUrl.replace(/["'\r\n\\]/g, '');
   }, [isSafeBgUrl, backgroundCustomUrl]);
 
   const isVideoBg = newTabBackground === 'custom_url' && isSafeBgUrl && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
@@ -1321,7 +1321,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         // A dark fallback keeps glass surfaces readable while a photo loads.
         backgroundColor: hasWallpaper ? '#101820' : 'var(--nova-frame-bg)'
       }}
-      className={`nova-newtab ${isCleanBackground ? "nova-newtab-clean" : ""} w-full h-full relative overflow-x-hidden overflow-y-auto p-4 sm:p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
+      className={`nova-newtab ${isCleanBackground ? "nova-newtab-clean" : ""} w-full h-full relative overflow-hidden select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
 
       {/* Unsplash Background */}
@@ -1329,34 +1329,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
             key={unsplashUrl}
-            className="absolute inset-0 bg-cover bg-center transition-all duration-700 animate-in fade-in duration-1000"
+            className="absolute inset-0 bg-cover bg-center transition-all duration-700 animate-in fade-in"
             style={{
               backgroundImage: `url('${(unsplashUrl || '').replace(/["'\r\n\\]/g, '')}')`
             }}
           />
-          <div className="absolute inset-0 bg-black/25"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/45"></div>
-
-          {/* Daily Wallpaper Credit & Shuffle Button */}
-          {unsplashPhoto && (
-            <div className="nova-newtab-glass absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/35 hover:bg-black/50 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-sm transition-colors duration-200 pointer-events-auto group select-none">
-              <span className="text-[11px] font-medium text-white/85 group-hover:text-white max-w-[200px] truncate tracking-tight transition-colors">
-                {formattedWallpaperTitle}
-              </span>
-              <span className="w-1 h-1 rounded-full bg-white/20 shrink-0" />
-              <span className="text-[11px] text-white/50 group-hover:text-white/75 max-w-[150px] truncate transition-colors font-normal">
-                {formattedWallpaperAuthor}
-              </span>
-              <button
-                type="button"
-                onClick={shuffleWallpaper}
-                className="ml-0.5 p-1 -mr-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-95 transition-colors duration-200 flex items-center justify-center focus:outline-none group/btn"
-                title={t('newtab.shuffleWallpaper')}
-              >
-                <Shuffle className="w-3 h-3" />
-              </button>
-            </div>
-          )}
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/20"></div>
         </div>
       )}
 
@@ -1374,12 +1353,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             />
           ) : (
             <div
-              className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
+              className="absolute inset-0 bg-cover bg-center transition-all duration-700"
               style={{ backgroundImage: `url('${safeBgCssUrl}')` }}
             />
           )}
-          <div className="absolute inset-0 bg-black/40"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/50"></div>
+          <div className="absolute inset-0 bg-black/15"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/20"></div>
         </div>
       )}
 
@@ -1619,6 +1598,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </div>
       )}
 
+      {/* Scrollable Content Viewport (decoupled from stationary full-bleed background layers) */}
+      <div className="relative z-10 w-full h-full overflow-x-hidden overflow-y-auto px-4 sm:px-6">
       <div
         className="nova-newtab-layout"
         data-tasks-visible={layout.tasksWidget.visible ? 'true' : 'false'}
@@ -1628,7 +1609,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {isCustomizeMode && hiddenWidgets.length > 0 && (
         <div
           data-customize-hidden-widgets="true"
-          className={`mb-6 z-40 flex flex-wrap items-center justify-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-md shadow-lg ${
+          className={`mb-3 z-40 flex flex-wrap items-center justify-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-md shadow-lg ${
             useDarkCanvasStyle
               ? 'bg-slate-900/85 border-white/15 text-white'
               : 'bg-white/95 border-slate-300/80 text-slate-800'
@@ -1668,7 +1649,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         variants={shouldAnimate ? containerVariants : undefined}
         initial={shouldAnimate ? "hidden" : false}
         animate="visible"
-        className="w-full max-w-[920px] my-auto flex flex-col items-center gap-8 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="w-full max-w-[920px] my-auto flex flex-col items-center gap-5 sm:gap-6 z-10 transition-[max-width,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
       >
         {/* Clock & Greeting Hero Block */}
         {(layout.clock.visible || layout.greeting.visible) && (
@@ -2237,6 +2218,32 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       )}
 
       </div>
+      </div>
+
+      {/* Daily Wallpaper Credit & Shuffle Button (anchored to stationary viewport above scroll layer) */}
+      {newTabBackground === 'unsplash' && unsplashPhoto && (
+        <div
+          className={`nova-newtab-glass absolute left-6 z-20 flex items-center gap-2.5 bg-black/35 hover:bg-black/50 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-sm transition-all duration-200 pointer-events-auto group select-none ${
+            isCustomizeMode ? 'bottom-16 sm:bottom-4' : 'bottom-4'
+          }`}
+        >
+          <span className="text-[11px] font-medium text-white/85 group-hover:text-white max-w-[200px] truncate tracking-tight transition-colors">
+            {formattedWallpaperTitle}
+          </span>
+          <span className="w-1 h-1 rounded-full bg-white/20 shrink-0" />
+          <span className="text-[11px] text-white/50 group-hover:text-white/75 max-w-[150px] truncate transition-colors font-normal">
+            {formattedWallpaperAuthor}
+          </span>
+          <button
+            type="button"
+            onClick={shuffleWallpaper}
+            className="ml-0.5 p-1 -mr-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-95 transition-colors duration-200 flex items-center justify-center focus:outline-none group/btn"
+            title={t('newtab.shuffleWallpaper')}
+          >
+            <Shuffle className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       {/* Edit/Add Modal */}
       <AnimatePresence>

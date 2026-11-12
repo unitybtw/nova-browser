@@ -2261,7 +2261,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       <main
         id="browser-content-main"
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
-        className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden min-h-0"
+        className="flex-1 min-h-0 relative w-full bg-white dark:bg-slate-900 flex overflow-hidden"
         onDragOver={(e) => {
           const types = Array.from(e.dataTransfer?.types || []);
           if (types.includes('text/plain')) {

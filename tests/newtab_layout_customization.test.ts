@@ -335,6 +335,9 @@ async function main() {
     };
 
     await renderInteractiveCustomize();
+    const newtabRoot = container.querySelector('.nova-newtab')!;
+    assert.ok(newtabRoot.className.includes('overflow-hidden'), 'Outer NewTab frame locks background layer to viewport');
+    assert.ok(newtabRoot.querySelector('.overflow-y-auto .nova-newtab-layout'), 'Scrollable layout sits inside dedicated inner scroller');
     for (const id of ['clock', 'greeting', 'searchBox', 'shortcuts', 'tasksWidget']) {
       assert.ok(container.querySelector(`[data-customize-widget="${id}"]`), `Customize outline renders for ${id}`);
       assert.ok(container.querySelector(`[data-widget-controls="${id}"]`), `Customize pill controls render for ${id}`);
