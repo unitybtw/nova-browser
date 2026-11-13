@@ -596,6 +596,25 @@ async function main() {
     assert.ok(appSource.includes('newTabLayout={browserNewTabLayout}'), 'App.tsx forwards browserNewTabLayout to BrowserView');
     assert.ok(appSource.includes('onUpdateNewTabLayout={handleUpdateNewTabLayout}'), 'App.tsx forwards handleUpdateNewTabLayout to BrowserView');
 
+    // Regression: symmetric tasks clearance keeps shortcuts centered even when tasks placement is left/right
+    const indexCss = fs.readFileSync(join(process.cwd(), 'src/index.css'), 'utf8');
+    assert.ok(
+      indexCss.includes('padding-inline: 320px;'),
+      'index.css uses symmetric padding-inline for left/right tasks placement'
+    );
+    assert.ok(
+      !indexCss.includes('padding-left: 320px;') && !indexCss.includes('padding-right: 320px;'),
+      'index.css does not apply asymmetric one-sided padding that pushes shortcuts off-center'
+    );
+    await React.act(async () => {
+      root.render(React.createElement(NewTabPage, {
+        onNavigate: noop,
+        newTabLayout: makeLayout({ tasksWidget: { visible: true, placement: 'left' } }),
+      }));
+    });
+    const shortcutsCenterWrap = container.querySelector('[data-widget="shortcuts"]')!;
+    assert.ok(shortcutsCenterWrap.className.includes('mx-auto'), 'Shortcuts wrapper remains centered with mx-auto');
+
     console.log('[PASS] App.tsx workspace-aware NewTabLayout persistence and BrowserView wiring');
     console.log('[PASS] ALL New Tab Layout Customization tests passed!');
   } finally {

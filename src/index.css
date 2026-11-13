@@ -480,11 +480,9 @@ button:active:not(:disabled) {
   padding-block: clamp(10px, 1.8vh, 20px);
 }
 @container (min-width: 1120px) {
-  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="left"] {
-    padding-left: 320px;
-  }
+  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="left"],
   .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="right"] {
-    padding-right: 320px;
+    padding-inline: 320px;
   }
   .nova-tasks-widget[data-placement="left"] {
     position: absolute;
@@ -499,12 +497,6 @@ button:active:not(:disabled) {
     top: 50%;
     transform: translateY(-50%);
     margin: 0;
-  }
-}
-@container (min-width: 1480px) {
-  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="left"],
-  .nova-newtab-layout[data-tasks-visible="true"][data-tasks-placement="right"] {
-    padding-inline: 320px;
   }
 }
 @container (min-width: 760px) {
