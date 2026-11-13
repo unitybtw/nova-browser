@@ -166,7 +166,7 @@ async function main() {
     assert.equal(defaultCfg.omniboxMaxWidth, 'balanced');
 
     assert.equal(getOmniboxWidthClass('compact'), 'max-w-md');
-    assert.equal(getOmniboxWidthClass('balanced'), 'max-w-2xl');
+    assert.equal(getOmniboxWidthClass('balanced'), 'max-w-5xl');
     assert.equal(getOmniboxWidthClass('full'), '');
 
     // Slot payload takes precedence over kind payload (CustomizeSlotWrapper sets both!)
@@ -339,7 +339,7 @@ async function main() {
     );
     assert.ok(toolbarAbove.querySelector('.w-\\[88px\\]'), 'macOS drag spacer moves to toolbar when toolbar is on top');
     assert.equal(tabBarBelow.querySelector('.w-\\[88px\\]'), null, 'tabbar drops macOS spacer when below toolbar');
-    assert.ok(!toolbarAbove.innerHTML.includes('max-w-md') && !toolbarAbove.innerHTML.includes('max-w-2xl'), 'full omnibox removes max-w caps');
+    assert.ok(!toolbarAbove.innerHTML.includes('max-w-md') && !toolbarAbove.innerHTML.includes('max-w-5xl'), 'full omnibox removes max-w caps');
 
     // Also check Windows spacer moves properly in below-toolbar mode
     Object.defineProperty(w.navigator, 'platform', { configurable: true, value: 'Win32' });

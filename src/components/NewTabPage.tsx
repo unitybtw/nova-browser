@@ -1990,7 +1990,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             data-widget="shortcuts-grid"
             data-columns={layout.shortcuts.columns}
             data-card-style={layout.shortcuts.cardStyle}
-            className={`grid ${shortcutsGridColsClass} gap-2.5 sm:gap-3 px-1 w-full`}
+            className={`grid ${shortcutsGridColsClass} gap-2.5 sm:gap-3 px-1 w-full mx-auto`}
+            style={(() => {
+              const totalCells = renderableSpeedDials.length + (renderableSpeedDials.length < 10 ? 1 : 0);
+              if (totalCells <= 0 || totalCells >= layout.shortcuts.columns) return undefined;
+              const cellWidth = layout.shortcuts.cardStyle === 'pill' ? 144 : 104;
+              return {
+                gridTemplateColumns: `repeat(${totalCells}, minmax(0, 1fr))`,
+                maxWidth: `${totalCells * cellWidth + (totalCells - 1) * 12 + 8}px`,
+              };
+            })()}
           >
             {renderableSpeedDials.map((dial) => (
               <motion.div

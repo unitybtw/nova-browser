@@ -249,7 +249,7 @@ export function getOmniboxWidthClass(
   omniboxMaxWidth: 'compact' | 'balanced' | 'full'
 ): string {
   if (omniboxMaxWidth === 'compact') return 'max-w-md';
-  if (omniboxMaxWidth === 'balanced') return 'max-w-2xl';
+  if (omniboxMaxWidth === 'balanced') return 'max-w-5xl';
   return '';
 }
 

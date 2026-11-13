@@ -615,6 +615,37 @@ async function main() {
     const shortcutsCenterWrap = container.querySelector('[data-widget="shortcuts"]')!;
     assert.ok(shortcutsCenterWrap.className.includes('mx-auto'), 'Shortcuts wrapper remains centered with mx-auto');
 
+    // Regression: when total shortcut tiles < column count (e.g. 0 speed dials -> only + Add), grid collapses to active count & centers
+    const prevSpeedDials = dom.window.localStorage.getItem('nova_speed_dials');
+    const sparseContainer = dom.window.document.createElement('div');
+    dom.window.document.body.appendChild(sparseContainer);
+    const sparseRoot = createRoot(sparseContainer);
+    try {
+      await React.act(async () => {
+        sparseRoot.render(React.createElement(NewTabPage, {
+          onNavigate: noop,
+          newTabLayout: makeLayout({ shortcuts: { visible: true, columns: 4, cardStyle: 'tile' } }),
+        }));
+      });
+      // Remove all existing dials so only the "+ Add" tile remains
+      while (sparseContainer.querySelectorAll('[data-widget="shortcuts-grid"] > div').length > 1) {
+        const removeBtn = sparseContainer.querySelector('[data-widget="shortcuts-grid"] > div .absolute button:last-child') as HTMLButtonElement | null;
+        if (!removeBtn) break;
+        await React.act(async () => {
+          removeBtn.click();
+        });
+      }
+      const sparseGrid = sparseContainer.querySelector('[data-widget="shortcuts-grid"]') as HTMLElement;
+      assert.equal(sparseGrid.children.length, 1, 'Only +Add tile remains after clearing dials');
+      assert.ok(sparseGrid.className.includes('mx-auto'), 'Sparse shortcuts grid centers with mx-auto');
+      assert.equal(sparseGrid.style.gridTemplateColumns, 'repeat(1, minmax(0, 1fr))', 'Single +Add tile uses 1 centered column');
+    } finally {
+      await React.act(async () => sparseRoot.unmount());
+      sparseContainer.remove();
+      if (prevSpeedDials === null) dom.window.localStorage.removeItem('nova_speed_dials');
+      else dom.window.localStorage.setItem('nova_speed_dials', prevSpeedDials);
+    }
+
     console.log('[PASS] App.tsx workspace-aware NewTabLayout persistence and BrowserView wiring');
     console.log('[PASS] ALL New Tab Layout Customization tests passed!');
   } finally {
