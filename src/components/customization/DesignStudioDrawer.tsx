@@ -147,11 +147,12 @@ export const DesignStudioDrawer: React.FC = () => {
     updateDraft,
     updateDraftTabStyle,
     updateDraftTabAnimation,
+    drawerDockSide: dockSide,
+    setDrawerDockSide: setDockSide,
   } = useCustomize();
 
-  const [dockSide, setDockSide] = useState<'left' | 'right'>('right');
   const [activeTab, setActiveTab] = useState<StudioTabId>('templates');
-  const [selectedZone, setSelectedZone] = useState<SurfaceZoneId>('frame');
+  const [selectedZone, setSelectedZone] = useState<SurfaceZoneId>('toolbar');
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -244,9 +245,9 @@ export const DesignStudioDrawer: React.FC = () => {
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={`fixed ${drawerTopClass} bottom-[72px] ${
         dockSide === 'right'
-          ? 'right-4 slide-in-from-right-4'
-          : 'left-4 slide-in-from-left-4'
-      } w-[380px] max-w-[calc(100vw-2rem)] z-[995] select-none pointer-events-auto no-drag flex flex-col rounded-2xl bg-slate-900/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-xl overflow-hidden font-sans text-xs animate-in fade-in duration-200`}
+          ? 'right-3 slide-in-from-right-4'
+          : 'left-3 slide-in-from-left-4'
+      } w-[356px] max-w-[calc(100vw-1.5rem)] z-[995] select-none pointer-events-auto no-drag flex flex-col rounded-2xl bg-slate-950/92 text-slate-100 border border-white/15 shadow-2xl backdrop-blur-xl overflow-hidden font-sans text-xs animate-in fade-in duration-200`}
     >
       {/* Studio Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80 shrink-0">
@@ -265,8 +266,8 @@ export const DesignStudioDrawer: React.FC = () => {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setDockSide((prev) => (prev === 'right' ? 'left' : 'right'))}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            onClick={() => setDockSide(dockSide === 'right' ? 'left' : 'right')}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
             title={`Dock to ${dockSide === 'right' ? 'Left' : 'Right'}`}
           >
             <MoveHorizontal className="w-4 h-4" />
@@ -274,7 +275,7 @@ export const DesignStudioDrawer: React.FC = () => {
           <button
             type="button"
             onClick={discard}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-300 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-300 hover:bg-slate-800 transition-colors cursor-pointer"
             title="Close Design Studio"
           >
             <X className="w-4 h-4" />
@@ -299,7 +300,7 @@ export const DesignStudioDrawer: React.FC = () => {
               type="button"
               data-studio-tab={t.id}
               onClick={() => setActiveTab(t.id as StudioTabId)}
-              className={`flex-1 py-1.5 px-1 rounded-lg font-medium flex flex-col items-center gap-1 transition-all text-[11px] ${
+              className={`flex-1 py-1.5 px-1 rounded-lg font-medium flex flex-col items-center gap-1 transition-all text-[11px] cursor-pointer ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -899,9 +900,9 @@ export const DesignStudioDrawer: React.FC = () => {
                   />
                   <SafeColorTextInput
                     value={currentZoneStyle.bg}
-                    placeholder="#1e293b or transparent"
+                    placeholder="#1e293b"
                     onChange={(val) => updateSelectedZone({ bg: val })}
-                    className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                    className="w-32 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
                     aria-label="Zone background color"
                     data-testid="zone-bg-input"
                   />
@@ -926,7 +927,7 @@ export const DesignStudioDrawer: React.FC = () => {
                     value={currentZoneStyle.textColor}
                     placeholder="#f8fafc"
                     onChange={(val) => updateSelectedZone({ textColor: val })}
-                    className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                    className="w-32 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
                     aria-label="Zone text color"
                     data-testid="zone-text-color-input"
                   />
@@ -951,7 +952,7 @@ export const DesignStudioDrawer: React.FC = () => {
                     value={currentZoneStyle.mutedColor}
                     placeholder="#94a3b8"
                     onChange={(val) => updateSelectedZone({ mutedColor: val })}
-                    className="w-28 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
+                    className="w-32 px-2 py-1 rounded bg-slate-900 border text-slate-200 text-xs font-mono"
                     aria-label="Zone muted color"
                     data-testid="zone-muted-color-input"
                   />

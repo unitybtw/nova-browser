@@ -31,13 +31,19 @@ export const CustomizeTopBanner: React.FC = () => {
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[996] max-w-[calc(100vw-2rem)] select-none pointer-events-auto no-drag animate-in fade-in slide-in-from-bottom-2 duration-200"
     >
-      <div className="flex flex-wrap items-center justify-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 text-slate-100 border border-slate-700/80 shadow-2xl backdrop-blur-xl text-xs font-sans">
+      <div className="flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/92 text-slate-100 border border-white/15 shadow-2xl backdrop-blur-xl text-xs font-sans">
+        {/* Live Preview Indicator */}
+        <div className="hidden sm:flex items-center gap-1.5 pl-1.5 pr-1 text-[11px] font-medium text-emerald-300/90">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Live</span>
+        </div>
+
         {/* Scope Pill */}
         <button
           type="button"
           data-scope-pill="true"
           onClick={() => switchScope(editingScope === 'global' ? 'workspace' : 'global')}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors border border-slate-700/60"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-100 font-medium transition-colors border border-white/10 cursor-pointer"
           title="Click to toggle between Global Design and Workspace Override"
         >
           <Layers className="w-3.5 h-3.5 text-blue-400" />

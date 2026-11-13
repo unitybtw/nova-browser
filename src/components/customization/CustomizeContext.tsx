@@ -50,6 +50,8 @@ export interface CustomizeContextValue {
   ) => void;
   updateDraftTabStyle: (tabStyle: 'rounded' | 'square' | 'floating') => void;
   updateDraftTabAnimation: (tabAnimation: 'chrome' | 'smooth' | 'snappy' | 'none') => void;
+  drawerDockSide: 'left' | 'right';
+  setDrawerDockSide: (side: 'left' | 'right') => void;
 }
 
 export interface CustomizeManagerOptions {
@@ -97,6 +99,7 @@ export function useCustomizeManager({
 }: CustomizeManagerOptions): CustomizeContextValue {
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [editingScope, setEditingScope] = useState<CustomizeScope>('global');
+  const [drawerDockSide, setDrawerDockSide] = useState<'left' | 'right'>('right');
 
   const initialGlobalProfile = useMemo(() => {
     return settings.designProfile
@@ -499,6 +502,8 @@ export function useCustomizeManager({
     updateDraft,
     updateDraftTabStyle,
     updateDraftTabAnimation,
+    drawerDockSide,
+    setDrawerDockSide,
   };
 }
 

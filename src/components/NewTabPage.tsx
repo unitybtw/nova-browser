@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Compass, Eye, EyeOff } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName, getSearchLocale, getSearchLanguage } from '../utils/searchEngine';
@@ -12,6 +12,7 @@ import { useTranslation, getLocale } from '../services/i18n';
 import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSharedLocalStorageState } from '../hooks/useSharedLocalStorage';
+import { CustomizeContext } from './customization/CustomizeContext';
 import { logger } from '../utils/logger';
 
 interface Todo {
@@ -821,6 +822,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   onUpdateNewTabLayout,
 }) => {
   const { t, language } = useTranslation();
+  const customizeCtx = useContext(CustomizeContext);
+  const customizeInsetClass = isCustomizeMode
+    ? customizeCtx?.drawerDockSide === 'left'
+      ? 'lg:pl-[376px]'
+      : 'lg:pr-[376px]'
+    : '';
   // Only animate on the first app launch, all subsequent new tabs open instantly
   const [shouldAnimate] = useState(() => {
     if (!hasAnimatedInitialLaunch) {
@@ -1599,7 +1606,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       )}
 
       {/* Scrollable Content Viewport (decoupled from stationary full-bleed background layers) */}
-      <div className="relative z-10 w-full h-full overflow-x-hidden overflow-y-auto px-4 sm:px-6">
+      <div className={`relative z-10 w-full h-full overflow-x-hidden overflow-y-auto px-4 sm:px-6 transition-[padding] duration-200 ${customizeInsetClass}`}>
       <div
         className="nova-newtab-layout"
         data-tasks-visible={layout.tasksWidget.visible ? 'true' : 'false'}
