@@ -185,14 +185,37 @@ export function getToolbarItemMeta(kind: ToolbarItemKind): ToolbarItemSpec {
   );
 }
 
+export type ActiveToolbarDragPayload =
+  | { type: 'slot'; draggedId: string; kind: ToolbarItemKind }
+  | { type: 'kind'; kind: ToolbarItemKind }
+  | null;
+
+let activeToolbarDragPayload: ActiveToolbarDragPayload = null;
+
+export function setActiveToolbarDragPayload(payload: ActiveToolbarDragPayload): void {
+  activeToolbarDragPayload = payload;
+}
+
+export function getActiveToolbarDragPayload(): ActiveToolbarDragPayload {
+  return activeToolbarDragPayload;
+}
+
+export function clearActiveToolbarDragPayload(): void {
+  activeToolbarDragPayload = null;
+}
+
 export interface CustomizeSlotWrapperProps {
   item: ToolbarSlotItem;
   isCustomizeMode?: boolean;
+  isDragging?: boolean;
+  dropSide?: 'before' | 'after' | null;
   controlsAlign?: 'center' | 'right';
   onToggleVisibility?: (id: string) => void;
   onRemove?: (id: string) => void;
   onDragStart?: (event: React.DragEvent<HTMLDivElement>, item: ToolbarSlotItem) => void;
   onDragOver?: (event: React.DragEvent<HTMLDivElement>, item: ToolbarSlotItem) => void;
+  onDragLeave?: (event: React.DragEvent<HTMLDivElement>, item: ToolbarSlotItem) => void;
+  onDragEnd?: (event: React.DragEvent<HTMLDivElement>, item: ToolbarSlotItem) => void;
   onDrop?: (event: React.DragEvent<HTMLDivElement>, item: ToolbarSlotItem) => void;
   children?: React.ReactNode;
   className?: string;
@@ -202,11 +225,15 @@ export interface CustomizeSlotWrapperProps {
 export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
   item,
   isCustomizeMode = false,
+  isDragging = false,
+  dropSide = null,
   controlsAlign = 'center',
   onToggleVisibility,
   onRemove,
   onDragStart,
   onDragOver,
+  onDragLeave,
+  onDragEnd,
   onDrop,
   children,
   className = '',
@@ -227,17 +254,20 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
   const isCritical = Boolean(spec.isCritical);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.effectAllowed = 'copyMove';
     e.dataTransfer.setData('text/plain', item.id);
     e.dataTransfer.setData('application/x-nova-toolbar-slot', item.id);
     e.dataTransfer.setData('application/x-nova-toolbar-kind', item.kind);
+    setActiveToolbarDragPayload({ type: 'slot', draggedId: item.id, kind: item.kind });
     onDragStart?.(e, item);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    const types = Array.from(e.dataTransfer?.types || []);
     if (
-      e.dataTransfer.types.includes('application/x-nova-toolbar-slot') ||
-      e.dataTransfer.types.includes('application/x-nova-toolbar-kind')
+      types.includes('application/x-nova-toolbar-slot') ||
+      types.includes('application/x-nova-toolbar-kind') ||
+      activeToolbarDragPayload !== null
     ) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -245,8 +275,18 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
     onDragOver?.(e, item);
   };
 
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    onDragLeave?.(e, item);
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    clearActiveToolbarDragPayload();
+    onDragEnd?.(e, item);
+  };
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    clearActiveToolbarDragPayload();
     onDrop?.(e, item);
   };
 
@@ -273,16 +313,30 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
       draggable={isCustomizeMode}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDragEnd={handleDragEnd}
       onDrop={handleDrop}
       onKeyDown={handleKeyDown}
-      className={`relative group/slot inline-flex items-center transition-all rounded-md select-none no-drag cursor-grab active:cursor-grabbing outline-none ring-1 ring-dashed ring-[var(--nova-accent,#3b82f6)]/50 hover:ring-2 hover:ring-[var(--nova-accent,#3b82f6)] focus-visible:ring-2 focus-visible:ring-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/[0.04] hover:bg-[var(--nova-accent,#3b82f6)]/[0.08] ${
+      className={`relative group/slot inline-flex items-center transition-all duration-150 rounded-md select-none no-drag cursor-grab active:cursor-grabbing outline-none ring-1 ring-dashed ring-[var(--nova-accent,#3b82f6)]/50 hover:ring-2 hover:ring-[var(--nova-accent,#3b82f6)] focus-visible:ring-2 focus-visible:ring-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/[0.04] hover:bg-[var(--nova-accent,#3b82f6)]/[0.08] ${
         !item.visible ? 'opacity-45 grayscale-[50%]' : ''
-      } ${className}`}
+      } ${isDragging ? 'opacity-35 scale-95 ring-blue-400' : ''} ${className}`}
       style={{
         WebkitAppRegion: 'no-drag',
         ...style,
       } as React.CSSProperties}
     >
+      {dropSide === 'before' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0.5 -left-1.5 w-0.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.95)] z-40"
+        />
+      )}
+      {dropSide === 'after' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0.5 -right-1.5 w-0.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.95)] z-40"
+        />
+      )}
       {/* Chrome Pills Overlay: Drag Handle, Eye, Remove (revealed on hover/focus below slot to avoid adjacent collisions & top-edge clipping) */}
       <div
         className={`absolute top-full mt-1.5 ${

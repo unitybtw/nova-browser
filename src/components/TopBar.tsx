@@ -71,7 +71,12 @@ import {
 } from '../types/browser';
 import type { ResolvedBrowserDesign } from '../utils/designEngine';
 import { ALLOWED_TOOLBAR_KINDS, TOOLBAR_ITEM_ORDER_DEFAULT } from '../utils/designDefaults';
-import { CustomizeSlotWrapper, getToolbarItemMeta } from './customization/toolbarRegistry';
+import {
+  CustomizeSlotWrapper,
+  getToolbarItemMeta,
+  getActiveToolbarDragPayload,
+  clearActiveToolbarDragPayload,
+} from './customization/toolbarRegistry';
 import { getWorkspaceIcon, WORKSPACE_COLORS } from '../utils/workspaceIcons';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
@@ -1056,7 +1061,31 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     y: 0,
   });
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+  const [dragOverSide, setDragOverSide] = useState<'before' | 'after' | null>(null);
+  const [draggingSlotId, setDraggingSlotId] = useState<string | null>(null);
   const topBarContextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isCustomizeMode) {
+      setDragOverTarget(null);
+      setDragOverSide(null);
+      setDraggingSlotId(null);
+      clearActiveToolbarDragPayload();
+      return;
+    }
+    const resetDragState = () => {
+      setDragOverTarget(null);
+      setDragOverSide(null);
+      setDraggingSlotId(null);
+      clearActiveToolbarDragPayload();
+    };
+    window.addEventListener('dragend', resetDragState);
+    window.addEventListener('drop', resetDragState);
+    return () => {
+      window.removeEventListener('dragend', resetDragState);
+      window.removeEventListener('drop', resetDragState);
+    };
+  }, [isCustomizeMode]);
 
   const handleOpenContextMenu = useCallback((targetTab: Tab, index: number, e: React.MouseEvent) => {
     setTopBarContextMenu(prev => (prev.isOpen ? { ...prev, isOpen: false } : prev));
@@ -1514,6 +1543,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   }, [onOpenCustomizeMode, onToggleBookmarksBar]);
 
   const hasToolbarDragTypes = (types: readonly string[] | DOMStringList | undefined): boolean => {
+    if (getActiveToolbarDragPayload()) return true;
     if (!types) return false;
     const list = Array.from(types as Iterable<string>);
     return (
@@ -1522,14 +1552,27 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     );
   };
 
+  const resolveDropPayload = (e: React.DragEvent<HTMLElement>) => {
+    const dtPayload = parseToolbarDropPayload((type) => e.dataTransfer?.getData(type) || '');
+    if (dtPayload) return dtPayload;
+    const shared = getActiveToolbarDragPayload();
+    if (!shared) return null;
+    return shared.type === 'slot'
+      ? { type: 'slot' as const, draggedId: shared.draggedId }
+      : { type: 'kind' as const, kind: shared.kind };
+  };
+
   const handleDropAtGap = useCallback(
     (e: React.DragEvent<HTMLElement>, rawIndex: number) => {
       if (!isCustomizeMode) return;
-      const payload = parseToolbarDropPayload((type) => e.dataTransfer?.getData(type) || '');
+      const payload = resolveDropPayload(e);
       if (!payload) return;
       e.preventDefault();
       e.stopPropagation();
       setDragOverTarget(null);
+      setDragOverSide(null);
+      setDraggingSlotId(null);
+      clearActiveToolbarDragPayload();
 
       if (payload.type === 'slot') {
         const adjustedIndex = resolveDropInsertionIndex(
@@ -1564,21 +1607,42 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const handleSlotDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>, targetSlot: ToolbarSlotItem, idx: number) => {
       if (!isCustomizeMode) return;
-      const payload = parseToolbarDropPayload((type) => e.dataTransfer?.getData(type) || '');
+      const payload = resolveDropPayload(e);
       if (!payload) return;
       e.preventDefault();
       e.stopPropagation();
+      const side = dragOverTarget === targetSlot.id && dragOverSide === 'after' ? 'after' : 'before';
       setDragOverTarget(null);
+      setDragOverSide(null);
+      setDraggingSlotId(null);
+      clearActiveToolbarDragPayload();
 
       if (payload.type === 'slot') {
-        if (payload.draggedId !== targetSlot.id) {
+        if (payload.draggedId === targetSlot.id) return;
+        if (onMoveToolbarSlotToIndex && dragOverSide !== null) {
+          const rawIndex = side === 'after' ? idx + 1 : idx;
+          const adjustedIndex = resolveDropInsertionIndex(
+            layoutConfig.toolbarItems,
+            payload.draggedId,
+            rawIndex
+          );
+          onMoveToolbarSlotToIndex(payload.draggedId, adjustedIndex);
+        } else {
           onReorderToolbarSlot?.(payload.draggedId, targetSlot.id);
         }
       } else if (payload.type === 'kind') {
-        onInsertToolbarSlot?.(payload.kind, idx);
+        onInsertToolbarSlot?.(payload.kind, side === 'after' ? idx + 1 : idx);
       }
     },
-    [isCustomizeMode, onInsertToolbarSlot, onReorderToolbarSlot]
+    [
+      dragOverSide,
+      dragOverTarget,
+      isCustomizeMode,
+      layoutConfig.toolbarItems,
+      onInsertToolbarSlot,
+      onMoveToolbarSlotToIndex,
+      onReorderToolbarSlot,
+    ]
   );
 
   const iconScaleStyle: React.CSSProperties = {
@@ -2718,6 +2782,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     }
 
     const isDragTarget = isCustomizeMode && dragOverTarget === slot.id;
+    const isSlotDragging = isCustomizeMode && draggingSlotId === slot.id;
 
     return (
       <div
@@ -2730,13 +2795,36 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         <CustomizeSlotWrapper
           item={slot}
           isCustomizeMode={isCustomizeMode}
+          isDragging={isSlotDragging}
+          dropSide={isDragTarget ? dragOverSide : null}
           controlsAlign={idx >= layoutConfig.toolbarItems.length - 2 ? 'right' : 'center'}
           onToggleVisibility={onToggleToolbarSlotVisibility}
           onRemove={onRemoveToolbarSlot}
-          onDragOver={(_, item) => {
-            if (isCustomizeMode && dragOverTarget !== item.id) {
+          onDragStart={(_, item) => {
+            setDraggingSlotId(item.id);
+          }}
+          onDragOver={(e, item) => {
+            if (!isCustomizeMode) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const side: 'before' | 'after' =
+              e.clientX < rect.left + rect.width / 2 ? 'before' : 'after';
+            if (dragOverTarget !== item.id) {
               setDragOverTarget(item.id);
             }
+            if (dragOverSide !== side) {
+              setDragOverSide(side);
+            }
+          }}
+          onDragLeave={(_, item) => {
+            if (dragOverTarget === item.id) {
+              setDragOverTarget(null);
+              setDragOverSide(null);
+            }
+          }}
+          onDragEnd={() => {
+            setDragOverTarget(null);
+            setDragOverSide(null);
+            setDraggingSlotId(null);
           }}
           onDrop={(e, item) => handleSlotDrop(e, item, idx)}
           className={wrapperClassName}
@@ -2749,15 +2837,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   const renderDropZone = (atIndex: number, zoneKey: string, isEnd = false) => {
     const isOver = dragOverTarget === zoneKey;
+    const isDragActive = Boolean(draggingSlotId || getActiveToolbarDragPayload());
     return (
       <div
         data-toolbar-dropzone={isEnd ? 'end' : String(atIndex)}
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         onDragOver={(e) => {
           if (!isCustomizeMode) return;
           if (hasToolbarDragTypes(e.dataTransfer?.types)) {
             e.preventDefault();
             if (dragOverTarget !== zoneKey) {
               setDragOverTarget(zoneKey);
+              setDragOverSide(null);
             }
           }
         }}
@@ -2769,20 +2860,24 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         onDrop={(e) => handleDropAtGap(e, atIndex)}
         className={
           isEnd
-            ? `min-w-[28px] h-7 px-2 rounded-md border border-dashed shrink-0 flex items-center justify-center text-[10px] font-medium transition-colors select-none ${
+            ? `no-drag min-w-[30px] h-7 px-2 rounded-md border border-dashed shrink-0 flex items-center justify-center text-[11px] font-medium transition-all select-none ${
                 isOver
-                  ? 'border-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/15 text-[var(--nova-accent,#3b82f6)]'
+                  ? 'border-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/20 text-[var(--nova-accent,#3b82f6)] scale-105'
+                  : isDragActive
+                  ? 'border-blue-400/60 bg-blue-500/10 text-blue-300'
                   : 'border-slate-300/70 dark:border-white/15 text-slate-400 dark:text-slate-500'
               }`
-            : `h-7 shrink-0 rounded-full transition-all ${
+            : `no-drag h-7 shrink-0 rounded-full transition-all flex items-center justify-center ${
                 isOver
                   ? 'w-5 mx-0.5 bg-[var(--nova-accent,#3b82f6)]/25 border border-dashed border-[var(--nova-accent,#3b82f6)]'
+                  : isDragActive
+                  ? 'w-3 mx-0 bg-blue-500/10'
                   : 'w-1.5 -mx-0.5'
               }`
         }
         title={isEnd ? 'Drop toolbar item here' : undefined}
       >
-        {isEnd ? '+' : null}
+        {isEnd ? '+' : isOver ? <span className="w-0.5 h-5 rounded-full bg-blue-400" /> : null}
       </div>
     );
   };
@@ -2978,10 +3073,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         borderColor: headerOwnsBackdrop ? 'var(--nova-tabBar-border, var(--nova-border-subtle))' : 'transparent',
         borderBottomWidth: headerOwnsBackdrop ? 'var(--nova-tabBar-border-width, 1px)' : '0px',
         fontFamily: 'var(--nova-font-ui, inherit)',
-      } : {
+        ...(isCustomizeMode ? { WebkitAppRegion: 'no-drag' } : {}),
+      } as React.CSSProperties : {
         fontFamily: 'var(--nova-font-ui, inherit)',
-      }}
-      className={`w-full flex flex-col select-none drag-region relative z-50 ${
+        ...(isCustomizeMode ? { WebkitAppRegion: 'no-drag' } : {}),
+      } as React.CSSProperties}
+      className={`w-full flex flex-col select-none ${isCustomizeMode ? 'no-drag' : 'drag-region'} relative z-50 ${
         isIncognito
           ? 'bg-slate-900 border-b border-slate-800 text-slate-100 dark'
           : headerOwnsBackdrop

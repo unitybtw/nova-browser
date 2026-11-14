@@ -549,11 +549,11 @@ async function main() {
     'DesignStudioDrawer must use explicit Tailwind slide-in class'
   );
 
-  // Check 5 tab buttons exist
+  // Check 4 tab buttons exist (Themes, Layout, Style, New Tab)
   const tabButtons = drawer!.querySelectorAll('[data-studio-tab]');
-  assert.strictEqual(tabButtons.length, 5, 'Drawer must have 5 tabs');
+  assert.strictEqual(tabButtons.length, 4, 'Drawer must have 4 tabs');
 
-  // Tab 1: Templates & Packs
+  // Tab 1: Themes
   const tabTemplatesBtn = drawer!.querySelector('[data-studio-tab="templates"]') as HTMLButtonElement;
   assert.ok(tabTemplatesBtn, 'Templates tab button must exist');
   await React.act(async () => {
@@ -582,12 +582,13 @@ async function main() {
   const widthSlider = drawer!.querySelector('input[type="range"][data-control="sidebarWidth"]');
   assert.ok(widthSlider, 'sidebarWidth slider must exist');
 
-  // Check Palette items with + Add buttons & Active Toolbar Items manager
+  // Check Active Toolbar Items manager & Move Down + DnD reordering
   const activeToolbarList = drawer!.querySelector('[data-active-toolbar-list="true"]');
   assert.ok(activeToolbarList, 'Active Toolbar Items manager list must render in Tab 2');
   const activeSlotRows = activeToolbarList!.querySelectorAll('[data-active-slot-id]');
-  assert.ok(activeSlotRows.length > 0, 'Active toolbar slots must be manageable inside Tab 2');
-  const firstSlotId = activeSlotRows[0].getAttribute('data-active-slot-id');
+  assert.ok(activeSlotRows.length >= 2, 'Active toolbar slots must be manageable inside Tab 2');
+  const firstSlotId = activeSlotRows[0].getAttribute('data-active-slot-id')!;
+  const secondSlotId = activeSlotRows[1].getAttribute('data-active-slot-id')!;
   const moveDownBtn = activeSlotRows[0].querySelector('[data-action="move-slot-down"]') as HTMLButtonElement | null;
   assert.ok(moveDownBtn, 'Active toolbar slot must expose move-down reorder button');
   await React.act(async () => {
@@ -599,44 +600,83 @@ async function main() {
     'Clicking Move Down in Active Toolbar list must move slot from index 0 to 1'
   );
 
+  // Verify drag-and-drop reordering on Active Toolbar rows moves item back to index 0
+  const reorderedRows = activeToolbarList!.querySelectorAll('[data-active-slot-id]');
+  const draggedRow = Array.from(reorderedRows).find((el) => el.getAttribute('data-active-slot-id') === firstSlotId)!;
+  const targetRow = Array.from(reorderedRows).find((el) => el.getAttribute('data-active-slot-id') === secondSlotId)!;
+  const dispatchDndEvent = async (target: Element, type: string, data: Record<string, string>) => {
+    const ev = new dom.window.Event(type, { bubbles: true, cancelable: true }) as any;
+    ev.dataTransfer = {
+      effectAllowed: 'copyMove',
+      dropEffect: 'move',
+      types: Object.keys(data),
+      setData: (k: string, v: string) => { data[k] = v; },
+      getData: (k: string) => data[k] || '',
+    };
+    await React.act(async () => {
+      target.dispatchEvent(ev);
+    });
+  };
+  const dragData: Record<string, string> = {};
+  await dispatchDndEvent(draggedRow, 'dragstart', dragData);
+  await dispatchDndEvent(targetRow, 'drop', dragData);
+  assert.strictEqual(
+    capturedState!.draftProfile.layout.toolbarItems[0].id,
+    firstSlotId,
+    'Dragging row back onto first position in Active Toolbar list must reorder slots'
+  );
+
+  // Verify Add Controls Palette (starts open by default, collapsible) & + Add / palette->list drop
+  const paletteToggleBtn = Array.from(drawer!.querySelectorAll('button')).find((b) =>
+    b.textContent?.includes('Add Controls Palette')
+  ) as HTMLButtonElement | undefined;
+  assert.ok(paletteToggleBtn, 'Add Controls Palette toggle must exist in Tab 2');
+  if (drawer!.querySelectorAll('[data-palette-item]').length === 0) {
+    await React.act(async () => {
+      paletteToggleBtn!.click();
+    });
+  }
+
   const paletteItems = drawer!.querySelectorAll('[data-palette-item]');
   assert.ok(paletteItems.length > 0, 'Palette items must be present');
   const addButtons = drawer!.querySelectorAll('[data-action="add-toolbar-item"]');
   assert.ok(addButtons.length > 0, '+ Add buttons must be present on palette items');
 
-  // Tab 3: Zones & Surfaces
+  // Tab 3: Style (Quick Surface Presets, Typography, Density + Collapsible Advanced Surface Inspector)
   const tabZonesBtn = drawer!.querySelector('[data-studio-tab="zones"]') as HTMLButtonElement;
-  assert.ok(tabZonesBtn, 'Zones tab button must exist');
+  assert.ok(tabZonesBtn, 'Style (zones) tab button must exist');
   await React.act(async () => {
     tabZonesBtn.click();
   });
 
-  const zonePills = drawer!.querySelectorAll('[data-zone-pill]');
-  assert.strictEqual(zonePills.length, 9, 'All 9 surface zones must have selection pills');
-
-  // Tab 4: Typography & Effects
-  const tabTypoBtn = drawer!.querySelector('[data-studio-tab="typography"]') as HTMLButtonElement;
-  assert.ok(tabTypoBtn, 'Typography tab button must exist');
-  await React.act(async () => {
-    tabTypoBtn.click();
-  });
+  const surfacePresets = drawer!.querySelectorAll('[data-surface-preset]');
+  assert.strictEqual(surfacePresets.length, 4, 'All 4 quick surface presets must be rendered in Style tab');
 
   const fontOptions = drawer!.querySelectorAll('[data-font-option]');
-  assert.ok(fontOptions.length >= 6, 'At least 6 font family options must be rendered');
+  assert.ok(fontOptions.length >= 6, 'At least 6 font family options must be rendered in Style tab');
 
-  // Tab 5: New Tab & CSS
+  // Expand Advanced Surface Inspector accordion to verify all 9 surface zone pills
+  const toggleAdvancedSurfacesBtn = drawer!.querySelector(
+    '[data-action="toggle-advanced-surfaces"]'
+  ) as HTMLButtonElement | null;
+  assert.ok(toggleAdvancedSurfacesBtn, 'Advanced Surface Inspector toggle must exist in Style tab');
+  await React.act(async () => {
+    toggleAdvancedSurfacesBtn!.click();
+  });
+
+  const zonePills = drawer!.querySelectorAll('[data-zone-pill]');
+  assert.strictEqual(zonePills.length, 9, 'All 9 surface zones must have selection pills when expanded');
+
+  // Tab 4: New Tab (Widgets + Collapsible Advanced Custom CSS)
   const tabCssBtn = drawer!.querySelector('[data-studio-tab="newtab-css"]') as HTMLButtonElement;
-  assert.ok(tabCssBtn, 'NewTab & CSS tab button must exist');
+  assert.ok(tabCssBtn, 'New Tab tab button must exist');
   await React.act(async () => {
     tabCssBtn.click();
   });
 
-  const cssTextarea = drawer!.querySelector('textarea[data-control="custom-css"]') as HTMLTextAreaElement;
-  assert.ok(cssTextarea, 'Custom CSS textarea must be rendered');
-
-  // Verify Clock align selector in Tab 5
+  // Verify Clock align selector in Tab 4
   const clockAlignSelect = drawer!.querySelector('[data-testid="clock-align-select"]') as HTMLSelectElement | null;
-  assert.ok(clockAlignSelect, 'Clock align select must be rendered in Tab 5');
+  assert.ok(clockAlignSelect, 'Clock align select must be rendered in Tab 4');
   await React.act(async () => {
     clockAlignSelect!.value = 'left';
     clockAlignSelect!.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
@@ -647,7 +687,19 @@ async function main() {
     'Clock align must be updated to left'
   );
 
-  console.log('[PASS] DesignStudioDrawer 5 tabs, palette, zones, typography and CSS verified');
+  // Expand Advanced: Custom CSS accordion
+  const toggleAdvancedCssBtn = drawer!.querySelector(
+    '[data-action="toggle-advanced-css"]'
+  ) as HTMLButtonElement | null;
+  assert.ok(toggleAdvancedCssBtn, 'Advanced Custom CSS toggle must exist in New Tab tab');
+  await React.act(async () => {
+    toggleAdvancedCssBtn!.click();
+  });
+
+  const cssTextarea = drawer!.querySelector('textarea[data-control="custom-css"]') as HTMLTextAreaElement;
+  assert.ok(cssTextarea, 'Custom CSS textarea must be rendered when Advanced Custom CSS is expanded');
+
+  console.log('[PASS] DesignStudioDrawer 4 tabs, DnD active list, quick presets, advanced accordions, typography & New Tab verified');
 
   // ---------------------------------------------------------------------------
   // 3b. SafeColorTextInput Incremental Typing Verification

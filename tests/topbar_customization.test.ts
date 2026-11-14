@@ -484,7 +484,31 @@ async function main() {
       'application/x-nova-toolbar-kind': 'menu',
     });
     assert.deepEqual(movesToIdx, [['slot-menu', customSlots.length - 1]]);
-    console.log('[PASS] Customize mode dimmed hidden slots, Eye/Remove controls, and DnD reorder/palette insert');
+
+    // Header must remove drag-region (set no-drag) in customize mode so macOS Electron does not hijack DnD
+    const customizeHeader = container.querySelector('header') as HTMLElement;
+    assert.ok(customizeHeader.className.includes('no-drag'), 'header sets no-drag during customize mode');
+    assert.ok(!customizeHeader.className.includes('drag-region'), 'header removes drag-region during customize mode');
+
+    // Drag start/end lifecycle cleanly clears dragging state without stuck highlights
+    const splitSlotEl = container.querySelector('[aria-label="Toolbar slot: Split View"]') as HTMLElement;
+    assert.ok(splitSlotEl, 'Split View slot wrapper exists');
+    const dragStartEv = new w.Event('dragstart', { bubbles: true, cancelable: true }) as any;
+    const setDataMap: Record<string, string> = {};
+    dragStartEv.dataTransfer = {
+      effectAllowed: 'copyMove',
+      setData: (k: string, v: string) => { setDataMap[k] = v; },
+    };
+    await React.act(async () => {
+      splitSlotEl.dispatchEvent(dragStartEv);
+    });
+    assert.equal(setDataMap['application/x-nova-toolbar-slot'], 'slot-split');
+    assert.ok(splitSlotEl.className.includes('opacity-35'), 'dragged slot dims cleanly while dragging');
+    await React.act(async () => {
+      w.dispatchEvent(new w.Event('dragend'));
+    });
+    assert.ok(!splitSlotEl.className.includes('opacity-35'), 'window dragend clears dragged slot styling');
+    console.log('[PASS] Customize mode dimmed hidden slots, Eye/Remove controls, no-drag header, and DnD reorder/cleanup');
 
     // 7. Right-click context menu on TopBar background -> Customize Browser..., Escape closes
     let contextCustomizeTriggered = 0;
