@@ -33,8 +33,13 @@ const EXTENSION_ID_RE = new RegExp(EXTENSION_ID_SOURCE);
 const extractExtensionId = (value: unknown): string | null => {
   const raw = typeof value === 'string' ? value.trim() : '';
   if (EXTENSION_ID_RE.test(raw)) return raw;
-  const lastSegment = raw.match(/\/([^/?#]+)\/?(?:[?#].*)?$/);
-  if (lastSegment && EXTENSION_ID_RE.test(lastSegment[1])) return lastSegment[1];
+  const withoutOrigin = raw.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/?#]*/, '');
+  const pathOnly = withoutOrigin.split(/[?#]/)[0] || '';
+  if (!pathOnly.includes('/')) return null;
+  const segments = pathOnly.split('/').filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (EXTENSION_ID_RE.test(segments[i])) return segments[i];
+  }
   return null;
 };
 
@@ -139,6 +144,8 @@ if ((window as any).__novaPreloadInjected) {
     return toast;
   };
 
+  let installInFlight = false;
+
   window.addEventListener('message', (event) => {
     if (window !== window.top) return;
     const host = window.location.hostname.toLowerCase();
@@ -154,10 +161,13 @@ if ((window as any).__novaPreloadInjected) {
       showNovaToast('Invalid extension identifier.', 'error');
       return;
     }
+    if (installInFlight) return;
+    installInFlight = true;
     const loadingToast = showNovaToast("Installing to Nova Browser...", 'info');
 
     ipcRenderer.invoke('install-from-webstore', extensionId)
       .then(result => {
+        installInFlight = false;
         loadingToast.remove();
         if (result.error) {
           showNovaToast('Installation error: ' + result.error, 'error');
@@ -165,10 +175,10 @@ if ((window as any).__novaPreloadInjected) {
         } else {
           showNovaToast('Extension installed successfully!', 'success');
           window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: true }, window.location.origin);
-          setTimeout(() => window.location.reload(), 1500);
         }
       })
       .catch(err => {
+        installInFlight = false;
         loadingToast.remove();
         showNovaToast('Installation error: ' + err.message, 'error');
         window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: err.message }, window.location.origin);
@@ -257,15 +267,20 @@ if ((window as any).__novaPreloadInjected) {
     const extractExtensionId = (value) => {
       const raw = String(value == null ? '' : value).trim();
       if (EXTENSION_ID_RE.test(raw)) return raw;
-      const lastSegment = raw.match(/\\/([^/?#]+)\\/?(?:[?#].*)?$/);
-      if (lastSegment && EXTENSION_ID_RE.test(lastSegment[1])) return lastSegment[1];
+      const withoutOrigin = raw.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\\/\\/[^/?#]*/, '');
+      const pathOnly = withoutOrigin.split(/[?#]/)[0] || '';
+      if (!pathOnly.includes('/')) return null;
+      const segments = pathOnly.split('/').filter(Boolean);
+      for (let i = segments.length - 1; i >= 0; i--) {
+        if (EXTENSION_ID_RE.test(segments[i])) return segments[i];
+      }
       return null;
     };
 
     window.chrome.webstore = {
       install: (url, successCallback, failureCallback) => {
         const targetUrl = url || window.location.href;
-        const extensionId = extractExtensionId(targetUrl);
+        const extensionId = extractExtensionId(targetUrl) || extractExtensionId(window.location.href);
 
         if (!extensionId) {
           if (failureCallback) failureCallback('Could not determine extension ID');
@@ -288,29 +303,58 @@ if ((window as any).__novaPreloadInjected) {
       }
     };
 
+    const findCallback = (args) => args.find((arg) => typeof arg === 'function');
+
     window.chrome.webstorePrivate = {
-      beginInstallWithManifest3: (details, callback) => {
+      beginInstallWithManifest3: (...args) => {
+        const details = args[0] && typeof args[0] === 'object' ? args[0] : {};
+        const callback = findCallback(args);
+        const targetId = details.id || extractExtensionId(window.location.href);
         if (typeof callback === 'function') {
-          window.chrome.webstore.install(details.id, () => callback('success'), (err) => callback(err));
+          window.chrome.webstore.install(targetId, () => callback(''), (err) => callback(err || 'user_cancelled'));
         } else {
           return new Promise((resolve, reject) => {
-            window.chrome.webstore.install(details.id, () => resolve('success'), (err) => reject(err));
+            window.chrome.webstore.install(targetId, () => resolve(''), (err) => reject(err));
           });
         }
       },
-      completeInstall: (id, callback) => {
-        if (typeof callback === 'function') callback();
-        else return Promise.resolve();
+      completeInstall: (...args) => {
+        const callback = findCallback(args);
+        if (typeof callback === 'function') callback('');
+        else return Promise.resolve('');
       },
-      getBrowserLogin: (callback) => {
+      getBrowserLogin: (...args) => {
+        const callback = findCallback(args);
         if (typeof callback === 'function') callback({ login: '', loggedIn: false });
         else return Promise.resolve({ login: '', loggedIn: false });
       },
-      getExtensionStatus: (id, callback) => {
+      getExtensionStatus: (...args) => {
+        const callback = findCallback(args);
         if (typeof callback === 'function') callback('installable');
         else return Promise.resolve('installable');
       },
-      isInIncognitoMode: (callback) => {
+      isInIncognitoMode: (...args) => {
+        const callback = findCallback(args);
+        if (typeof callback === 'function') callback(false);
+        else return Promise.resolve(false);
+      },
+      getIsLauncherEnabled: (...args) => {
+        const callback = findCallback(args);
+        if (typeof callback === 'function') callback(true);
+        else return Promise.resolve(true);
+      },
+      getWebGLStatus: (...args) => {
+        const callback = findCallback(args);
+        if (typeof callback === 'function') callback('webgl_allowed');
+        else return Promise.resolve('webgl_allowed');
+      },
+      getReferrerChain: (...args) => {
+        const callback = findCallback(args);
+        if (typeof callback === 'function') callback('');
+        else return Promise.resolve('');
+      },
+      isPendingCustodianApproval: (...args) => {
+        const callback = findCallback(args);
         if (typeof callback === 'function') callback(false);
         else return Promise.resolve(false);
       }
@@ -337,11 +381,26 @@ if ((window as any).__novaPreloadInjected) {
     }
 
     if (window.location.pathname.includes('/detail/')) {
+      const currentExtensionId = extractExtensionId(window.location.href) || '';
       const existingBanner = document.getElementById('nova-extension-banner');
-      if (existingBanner) return;
+      if (existingBanner) {
+        if (existingBanner.getAttribute('data-extension-id') !== currentExtensionId) {
+          existingBanner.setAttribute('data-extension-id', currentExtensionId);
+          const existingBtn = document.getElementById('nova-install-btn');
+          if (existingBtn) {
+            existingBtn.removeAttribute('disabled');
+            existingBtn.style.opacity = '1';
+            existingBtn.style.background = 'white';
+            existingBtn.style.color = '#4f46e5';
+            existingBtn.textContent = 'Add to Nova';
+          }
+        }
+        return;
+      }
 
       const banner = document.createElement('div');
       banner.id = 'nova-extension-banner';
+      banner.setAttribute('data-extension-id', currentExtensionId);
       banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: white; padding: 12px 24px; z-index: 9999999; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
 
       const leftContainer = document.createElement('div');
@@ -431,6 +490,25 @@ if ((window as any).__novaPreloadInjected) {
     scheduleBannerUpdate();
     const observer = new MutationObserver(scheduleBannerUpdate);
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Fallback: intercept clicks on native Chrome Web Store "Add to Chrome" buttons
+    // in case CWS's internal JS bypasses chrome.webstorePrivate
+    document.addEventListener('click', (event) => {
+      if (!window.location.pathname.includes('/detail/')) return;
+      const target = event.target instanceof Element ? event.target.closest('button, [role="button"]') : null;
+      if (!target || target.id === 'nova-install-btn') return;
+      const label = (target.textContent || '').trim();
+      if (!/^(add to chrome|add to browser|chrome'a ekle|chrome’a ekle)$/i.test(label)) return;
+      const extensionId = extractExtensionId(window.location.href);
+      const host = window.location.hostname.toLowerCase();
+      if (extensionId && isWebStoreHost(host)) {
+        setTimeout(() => {
+          if (!installInFlight) {
+            window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, `https://${host}`);
+          }
+        }, 120);
+      }
+    }, true);
   };
 
   if (document.readyState === 'loading') {

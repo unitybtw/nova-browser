@@ -27,7 +27,7 @@ export async function parseExtensionPermissions(extractPath: string): Promise<Ex
   }
 
   try {
-    const manifestContent = fs.readFileSync(manifestPath, 'utf-8');
+    const manifestContent = fs.readFileSync(manifestPath, 'utf-8').replace(/^\uFEFF/, '');
     const manifest = JSON.parse(manifestContent);
 
     const asStringArray = (value: unknown): string[] => (
@@ -379,7 +379,8 @@ export async function loadSafeCrxZip(buffer: Buffer, targetDir: string) {
   const zip = await JSZip.loadAsync(getCrxInnerZip(buffer));
   const resolvedTarget = path.resolve(targetDir);
   const entryKeys = Object.keys(zip.files);
-  if (entryKeys.length > MAX_TOTAL_ENTRIES) {
+  const fileEntryCount = entryKeys.filter((k) => !zip.files[k]?.dir).length;
+  if (fileEntryCount > MAX_TOTAL_ENTRIES || entryKeys.length > MAX_TOTAL_ENTRIES * 2) {
     throw new Error(`Extension contains too many entries (${entryKeys.length} > ${MAX_TOTAL_ENTRIES}), potential zip bomb.`);
   }
 
@@ -474,12 +475,34 @@ export function computeExtensionIdFromPublicKey(keyBase64: string): string | nul
 function readProtobufVarint(buf: Buffer, offset: number): { value: number; nextOffset: number } | null {
   let val = 0;
   let shift = 0;
-  while (offset < buf.length) {
+  let bytesRead = 0;
+  while (offset < buf.length && bytesRead < 10) {
     const b = buf[offset++];
-    val |= (b & 0x7f) << shift;
+    bytesRead++;
+    if (shift <= 28) {
+      val |= (b & 0x7f) << shift;
+    }
     if ((b & 0x80) === 0) return { value: val >>> 0, nextOffset: offset };
     shift += 7;
-    if (shift > 28) return null;
+  }
+  return null;
+}
+
+function skipProtobufField(buf: Buffer, offset: number, wireType: number): number | null {
+  if (wireType === 0) {
+    const v = readProtobufVarint(buf, offset);
+    return v ? v.nextOffset : null;
+  }
+  if (wireType === 1) {
+    return offset + 8 <= buf.length ? offset + 8 : null;
+  }
+  if (wireType === 2) {
+    const lenVar = readProtobufVarint(buf, offset);
+    if (!lenVar || lenVar.value < 0 || lenVar.nextOffset + lenVar.value > buf.length) return null;
+    return lenVar.nextOffset + lenVar.value;
+  }
+  if (wireType === 5) {
+    return offset + 4 <= buf.length ? offset + 4 : null;
   }
   return null;
 }
@@ -516,6 +539,7 @@ export function extractCrxPublicKey(buffer: Buffer, expectedExtId?: string): str
         return null;
       }
       const header = buffer.subarray(CRX3_HEADER_BYTES, CRX3_HEADER_BYTES + headerSize);
+      let fallbackKeyB64: string | null = null;
       let offset = 0;
       while (offset < header.length) {
         const tagVar = readProtobufVarint(header, offset);
@@ -537,33 +561,29 @@ export function extractCrxPublicKey(buffer: Buffer, expectedExtId?: string): str
               subOff = subTag.nextOffset;
               const subWire = subTag.value & 0x07;
               const subField = subTag.value >>> 3;
-              if (subWire === 2) {
+              if (subWire === 2 && subField === 1) {
                 const subLen = readProtobufVarint(payload, subOff);
                 if (!subLen || subLen.value < 0 || subLen.nextOffset + subLen.value > payload.length) break;
                 const subBytes = payload.subarray(subLen.nextOffset, subLen.nextOffset + subLen.value);
                 subOff = subLen.nextOffset + subLen.value;
-                // AsymmetricKeyProof: field 1 = public_key
-                if (subField === 1 && subBytes.length > 0) {
+                if (subBytes.length > 0) {
                   const b64 = subBytes.toString('base64');
                   if (!expectedExtId || computeExtensionIdFromPublicKey(b64) === expectedExtId) {
                     return b64;
                   }
+                  if (!fallbackKeyB64) fallbackKeyB64 = b64;
                 }
-              } else if (subWire === 0) {
-                const v = readProtobufVarint(payload, subOff);
-                if (!v) break;
-                subOff = v.nextOffset;
               } else {
-                break;
+                const nextSubOff = skipProtobufField(payload, subOff, subWire);
+                if (nextSubOff === null) break;
+                subOff = nextSubOff;
               }
             }
           }
-        } else if (wireType === 0) {
-          const v = readProtobufVarint(header, offset);
-          if (!v) break;
-          offset = v.nextOffset;
         } else {
-          break;
+          const nextOff = skipProtobufField(header, offset, wireType);
+          if (nextOff === null) break;
+          offset = nextOff;
         }
       }
     }
@@ -600,7 +620,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
   let stagingPath = '';
 
   try {
-    if (typeof urlOrId !== 'string' || urlOrId.length > 256) {
+    if (typeof urlOrId !== 'string' || urlOrId.length > 1024) {
       return { error: 'Invalid extension URL or ID' };
     }
 
@@ -617,14 +637,16 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
           (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')
         ) {
           const segments = parsed.pathname.split('/').filter(Boolean);
-          const lastSeg = segments[segments.length - 1];
-          if (lastSeg && /^[a-p]{32}$/i.test(lastSeg)) {
-            extensionId = lastSeg.toLowerCase();
+          for (let i = segments.length - 1; i >= 0; i--) {
+            if (/^[a-p]{32}$/i.test(segments[i])) {
+              extensionId = segments[i].toLowerCase();
+              break;
+            }
           }
         }
       } catch (_) {}
       if (!extensionId) {
-        const match = trimmed.match(/(?:^|[\/=])([a-p]{32})(?:[\/?#]|$)/i);
+        const match = trimmed.match(/(?:^|[\/=])([a-p]{32})(?:[\/?#&]|$)/i);
         if (match && match[1]) {
           extensionId = match[1].toLowerCase();
         }
@@ -663,7 +685,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     // verify a CRX signature (it only loads unpacked extensions, and the
     // signature covers the container we deliberately strip), so transport is the
     // only real lever: every hop must stay https and stay on a Google host.
-    const ALLOWED_DOWNLOAD_HOSTS = /(^|\.)(google\.com|googleusercontent\.com|ggpht\.com)$/i;
+    const ALLOWED_DOWNLOAD_HOSTS = /(^|\.)(google\.com|googleusercontent\.com|ggpht\.com|gvt1\.com|gvt2\.com|gstatic\.com|googleapis\.com|1e100\.net)$/i;
     const MAX_REDIRECTS = 5;
     let currentUrl = crxUrl;
     let res: any = null;
@@ -759,7 +781,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       // Security: manifest update_url must be https when present; http/plain is rejected.
       // Non-WebStore update hosts are sideload candidates — warn only, no block.
       try {
-        const rawManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        const rawManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
         const updateUrl = (rawManifest as any)?.update_url;
         if (typeof updateUrl === 'string' && updateUrl.length > 0) {
           let parsedUpdate: URL;
@@ -808,7 +830,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const permissions = await parseExtensionPermissions(stagingPath);
     let extensionName = extensionId;
     try {
-      const manifest = JSON.parse(fs.readFileSync(path.join(stagingPath, 'manifest.json'), 'utf8'));
+      const manifest = JSON.parse(fs.readFileSync(path.join(stagingPath, 'manifest.json'), 'utf8').replace(/^\uFEFF/, ''));
       if (manifest.name && typeof manifest.name === 'string') {
         // manifest.name is attacker-controlled and goes straight into a native
         // dialog. Left unbounded it can be megabytes long or carry control

@@ -1,11 +1,13 @@
-import React from 'react';
-import { Settings, Upload, ExternalLink, Puzzle, Play, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, Upload, ExternalLink, Puzzle, Play, Trash2, Download } from 'lucide-react';
 import { showAlert } from '../../utils/confirmDialog';
 import { useExtensions } from '../../hooks/useExtensions';
-import { installUnpackedExtension, launchExtensionPopup } from '../../services/extensionActions';
+import { installUnpackedExtension, installWebStoreExtension, launchExtensionPopup } from '../../services/extensionActions';
 
 export const ExtensionsSection: React.FC = () => {
   const { extensions, pendingExtensionIds, refreshExtensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
+  const [webstoreUrlOrId, setWebstoreUrlOrId] = useState('');
+  const [isInstallingWebstore, setIsInstallingWebstore] = useState(false);
 
   const handleLoadUnpacked = async () => {
     try {
@@ -13,6 +15,23 @@ export const ExtensionsSection: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       void showAlert({ title: 'Extensions', message: e?.message || 'Failed to load extension.' });
+    }
+  };
+
+  const handleInstallFromWebStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!webstoreUrlOrId.trim() || isInstallingWebstore) return;
+    setIsInstallingWebstore(true);
+    try {
+      if (await installWebStoreExtension(webstoreUrlOrId)) {
+        setWebstoreUrlOrId('');
+        await refreshExtensions();
+      }
+    } catch (err: any) {
+      console.error(err);
+      void showAlert({ title: 'Extensions', message: err?.message || 'Failed to install extension from Chrome Web Store.' });
+    } finally {
+      setIsInstallingWebstore(false);
     }
   };
 
@@ -48,6 +67,28 @@ export const ExtensionsSection: React.FC = () => {
             </button>
           </div>
         </div>
+
+        <form
+          onSubmit={handleInstallFromWebStore}
+          className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shadow-xs"
+        >
+          <input
+            type="text"
+            value={webstoreUrlOrId}
+            onChange={(e) => setWebstoreUrlOrId(e.target.value)}
+            placeholder="Paste Chrome Web Store URL or 32-character Extension ID..."
+            disabled={isInstallingWebstore}
+            className="flex-1 min-w-0 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          />
+          <button
+            type="submit"
+            disabled={!webstoreUrlOrId.trim() || isInstallingWebstore}
+            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isInstallingWebstore ? 'Installing...' : 'Install from Web Store'}</span>
+          </button>
+        </form>
 
         {/* Extension Management */}
         {(!extensions || extensions.length === 0) ? (

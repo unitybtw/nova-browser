@@ -6091,7 +6091,7 @@ async function loadPersistentExtensions(): Promise<void> {
       if (!fs.statSync(realPath).isDirectory()) return;
       const manifestPath = path.join(realPath, 'manifest.json');
       if (!fs.existsSync(manifestPath)) return;
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
       if (disabledIds.includes(id)) {
         rememberDisabled(id, realPath, manifest);
         return;
@@ -6145,7 +6145,7 @@ function getLocalizedManifestString(extPath: string, text: string, fallback: str
       const msgFile = path.join(localesDir, loc, 'messages.json');
       if (fs.existsSync(msgFile)) {
         try {
-          const content = JSON.parse(fs.readFileSync(msgFile, 'utf8'));
+          const content = JSON.parse(fs.readFileSync(msgFile, 'utf8').replace(/^\uFEFF/, ''));
           if (content[key]?.message) {
             return content[key].message;
           }
@@ -6205,7 +6205,7 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   let rawManifestBefore: string;
   try {
     rawManifestBefore = fs.readFileSync(manifestPath, 'utf8');
-    manifest = JSON.parse(rawManifestBefore);
+    manifest = JSON.parse(rawManifestBefore.replace(/^\uFEFF/, ''));
   } catch {
     return { error: 'Extension manifest.json is invalid.' };
   }
@@ -6371,7 +6371,7 @@ ipcMain.handle('list-extensions', async (event) => {
     try {
       const manifestPath = path.join(e.path, 'manifest.json');
       if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
 
         localizedName = getLocalizedManifestString(e.path, manifest.name, e.name);
         localizedDesc = getLocalizedManifestString(e.path, manifest.description, e.description);
@@ -6392,29 +6392,37 @@ ipcMain.handle('list-extensions', async (event) => {
           homepageUrl = manifest.homepage_url;
         }
 
-        if (manifest.icons) {
-          // Find largest icon
-          const sizes = Object.keys(manifest.icons).map(Number).sort((a, b) => b - a);
-          if (sizes.length > 0) {
-            const rawIconRel = manifest.icons[sizes[0]];
-            if (typeof rawIconRel === 'string') {
-              let baseDir = path.resolve(e.path);
-              try {
-                baseDir = fs.realpathSync(baseDir);
-              } catch (_) {}
-              const resolvedIconPath = path.resolve(baseDir, rawIconRel);
-              const normalizedBase = baseDir + path.sep;
-              if (resolvedIconPath.startsWith(normalizedBase) && fs.existsSync(resolvedIconPath)) {
-                try {
-                  const realIconPath = fs.realpathSync(resolvedIconPath);
-                  if (realIconPath.startsWith(normalizedBase)) {
-                    const ext = path.extname(realIconPath).toLowerCase().substring(1) || 'png';
-                    const buffer = fs.readFileSync(realIconPath);
-                    iconData = `data:image/${ext};base64,${buffer.toString('base64')}`;
-                  }
-                } catch {}
+        let rawIconRel: string | undefined;
+        const iconSource = manifest.icons || manifest.action?.default_icon || manifest.browser_action?.default_icon || manifest.page_action?.default_icon;
+        if (typeof iconSource === 'string') {
+          rawIconRel = iconSource;
+        } else if (iconSource && typeof iconSource === 'object') {
+          const sizes = Object.keys(iconSource).map(Number).filter(n => !Number.isNaN(n)).sort((a, b) => b - a);
+          if (sizes.length > 0 && typeof iconSource[sizes[0]] === 'string') {
+            rawIconRel = iconSource[sizes[0]];
+          } else {
+            const firstVal = Object.values(iconSource).find((v): v is string => typeof v === 'string');
+            if (firstVal) rawIconRel = firstVal;
+          }
+        }
+
+        if (typeof rawIconRel === 'string' && rawIconRel.trim()) {
+          let baseDir = path.resolve(e.path);
+          try {
+            baseDir = fs.realpathSync(baseDir);
+          } catch (_) {}
+          const resolvedIconPath = path.resolve(baseDir, rawIconRel.replace(/^\.?\//, ''));
+          const normalizedBase = baseDir + path.sep;
+          if (resolvedIconPath.startsWith(normalizedBase) && fs.existsSync(resolvedIconPath)) {
+            try {
+              const realIconPath = fs.realpathSync(resolvedIconPath);
+              if (realIconPath.startsWith(normalizedBase)) {
+                const ext = path.extname(realIconPath).toLowerCase().substring(1) || 'png';
+                const mimeType = ext === 'svg' ? 'svg+xml' : ext;
+                const buffer = fs.readFileSync(realIconPath);
+                iconData = `data:image/${mimeType};base64,${buffer.toString('base64')}`;
               }
-            }
+            } catch {}
           }
         }
       }
@@ -6468,10 +6476,21 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   if (!url.startsWith('chrome-extension://')) {
     return { error: 'Blocked: extension popup URL must be chrome-extension://' };
   }
+  let targetExtensionId = '';
   try {
     const parsedExtensionUrl = new URL(url);
     const extensionId = parsedExtensionUrl.hostname;
-    const extension = (session.defaultSession.extensions || session.defaultSession).getExtension(extensionId);
+    targetExtensionId = extensionId;
+    const extApi = (session.defaultSession as any).extensions || session.defaultSession;
+    let extension = extApi.getExtension(extensionId);
+    if (!extension && /^[a-p]{32}$/.test(extensionId)) {
+      const foundExt = loadedExtensions.find(e => e.id === extensionId && e.enabled !== false && e.path);
+      if (foundExt?.path && fs.existsSync(path.join(foundExt.path, 'manifest.json')) && typeof extApi.loadExtension === 'function') {
+        try {
+          extension = await extApi.loadExtension(foundExt.path, { allowFileAccess: false });
+        } catch (_) {}
+      }
+    }
     if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !extension ||
         parsedExtensionUrl.username || parsedExtensionUrl.password || parsedExtensionUrl.port) {
       return { error: 'This extension is disabled or could not be loaded. Enable it from Extensions and try again.' };
@@ -6531,7 +6550,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
     backgroundColor: '#151122',
     hasShadow: true,
     alwaysOnTop: true,
-    resizable: false,
+    resizable: true,
     skipTaskbar: true,
     show: false,
     webPreferences: {
@@ -6619,7 +6638,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       try {
         const mPath = path.join(ext.path, 'manifest.json');
         if (fs.existsSync(mPath)) {
-          manifest = JSON.parse(fs.readFileSync(mPath, 'utf8'));
+          manifest = JSON.parse(fs.readFileSync(mPath, 'utf8').replace(/^\uFEFF/, ''));
         }
       } catch {}
     }
@@ -6677,31 +6696,40 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
 
   // Graceful show & blur handling: only allow blur-close after popup is stably shown
   let canCloseOnBlur = false;
+  let blurGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  let settleFitTimer: ReturnType<typeof setTimeout> | null = null;
   const showPopup = () => {
     if (!popupWin.isDestroyed() && !popupWin.isVisible()) {
+      canCloseOnBlur = false;
       popupWin.show();
       popupWin.focus();
-      setTimeout(() => {
+      if (blurGraceTimer) clearTimeout(blurGraceTimer);
+      blurGraceTimer = setTimeout(() => {
         canCloseOnBlur = true;
-      }, 400);
+      }, 650);
     }
   };
 
-  popupWin.webContents.on('dom-ready', async () => {
-    showPopup();
-
-    // Auto-fit popup dimensions to content
+  const autoFitPopup = async () => {
     try {
       if (!popupWin.isDestroyed() && !popupWin.webContents.isDestroyed()) {
         const dimensions = await popupWin.webContents.executeJavaScript(`
-          ({
-            width: Math.max(document.body?.scrollWidth || 0, document.documentElement?.scrollWidth || 0, 320),
-            height: Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, 200)
-          })
+          (() => {
+            const body = document.body;
+            const doc = document.documentElement;
+            const bodyRect = body ? body.getBoundingClientRect() : { width: 0, height: 0 };
+            const docRect = doc ? doc.getBoundingClientRect() : { width: 0, height: 0 };
+            return {
+              width: Math.ceil(Math.max(body?.scrollWidth || 0, body?.offsetWidth || 0, bodyRect.width || 0, doc?.scrollWidth || 0)),
+              height: Math.ceil(Math.max(body?.scrollHeight || 0, body?.offsetHeight || 0, bodyRect.height || 0, docRect.height || 0))
+            };
+          })()
         `);
         if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
-          const fitWidth = Math.min(Math.max(dimensions.width, 320), 800);
-          const fitHeight = Math.min(Math.max(dimensions.height, 200), 700);
+          const rawW = dimensions.width;
+          const rawH = dimensions.height;
+          const fitWidth = rawW > 120 ? Math.min(Math.max(rawW, 340), 800) : popupWidth;
+          const fitHeight = rawH > 100 ? Math.min(Math.max(rawH, 320), 720) : popupHeight;
 
           if (!popupWin.isDestroyed()) {
             popupWin.setSize(fitWidth, fitHeight);
@@ -6709,6 +6737,17 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
         }
       }
     } catch (_) {}
+  };
+
+  popupWin.webContents.on('dom-ready', async () => {
+    showPopup();
+    await autoFitPopup();
+    if (!popupWin.isDestroyed()) {
+      if (settleFitTimer) clearTimeout(settleFitTimer);
+      settleFitTimer = setTimeout(() => {
+        void autoFitPopup();
+      }, 220);
+    }
   });
 
   popupWin.once('ready-to-show', showPopup);
@@ -6721,6 +6760,14 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   });
 
   popupWin.on('closed', () => {
+    if (blurGraceTimer) {
+      clearTimeout(blurGraceTimer);
+      blurGraceTimer = null;
+    }
+    if (settleFitTimer) {
+      clearTimeout(settleFitTimer);
+      settleFitTimer = null;
+    }
     extensionPopupContexts.delete(popupContentsId);
     if (activeExtensionPopupWin === popupWin) {
       activeExtensionPopupWin = null;
@@ -6740,6 +6787,14 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   });
 
   try {
+    if (targetExtensionId) {
+      try {
+        const swApi = (session.defaultSession as any).serviceWorkers;
+        if (swApi && typeof swApi.startWorkerForScope === 'function') {
+          void Promise.resolve(swApi.startWorkerForScope(`chrome-extension://${targetExtensionId}/`)).catch(() => {});
+        }
+      } catch (_) {}
+    }
     if (!popupWin.isDestroyed()) {
       await popupWin.loadURL(url);
       popupLoaded = true;

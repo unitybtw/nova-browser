@@ -456,12 +456,28 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     [isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, isChangelogTab]
   );
 
+  const isWebstoreTab = React.useMemo(() => {
+    if (!tab?.url) return false;
+    try {
+      const parsed = new URL(tab.url);
+      if (parsed.protocol !== 'https:') return false;
+      const host = parsed.hostname.toLowerCase();
+      return host === 'chromewebstore.google.com' || (host === 'chrome.google.com' && /^\/webstore(\/|$)/i.test(parsed.pathname));
+    } catch {
+      return false;
+    }
+  }, [tab?.url]);
+
+  const prevWebstoreTabRef = useRef<boolean>(isWebstoreTab);
+
   if (!rendersWebview || tab?.isSuspended) {
     initialWebviewSrcRef.current = '';
     lastLoadedUrl.current = '';
-  } else if (!initialWebviewSrcRef.current) {
+    prevWebstoreTabRef.current = isWebstoreTab;
+  } else if (!initialWebviewSrcRef.current || prevWebstoreTabRef.current !== isWebstoreTab) {
     initialWebviewSrcRef.current = getSafeUrl(tab?.url);
     lastLoadedUrl.current = tab?.url || '';
+    prevWebstoreTabRef.current = isWebstoreTab;
   }
 
   const latestTabRef = useRef(tab);
@@ -984,7 +1000,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('media-paused', handleMediaPaused);
       webview.removeEventListener('ipc-message', handleIpcMessage);
     };
-  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onNavigate, onActivate, onFoundInPage, isNewTab, rendersWebview]);
+  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onNavigate, onActivate, onFoundInPage, isNewTab, rendersWebview, isWebstoreTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;
@@ -1401,6 +1417,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         {/* Electron Webview Tag for Native Browser Experience */}
         {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
+            key={isWebstoreTab ? 'webstore-webview' : 'standard-webview'}
             ref={webviewRef}
             data-tab-id={tab.id}
             partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}

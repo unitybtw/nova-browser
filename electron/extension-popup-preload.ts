@@ -14,7 +14,7 @@ export function installPopupTabBridge(tab: Record<string, unknown>): void {
   };
   tabs.query = (query: Record<string, unknown> = {}, callback?: (value: any) => void) => {
     const knownFilters = ['active', 'currentWindow', 'lastFocusedWindow', 'windowId'];
-    const isActiveQuery = query.active === true && query.currentWindow !== false && query.lastFocusedWindow !== false && Object.keys(query).every(key => knownFilters.includes(key)) &&
+    const isActiveQuery = (query.active === true || query.active === undefined) && query.currentWindow !== false && query.lastFocusedWindow !== false && Object.keys(query).every(key => knownFilters.includes(key)) &&
       (query.windowId === undefined || query.windowId === tab.windowId || query.windowId === -2);
     if (isActiveQuery) return respond([{ ...tab }], callback);
     if (originalQuery) return originalQuery(query, callback);

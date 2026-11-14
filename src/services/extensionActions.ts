@@ -26,3 +26,13 @@ export async function installUnpackedExtension(): Promise<boolean> {
   if (result?.success !== true) throw new Error(result?.error || 'The extension installation was not confirmed.');
   return true;
 }
+
+export async function installWebStoreExtension(urlOrId: string): Promise<boolean> {
+  const trimmed = urlOrId.trim();
+  if (!trimmed) throw new Error('Enter a Chrome Web Store URL or 32-character extension ID.');
+  const api = getElectronAPI();
+  if (!api?.installFromWebStore) throw new Error('Web Store installation is only available in the desktop app.');
+  const result = await api.installFromWebStore(trimmed);
+  if (result?.success !== true) throw new Error(result?.error || 'Could not install extension from the Chrome Web Store.');
+  return true;
+}

@@ -22,6 +22,7 @@ async function run() {
   window.chrome.tabs.query({ active: true, currentWindow: true }, value => { result = value; });
   assert.equal(result[0].url, tab.url, 'callback-style startup sees the source tab synchronously');
   assert.equal((await window.chrome.tabs.query({ active: true }) as any)[0].id, 7);
+  assert.equal((await window.chrome.tabs.query({ currentWindow: true }) as any)[0].id, 7);
   await window.chrome.tabs.query({ active: false });
   await window.chrome.tabs.query({ active: true, url: 'https://other.test/*' });
   assert.equal(queries.length, 2, 'other queries retain native filtering instead of fabricating an active match');

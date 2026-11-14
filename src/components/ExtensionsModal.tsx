@@ -1,11 +1,10 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play, Shield, AlertTriangle, CheckCircle, Download } from 'lucide-react';
 import { Extension, Tab } from '../types/browser';
-import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { showAlert } from '../utils/confirmDialog';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-import { installUnpackedExtension, launchExtensionPopup } from '../services/extensionActions';
+import { installUnpackedExtension, installWebStoreExtension, launchExtensionPopup } from '../services/extensionActions';
 
 interface ExtensionPermission {
   name: string;
@@ -179,17 +178,33 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onPermissionReviewResponse
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [webstoreInput, setWebstoreInput] = useState('');
+  const [isInstallingWebstore, setIsInstallingWebstore] = useState(false);
   useDialogA11y({ isOpen, onClose, containerRef });
-  useModalFocusTrap(isOpen, onClose, containerRef);
 
-  const handleLaunchExtension = async (ext: Extension, e?: React.MouseEvent) => {
-    const page = ext.popupUrl || ext.optionsUrl;
+  const handleLaunchExtension = async (ext: Extension, e?: React.MouseEvent, targetPage?: string) => {
+    const page = targetPage || ext.popupUrl || ext.optionsUrl;
     if (!page || ext.enabled === false) return;
     const url = `chrome-extension://${ext.id}/${page.replace(/^\.?\//, '')}`;
     const rect = e?.currentTarget.getBoundingClientRect();
     const opened = await launchExtensionPopup(url, rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : undefined,
       activeTab ? { id: activeTab.id, url: activeTab.url, title: activeTab.title, favIconUrl: activeTab.favicon, webContentsId: activeTab.webContentsId, isIncognito: Boolean(activeTab.isIncognito) } : undefined);
     if (opened) onClose();
+  };
+
+  const handleInstallFromWebstoreInput = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!webstoreInput.trim() || isInstallingWebstore) return;
+    setIsInstallingWebstore(true);
+    try {
+      await installWebStoreExtension(webstoreInput);
+      setWebstoreInput('');
+    } catch (err: any) {
+      console.error('Failed to install Web Store extension:', err);
+      void showAlert({ title: 'Extensions', message: err?.message || 'Could not install extension from Chrome Web Store.' });
+    } finally {
+      setIsInstallingWebstore(false);
+    }
   };
 
   const handleLoadUnpacked = async () => {
@@ -245,6 +260,25 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
               </button>
             </div>
 
+            <form onSubmit={handleInstallFromWebstoreInput} className="px-3 pt-3 pb-2 border-b border-slate-100 dark:border-white/10 flex gap-2">
+              <input
+                type="text"
+                value={webstoreInput}
+                onChange={(e) => setWebstoreInput(e.target.value)}
+                placeholder="Paste Chrome Web Store URL or Extension ID..."
+                disabled={isInstallingWebstore}
+                className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+              <button
+                type="submit"
+                disabled={!webstoreInput.trim() || isInstallingWebstore}
+                className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{isInstallingWebstore ? 'Installing...' : 'Install'}</span>
+              </button>
+            </form>
+
             <div className="p-2 max-h-[60vh] overflow-y-auto">
               {extensions.length === 0 ? (
                 <div className="py-12 px-6 flex flex-col items-center justify-center text-center">
@@ -290,6 +324,15 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                             title={ext.popupUrl ? 'Open Popup' : 'Open Options'}
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
+                          </button>
+                        )}
+                        {ext.popupUrl && ext.optionsUrl && (
+                          <button
+                            onClick={(e) => handleLaunchExtension(ext, e, ext.optionsUrl)}
+                            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Open Options"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
                           </button>
                         )}
                         <button 
