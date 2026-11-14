@@ -610,6 +610,54 @@ async function main() {
     );
     console.log('[PASS] Compact workspace deduplication, incognito isolation & single-backdrop header');
 
+    // 9. TopBar row stacking hierarchy keeps top-most dropdowns (Workspace Switcher) above lower rows
+    const assertStackingForPosition = async (tabBarPosition: 'above-toolbar' | 'below-toolbar') => {
+      await React.act(async () =>
+        root.render(
+          React.createElement(
+            TopBar,
+            baseProps({
+              isIncognito: false,
+              showBookmarksBar: true,
+              bookmarks: [{ id: 'bm-1', title: 'Docs', url: 'https://example.com' }],
+              design: makeResolvedDesign({
+                chromeMode: 'classic-tabs',
+                tabBarPosition,
+              }),
+            })
+          )
+        )
+      );
+
+      const tabbarRow = container.querySelector('[data-topbar-row="tabbar"]') as HTMLElement;
+      const toolbarRow = container.querySelector('[data-topbar-row="toolbar"]') as HTMLElement;
+      const tabbarBackdrop = container.querySelector('[data-topbar-backdrop="tabbar"]') as HTMLElement;
+      assert.ok(tabbarRow && toolbarRow && tabbarBackdrop, `rows and tabbar backdrop present for ${tabBarPosition}`);
+      assert.ok(!tabbarRow.style.backdropFilter, 'backdropFilter lives on dedicated backdrop layer, not tabbar row');
+      assert.ok(tabbarBackdrop.className.includes('pointer-events-none'), 'tabbar backdrop does not block clicks');
+
+      if (tabBarPosition === 'above-toolbar') {
+        assert.ok(tabbarRow.className.includes('z-30'), 'above-toolbar places tabbar row in z-30');
+        assert.ok(toolbarRow.className.includes('z-20'), 'above-toolbar places toolbar row in z-20');
+      } else {
+        assert.ok(toolbarRow.className.includes('z-30'), 'below-toolbar places toolbar row in z-30');
+        assert.ok(tabbarRow.className.includes('z-20'), 'below-toolbar places tabbar row in z-20');
+      }
+    };
+
+    await assertStackingForPosition('above-toolbar');
+    await assertStackingForPosition('below-toolbar');
+
+    // Open Workspace Switcher from tabbar and confirm dropdown mounts with high z-index
+    const wsBtn = container.querySelector('[data-topbar-row="tabbar"] [aria-label="Switch workspace"]') as HTMLButtonElement;
+    assert.ok(wsBtn, 'workspace switcher button found in tabbar');
+    await React.act(async () => {
+      wsBtn.click();
+    });
+    assert.equal(wsBtn.getAttribute('aria-expanded'), 'true', 'workspace menu opens');
+    assert.ok(container.textContent?.includes('Workspaces'), 'workspace dropdown content is rendered');
+    console.log('[PASS] TopBar row stacking & workspace dropdown overlay ordering');
+
     console.log('\ntopbar_customization.test.ts passed');
   } finally {
     await React.act(async () => root.unmount());

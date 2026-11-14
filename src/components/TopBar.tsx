@@ -1666,7 +1666,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     return (
       <div
         ref={refObj}
-        className={`relative no-drag ${source === 'tabbar' ? 'mb-1' : ''}`}
+        className={`relative no-drag ${isOpen ? 'z-30' : 'z-10'} ${source === 'tabbar' ? 'mb-1' : ''}`}
       >
         <button
           type="button"
@@ -1714,7 +1714,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               exit={{ opacity: 0, y: -6, scale: 0.96 }}
               transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
-              className="absolute top-full left-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-50 overflow-hidden"
+              className="absolute top-full left-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c22]/95 border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 z-[60] overflow-hidden"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5">
@@ -2933,6 +2933,19 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       />
     ) : null;
 
+  const renderTabBarBackdropLayer = () =>
+    !isIncognito ? (
+      <div
+        aria-hidden="true"
+        data-topbar-backdrop="tabbar"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
+          WebkitBackdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
+        }}
+      />
+    ) : null;
+
   const renderTabBarRow = (isTopMostRow: boolean) => (
     <AnimatePresence key="classic-tabbar-presence" initial={false}>
       <motion.div
@@ -2942,19 +2955,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
         exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
         transition={layoutConfig.reduceMotion ? { duration: 0 } : { duration: 0.2 }}
-        style={
-          !isIncognito
-            ? {
-                minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
-                backdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
-                WebkitBackdropFilter: 'blur(var(--nova-tabBar-blur, 0px))',
-              }
-            : {
-                minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
-              }
-        }
-        className={`flex items-end px-2 ${isTopMostRow ? 'pt-2.5' : 'pt-1.5'} gap-1`}
+        style={{
+          minHeight: 'calc(var(--nova-tab-height, 38px) + 6px)',
+        }}
+        className={`relative overflow-visible ${isTopMostRow ? 'z-30' : 'z-20'} flex items-end px-2 ${
+          isTopMostRow ? 'pt-2.5' : 'pt-1.5'
+        } gap-1`}
       >
+        {/* Dedicated backdrop layer keeps backdrop-filter off the tabbar row so dropdown popovers float above lower rows */}
+        {renderTabBarBackdropLayer()}
+
         {/* macOS Traffic Lights Spacer when TabBar is top-most */}
         {isMac && isTopMostRow && renderWindowDragSpacer('mac')}
 
@@ -2985,7 +2995,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         handleDropAtGap(e, layoutConfig.toolbarItems.length);
       }}
       style={toolbarRowStyle}
-      className={`relative flex items-center px-3 py-1.5 gap-2 no-drag ${
+      className={`relative ${isTopMostRow ? 'z-30' : 'z-20'} flex items-center px-3 py-1.5 gap-2 no-drag ${
         isIncognito
           ? 'bg-slate-800 border-b border-slate-700'
           : 'bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700'
@@ -3026,7 +3036,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         handleDropAtGap(e, layoutConfig.toolbarItems.length);
       }}
       style={toolbarRowStyle}
-      className={`relative flex items-center px-2.5 py-1 gap-2 no-drag ${
+      className={`relative z-20 flex items-center px-2.5 py-1 gap-2 no-drag ${
         isIncognito
           ? 'bg-slate-800 border-b border-slate-700'
           : 'bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700'
@@ -3113,7 +3123,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             borderColor: 'var(--nova-toolbar-border, var(--nova-border-subtle))',
             borderTopWidth: 'var(--nova-toolbar-border-width, 1px)',
           } : undefined}
-          className={`flex items-center px-3 py-1 gap-2 border-t overflow-x-auto no-scrollbar no-drag ${
+          className={`relative z-10 flex items-center px-3 py-1 gap-2 border-t overflow-x-auto no-scrollbar no-drag ${
             isIncognito ? 'bg-slate-800/80 border-slate-700/60 text-slate-300' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-300'
           }`}
         >
