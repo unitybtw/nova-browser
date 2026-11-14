@@ -36,11 +36,15 @@ export function moveToolbarItemToIndex(
 }
 
 export function toggleToolbarItemVisibility(items: ToolbarSlotItem[], id: string): ToolbarSlotItem[] {
-  return items.map(item => (item.id === id ? { ...item, visible: !item.visible } : item));
+  return items.map(item => {
+    if (item.id !== id) return item;
+    if (item.kind === 'omnibox') return { ...item, visible: true };
+    return { ...item, visible: !item.visible };
+  });
 }
 
 export function removeToolbarItem(items: ToolbarSlotItem[], id: string): ToolbarSlotItem[] {
-  return items.filter(item => item.id !== id);
+  return items.filter(item => item.id !== id || item.kind === 'omnibox');
 }
 
 export function insertToolbarItem(

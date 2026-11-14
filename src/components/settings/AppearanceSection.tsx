@@ -8,6 +8,7 @@ import { SmoothCollapse } from './SmoothCollapse';
 import { BackgroundPreviewCard, BACKGROUND_OPTIONS } from './BackgroundPreviewCard';
 import { STARTER_DESIGN_TEMPLATES, getStarterTemplateById } from '../../utils/designTemplates';
 import { createDefaultDesignProfile } from '../../utils/designDefaults';
+import { resolveEffectiveDesign } from '../../utils/designEngine';
 import { exportThemePack, importThemePack, sanitizeDesignProfile } from '../../utils/designSecurity';
 
 export interface AppearanceSectionProps {
@@ -230,6 +231,9 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
         setThemePackMsg({ type: 'error', text: err?.message || 'Invalid theme file' });
       }
     };
+    reader.onerror = () => {
+      setThemePackMsg({ type: 'error', text: 'Failed to read theme file from disk' });
+    };
     reader.readAsText(file);
     e.target.value = '';
   };
@@ -253,6 +257,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
       Object.prototype.hasOwnProperty.call(settings.workspaceDesigns, activeWorkspaceId) &&
       settings.workspaceDesigns[activeWorkspaceId]
   );
+  const resolved = resolveEffectiveDesign(settings, activeWorkspaceId, false);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -275,7 +280,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
               Live Design Studio
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
-              Real-time interactive chrome customizer with 5 tabs, modular toolbar slots, 9 UI surface zones,
+              Real-time interactive chrome customizer with 4 tabs, modular toolbar slots, 9 UI surface zones,
               desktop window vibrancy, typography scaling, and starter templates. Shortcut:{' '}
               <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[11px] font-mono border border-slate-300 dark:border-slate-700">
                 Cmd/Ctrl+Shift+E
@@ -694,9 +699,15 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                     </div>
                     <ToggleSwitch
                       ariaLabel="Toggle vertical tabs"
-                      checked={settings.useVerticalTabs}
+                      checked={
+                        resolved.layout.chromeMode === 'vertical-left' ||
+                        resolved.layout.chromeMode === 'vertical-right'
+                      }
                       onToggle={() => {
-                        const nextVertical = !settings.useVerticalTabs;
+                        const isCurrentlyVertical =
+                          resolved.layout.chromeMode === 'vertical-left' ||
+                          resolved.layout.chromeMode === 'vertical-right';
+                        const nextVertical = !isCurrentlyVertical;
                         const base = settings.designProfile || createDefaultDesignProfile();
                         let nextChromeMode = base.layout.chromeMode;
                         if (nextVertical) {
@@ -708,6 +719,10 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                             nextChromeMode = 'classic-top';
                           }
                         }
+                        const existingWs =
+                          hasWsOverride && activeWorkspaceId
+                            ? settings.workspaceDesigns?.[activeWorkspaceId]
+                            : undefined;
                         onUpdateSettings({
                           useVerticalTabs: nextVertical,
                           designProfile: {
@@ -717,6 +732,24 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                               chromeMode: nextChromeMode,
                             },
                           },
+                          ...(existingWs && activeWorkspaceId
+                            ? {
+                                workspaceDesigns: {
+                                  ...settings.workspaceDesigns,
+                                  [activeWorkspaceId]: {
+                                    ...existingWs,
+                                    layout: {
+                                      ...(existingWs.layout || {}),
+                                      chromeMode: nextVertical
+                                        ? existingWs.layout?.chromeMode === 'vertical-right'
+                                          ? 'vertical-right'
+                                          : 'vertical-left'
+                                        : 'classic-top',
+                                    },
+                                  },
+                                },
+                              }
+                            : {}),
                         });
                       }}
                     />
@@ -729,10 +762,14 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                     </div>
                     <ToggleSwitch
                       ariaLabel="Toggle tasks widget"
-                      checked={Boolean(settings.showTasksWidget)}
+                      checked={Boolean(resolved.newTabLayout.tasksWidget.visible)}
                       onToggle={() => {
-                        const nextTasks = !settings.showTasksWidget;
+                        const nextTasks = !resolved.newTabLayout.tasksWidget.visible;
                         const base = settings.designProfile || createDefaultDesignProfile();
+                        const existingWs =
+                          hasWsOverride && activeWorkspaceId
+                            ? settings.workspaceDesigns?.[activeWorkspaceId]
+                            : undefined;
                         onUpdateSettings({
                           showTasksWidget: nextTasks,
                           designProfile: {
@@ -745,6 +782,25 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                               },
                             },
                           },
+                          ...(existingWs && activeWorkspaceId
+                            ? {
+                                workspaceDesigns: {
+                                  ...settings.workspaceDesigns,
+                                  [activeWorkspaceId]: {
+                                    ...existingWs,
+                                    newTabLayout: {
+                                      ...base.newTabLayout,
+                                      ...(existingWs.newTabLayout || {}),
+                                      tasksWidget: {
+                                        ...base.newTabLayout.tasksWidget,
+                                        ...(existingWs.newTabLayout?.tasksWidget || {}),
+                                        visible: nextTasks,
+                                      },
+                                    },
+                                  },
+                                },
+                              }
+                            : {}),
                         });
                       }}
                     />

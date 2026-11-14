@@ -107,6 +107,16 @@ assert.deepEqual(toggledMissing, baseList);
 const removeMissing = removeToolbarItem(baseList, 'non-existent');
 assert.deepEqual(removeMissing, baseList);
 
+// Critical omnibox cannot be hidden or removed
+const listWithOmnibox: ToolbarSlotItem[] = [
+  { id: 'slot-back', kind: 'back', visible: true },
+  { id: 'slot-omnibox', kind: 'omnibox', visible: true },
+];
+const toggledOmnibox = toggleToolbarItemVisibility(listWithOmnibox, 'slot-omnibox');
+assert.equal(toggledOmnibox.find(i => i.id === 'slot-omnibox')?.visible, true, 'Critical omnibox cannot be hidden');
+const removedOmnibox = removeToolbarItem(listWithOmnibox, 'slot-omnibox');
+assert.ok(removedOmnibox.some(i => i.id === 'slot-omnibox'), 'Critical omnibox cannot be removed');
+
 // ============================================================================
 // 5. Edge Cases: insertToolbarItem Singleton Deduplication
 // ============================================================================

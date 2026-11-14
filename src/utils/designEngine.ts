@@ -65,7 +65,12 @@ export function resolveEffectiveDesign(
   const baseProfile = sanitizeDesignProfile(settings.designProfile, createDefaultDesignProfile());
 
   // Sync legacy useVerticalTabs and showTasksWidget seamlessly when global overrides haven't specified them
-  if (settings.useVerticalTabs && baseProfile.layout.chromeMode !== 'vertical-left' && baseProfile.layout.chromeMode !== 'vertical-right') {
+  if (
+    settings.useVerticalTabs &&
+    settings.designProfile?.layout?.chromeMode === undefined &&
+    baseProfile.layout.chromeMode !== 'vertical-left' &&
+    baseProfile.layout.chromeMode !== 'vertical-right'
+  ) {
     baseProfile.layout.chromeMode = 'vertical-left';
   }
   if (typeof settings.showTasksWidget === 'boolean' && settings.designProfile?.newTabLayout?.tasksWidget?.visible === undefined) {

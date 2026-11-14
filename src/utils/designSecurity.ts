@@ -25,19 +25,60 @@ const MAX_CUSTOM_CSS_CHARS = 32_768;
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const RGB_FUNC_RE = /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*[,/]\s*(?:0|1|0?\.\d+|\d{1,3}%))?\s*\)$/;
 const HSL_FUNC_RE = /^hsla?\(\s*\d{1,3}(?:deg)?\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%(?:\s*[,/]\s*(?:0|1|0?\.\d+|\d{1,3}%))?\s*\)$/i;
-const GRADIENT_RE = /^(?:linear|radial|conic)-gradient\([^{};<>]+?\)$/i;
+const GRADIENT_PREFIX_RE = /^(?:linear|radial|conic)-gradient\(/i;
 const SAFE_SLOT_ID_RE = /^[a-zA-Z0-9_-]{1,48}$/;
+const REPEATABLE_KINDS = new Set<ToolbarItemKind>(['spacer', 'divider']);
 
 export function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
 }
 
+function isSafeGradientColor(trimmed: string): boolean {
+  const prefixMatch = GRADIENT_PREFIX_RE.exec(trimmed);
+  if (!prefixMatch || !trimmed.endsWith(')')) return false;
+  if (/[\\'"<>{};:]|\/\*|\*\//.test(trimmed)) return false;
+
+  const openParenIndex = prefixMatch[0].length - 1;
+  let depth = 0;
+  for (let i = openParenIndex; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+      if (depth < 0) return false;
+      if (depth === 0 && i !== trimmed.length - 1) {
+        return false;
+      }
+    }
+  }
+  if (depth !== 0) return false;
+
+  const inner = trimmed.slice(openParenIndex + 1, -1);
+  const funcCallRe = /([a-zA-Z_-][a-zA-Z0-9_-]*)\s*\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = funcCallRe.exec(inner)) !== null) {
+    const fnName = match[1].toLowerCase();
+    if (fnName !== 'rgb' && fnName !== 'rgba' && fnName !== 'hsl' && fnName !== 'hsla') {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function isSafeSurfaceColor(val: unknown): val is string {
   if (typeof val !== 'string') return false;
   const trimmed = val.trim();
   if (!trimmed || trimmed.length > 240) return false;
-  if (/url\s*\(/i.test(trimmed) || /expression\s*\(/i.test(trimmed) || /javascript:/i.test(trimmed)) {
+  if (
+    /url\s*\(/i.test(trimmed) ||
+    /image-set\s*\(/i.test(trimmed) ||
+    /expression\s*\(/i.test(trimmed) ||
+    /javascript:/i.test(trimmed) ||
+    /[\\'"<>{};]/.test(trimmed) ||
+    /\/\*|\*\//.test(trimmed)
+  ) {
     return false;
   }
   if (trimmed === 'inherit' || trimmed === 'transparent') return true;
@@ -45,8 +86,24 @@ export function isSafeSurfaceColor(val: unknown): val is string {
     HEX_COLOR_RE.test(trimmed) ||
     RGB_FUNC_RE.test(trimmed) ||
     HSL_FUNC_RE.test(trimmed) ||
-    GRADIENT_RE.test(trimmed)
+    isSafeGradientColor(trimmed)
   );
+}
+
+function decodeCssEscapes(input: string): string {
+  return input
+    .replace(/\\([0-9a-fA-F]{1,6})\s?/g, (_, hex: string) => {
+      const codePoint = parseInt(hex, 16);
+      if (!Number.isFinite(codePoint) || codePoint <= 0 || codePoint > 0x10ffff) {
+        return '';
+      }
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return '';
+      }
+    })
+    .replace(/\\([^\n\r])/g, '$1');
 }
 
 export function sanitizeCustomCss(rawCss: string): { css: string; warnings: string[] } {
@@ -63,12 +120,17 @@ export function sanitizeCustomCss(rawCss: string): { css: string; warnings: stri
 
   const rules: Array<{ pattern: RegExp; replacement: string; message: string }> = [
     {
+      pattern: /\/\*[\s\S]*?(?:\*\/|$)/g,
+      replacement: '',
+      message: 'Stripped CSS comment block.',
+    },
+    {
       pattern: /<\/?\s*(?:style|script)(?:[^>]*>|[^>]*$)/gi,
       replacement: '',
       message: 'Stripped HTML style/script tag markup.',
     },
     {
-      pattern: /@(?:import|charset|namespace)\b[^;]*(?:;|$)/gi,
+      pattern: /@(?:import|charset|namespace)\b[^;{}]*(?:;|$)/gi,
       replacement: '',
       message: 'Stripped @import/@charset/@namespace directive.',
     },
@@ -78,12 +140,22 @@ export function sanitizeCustomCss(rawCss: string): { css: string; warnings: stri
       message: 'Stripped CSS expression() call.',
     },
     {
-      pattern: /url\s*\(\s*(?:(['"])\s*(?:[a-z][a-z0-9+.-]*:|\/\/|\\\\|[^\n\r'"]*\\)[\s\S]*?\1|(?:\s*(?:[a-z][a-z0-9+.-]*:|\/\/|\\\\|[^\n\r);]*\\)[^);]*))\s*\)/gi,
+      pattern: /(?:-[a-z]+-)?image-set\s*\([^{};]*\)/gi,
+      replacement: 'none',
+      message: 'Stripped CSS image-set() call.',
+    },
+    {
+      pattern: /\bsrc\s*\(\s*(?:(['"])[\s\S]*?\1|[^)]*)\)/gi,
+      replacement: 'none',
+      message: 'Stripped CSS src() reference.',
+    },
+    {
+      pattern: /url\s*\(\s*(?:(['"])[\s\S]*?\1|[^)]*)\)/gi,
       replacement: 'none',
       message: 'Stripped external or protocol url() reference.',
     },
     {
-      pattern: /(^|[;\s{])(?:behavior|-moz-binding)\s*:[^;]*(?:;|$)/gi,
+      pattern: /(^|[;\s{])(?:behavior|-moz-binding)\s*:[^;{}]*(?:;|$)/gi,
       replacement: '$1',
       message: 'Stripped unsafe behavior/-moz-binding property.',
     },
@@ -99,6 +171,16 @@ export function sanitizeCustomCss(rawCss: string): { css: string; warnings: stri
   while (changed && iterations < 10) {
     changed = false;
     iterations++;
+    if (css.includes('\\')) {
+      const decoded = decodeCssEscapes(css);
+      if (decoded !== css) {
+        css = decoded;
+        if (!warnings.includes('Normalized CSS backslash escape sequence.')) {
+          warnings.push('Normalized CSS backslash escape sequence.');
+        }
+        changed = true;
+      }
+    }
     for (const rule of rules) {
       const nextCss = css.replace(rule.pattern, rule.replacement);
       if (nextCss !== css) {
@@ -125,6 +207,7 @@ function hasOwnProp<K extends string>(obj: unknown, key: K): obj is Record<K, un
 function sanitizeToolbarItems(raw: unknown, fallback: ToolbarSlotItem[]): ToolbarSlotItem[] {
   if (!Array.isArray(raw)) return fallback;
   const seenIds = new Set<string>();
+  const seenSingletonKinds = new Set<ToolbarItemKind>();
   const result: ToolbarSlotItem[] = [];
   for (let i = 0; i < raw.length && result.length < 40; i++) {
     const entry = raw[i];
@@ -132,17 +215,29 @@ function sanitizeToolbarItems(raw: unknown, fallback: ToolbarSlotItem[]): Toolba
     if (!hasOwnProp(entry, 'kind')) continue;
     const kind = entry.kind as ToolbarItemKind;
     if (!ALLOWED_TOOLBAR_KINDS.includes(kind)) continue;
+    if (!REPEATABLE_KINDS.has(kind)) {
+      if (seenSingletonKinds.has(kind)) continue;
+      seenSingletonKinds.add(kind);
+    }
     const rawId =
       hasOwnProp(entry, 'id') && typeof entry.id === 'string' && SAFE_SLOT_ID_RE.test(entry.id)
         ? entry.id
         : `slot-${kind}-${i}`;
     if (seenIds.has(rawId)) continue;
     seenIds.add(rawId);
+    const isCritical = kind === 'omnibox';
     result.push({
       id: rawId,
       kind,
-      visible: hasOwnProp(entry, 'visible') && typeof entry.visible === 'boolean' ? entry.visible : true,
+      visible: isCritical
+        ? true
+        : hasOwnProp(entry, 'visible') && typeof entry.visible === 'boolean'
+          ? entry.visible
+          : true,
     });
+  }
+  if (result.length > 0 && result.every(item => !item.visible)) {
+    result[0] = { ...result[0], visible: true };
   }
   return result.length > 0 ? result : fallback;
 }

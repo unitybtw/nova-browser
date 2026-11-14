@@ -98,9 +98,43 @@ assert.equal(isSafeSurfaceColor('javascript:alert(1)'), false);
 assert.equal(isSafeSurfaceColor('url("https://evil.com")'), false);
 assert.equal(isSafeSurfaceColor('expression(alert(1))'), false);
 assert.equal(isSafeSurfaceColor('<script>alert(1)</script>'), false);
+assert.equal(isSafeSurfaceColor('linear-gradient(#000, #fff), image-set("https://evil.example/x.png" 1x)'), false);
+assert.equal(isSafeSurfaceColor('linear-gradient(#000, url(https://evil.example/x.png))'), false);
+assert.equal(isSafeSurfaceColor('linear-gradient(#000, \\75\\72\\6c(https://evil.example/x.png))'), false);
+assert.equal(isSafeSurfaceColor('linear-gradient(#000, /* comment */ #fff)'), false);
+assert.equal(isSafeSurfaceColor('linear-gradient(135deg, rgba(15, 23, 42, 0.8), hsla(220, 80%, 50%, 0.9))'), true);
 assert.equal(isSafeSurfaceColor(null), false);
 assert.equal(isSafeSurfaceColor(undefined), false);
 assert.equal(isSafeSurfaceColor(123), false);
+
+// 2d. Advanced CSS comment, hex escape, and image-set bypasses
+const obfuscatedCss = `
+  @/**/import "https://evil.example/steal.css";
+  .a { background: u/**/rl("https://evil.example/a.png"); }
+  .b { background: \\75\\72\\6c("https://evil.example/b.png"); }
+  .c { background-image: -webkit-image-set("https://evil.example/c.png" 1x); }
+  .d { background-image: src("https://evil.example/d.png"); }
+  .e { width: exp/**/ression(alert(1)); }
+`;
+const obfuscatedResult = sanitizeCustomCss(obfuscatedCss);
+assert.ok(!obfuscatedResult.css.toLowerCase().includes('evil.example'), 'Obfuscated CSS bypasses must be stripped');
+assert.ok(!obfuscatedResult.css.toLowerCase().includes('image-set'), 'image-set() must be stripped');
+assert.ok(!obfuscatedResult.css.toLowerCase().includes('expression'), 'commented expression() must be stripped');
+
+// 2e. Toolbar sanitization preserves critical omnibox visibility and deduplicates singletons
+const toolbarSanitized = sanitizeDesignProfile({
+  layout: {
+    toolbarItems: [
+      { id: 'slot-omnibox', kind: 'omnibox', visible: false },
+      { id: 'slot-omnibox-dup', kind: 'omnibox', visible: true },
+      { id: 'slot-spacer-1', kind: 'spacer', visible: true },
+      { id: 'slot-spacer-2', kind: 'spacer', visible: true },
+    ],
+  },
+});
+assert.equal(toolbarSanitized.layout.toolbarItems.filter(i => i.kind === 'omnibox').length, 1, 'Omnibox singleton must be deduplicated');
+assert.equal(toolbarSanitized.layout.toolbarItems.find(i => i.kind === 'omnibox')?.visible, true, 'Critical omnibox must remain visible');
+assert.equal(toolbarSanitized.layout.toolbarItems.filter(i => i.kind === 'spacer').length, 2, 'Repeatable spacers must be preserved');
 
 // 3. Export / import roundtrip and invalid pack rejection
 const exported = exportThemePack(createDefaultDesignProfile());

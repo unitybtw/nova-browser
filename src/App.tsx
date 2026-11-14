@@ -787,6 +787,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           ...settings,
           designProfile: customize.draftProfile,
           workspaceDesigns: undefined,
+          useVerticalTabs:
+            customize.draftProfile.layout.chromeMode === 'vertical-left' ||
+            customize.draftProfile.layout.chromeMode === 'vertical-right',
+          showTasksWidget: customize.draftProfile.newTabLayout.tasksWidget.visible,
         },
         activeWorkspaceId,
         Boolean(activeTab?.isIncognito)
@@ -1221,28 +1225,85 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [isWebsiteDemo, customize, setSettings, activeWorkspaceIdRef]);
 
   const handleUpdateSettingsWithDesignSync = useCallback((updates: Partial<UserSettings>) => {
-    if (typeof updates.showTasksWidget === 'boolean' && !updates.designProfile) {
+    if ((typeof updates.showTasksWidget === 'boolean' || typeof updates.useVerticalTabs === 'boolean') && !updates.designProfile) {
       setSettings(prev => {
         const base = sanitizeDesignProfile(prev.designProfile, createDefaultDesignProfile());
+        const nextChromeMode =
+          typeof updates.useVerticalTabs === 'boolean'
+            ? updates.useVerticalTabs
+              ? base.layout.chromeMode === 'vertical-right'
+                ? 'vertical-right'
+                : 'vertical-left'
+              : base.layout.chromeMode === 'compact-single-row'
+                ? 'compact-single-row'
+                : 'classic-top'
+            : base.layout.chromeMode;
+        const nextTasksVisible =
+          typeof updates.showTasksWidget === 'boolean'
+            ? updates.showTasksWidget
+            : base.newTabLayout.tasksWidget.visible;
+        const activeWsId = activeWorkspaceIdRef.current;
+        const existingWsOverride = hasWorkspaceDesignOverride(prev, activeWsId)
+          ? prev.workspaceDesigns![activeWsId]!
+          : undefined;
         return {
           ...prev,
           ...updates,
           designProfile: {
             ...base,
+            layout: {
+              ...base.layout,
+              chromeMode: nextChromeMode,
+            },
             newTabLayout: {
               ...base.newTabLayout,
               tasksWidget: {
                 ...base.newTabLayout.tasksWidget,
-                visible: updates.showTasksWidget!,
+                visible: nextTasksVisible,
               },
             },
           },
+          ...(existingWsOverride
+            ? {
+                workspaceDesigns: {
+                  ...prev.workspaceDesigns,
+                  [activeWsId]: {
+                    ...existingWsOverride,
+                    ...(typeof updates.useVerticalTabs === 'boolean'
+                      ? {
+                          layout: {
+                            ...(existingWsOverride.layout || {}),
+                            chromeMode: updates.useVerticalTabs
+                              ? existingWsOverride.layout?.chromeMode === 'vertical-right'
+                                ? 'vertical-right'
+                                : 'vertical-left'
+                              : 'classic-top',
+                          },
+                        }
+                      : {}),
+                    ...(typeof updates.showTasksWidget === 'boolean'
+                      ? {
+                          newTabLayout: {
+                            ...base.newTabLayout,
+                            ...(existingWsOverride.newTabLayout || {}),
+                            tasksWidget: {
+                              ...base.newTabLayout.tasksWidget,
+                              ...(existingWsOverride.newTabLayout?.tasksWidget || {}),
+                              visible: updates.showTasksWidget,
+                            },
+                          },
+                        }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
         };
       });
       return;
     }
     handleUpdateSettings(updates);
-  }, [handleUpdateSettings, setSettings]);
+  }, [handleUpdateSettings, setSettings, activeWorkspaceIdRef]);
 
   const mutateToolbarItems = useCallback(
     (updater: (items: ToolbarSlotItem[]) => ToolbarSlotItem[]) => {

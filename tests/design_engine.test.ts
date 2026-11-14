@@ -177,6 +177,24 @@ const explicitSettings: UserSettings = {
 const explicitResolved = resolveEffectiveDesign(explicitSettings, undefined, false);
 assert.equal(explicitResolved.newTabLayout.tasksWidget.visible, false);
 
+// Explicit classic-top or compact-single-row in designProfile must not be overwritten by legacy useVerticalTabs: true
+const explicitClassicWithLegacyVertical: UserSettings = {
+  ...defaultSettings,
+  useVerticalTabs: true,
+  designProfile: {
+    ...defaultSettings.designProfile!,
+    layout: {
+      ...defaultSettings.designProfile!.layout,
+      chromeMode: 'classic-top',
+    },
+  },
+};
+assert.equal(
+  resolveEffectiveDesign(explicitClassicWithLegacyVertical, undefined, false).layout.chromeMode,
+  'classic-top',
+  'Explicit classic-top in designProfile must take precedence over legacy useVerticalTabs flag'
+);
+
 // ---------------------------------------------------------------------------
 // 4. Accent Color Mapping
 // ---------------------------------------------------------------------------

@@ -403,7 +403,7 @@ let cachedDailyWallpapers: WallpaperPhoto[] = [...CURATED_4K_WALLPAPERS];
 export function isValidWallpaperUrl(urlStr: unknown): urlStr is string {
   if (typeof urlStr !== 'string' || !urlStr.trim()) return false;
   const trimmed = urlStr.trim();
-  if (/["'\r\n\\]/.test(trimmed)) return false;
+  if (/["'\r\n\\()<>]|[\x00-\x1f\x7f]/.test(trimmed)) return false;
   try {
     const parsed = new URL(trimmed);
     return parsed.protocol === 'https:' || parsed.protocol === 'http:';
@@ -741,7 +741,20 @@ export function useLiveUnsplashPhoto(enabled = true) {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.ACTIVE_WALLPAPER_ID && e.newValue) {
         const pool = poolRef.current;
-        const found = pool.find(p => p.id === e.newValue);
+        let found: WallpaperPhoto | null | undefined = pool.find(p => p.id === e.newValue);
+        if (!found) {
+          try {
+            const rawCustom = localStorage.getItem(STORAGE_KEYS.CUSTOM_PHOTO);
+            if (rawCustom) {
+              const parsed = sanitizeWallpaperPhoto(JSON.parse(rawCustom));
+              if (parsed && parsed.id === e.newValue) {
+                found = parsed;
+              }
+            }
+          } catch {
+            // Ignore malformed custom wallpaper storage
+          }
+        }
         if (found) {
           setCurrentPhoto(found);
           const override = localStorage.getItem(STORAGE_KEYS.USER_OVERRIDE) === 'true';
@@ -754,9 +767,17 @@ export function useLiveUnsplashPhoto(enabled = true) {
     // 3. Subscribe to custom event fallback
     const handleCustomSync = (e: Event) => {
       const customEvt = e as CustomEvent<{ photo: WallpaperPhoto; pool: WallpaperPhoto[]; isUserOverride: boolean }>;
-      if (customEvt.detail?.photo) {
-        setCurrentPhoto(customEvt.detail.photo);
-        if (customEvt.detail.pool) setPhotoPool(customEvt.detail.pool);
+      const safePhoto = sanitizeWallpaperPhoto(customEvt.detail?.photo);
+      if (safePhoto) {
+        setCurrentPhoto(safePhoto);
+        if (Array.isArray(customEvt.detail?.pool)) {
+          const safePool = customEvt.detail.pool
+            .map(item => sanitizeWallpaperPhoto(item))
+            .filter((p): p is WallpaperPhoto => p !== null);
+          if (safePool.length > 0) {
+            setPhotoPool(safePool);
+          }
+        }
         if (typeof customEvt.detail.isUserOverride === 'boolean') {
           setIsUserOverride(customEvt.detail.isUserOverride);
         }

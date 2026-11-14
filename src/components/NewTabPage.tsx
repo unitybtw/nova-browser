@@ -1199,10 +1199,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const isSafeBgUrl = useMemo(() => {
     if (!backgroundCustomUrl || typeof backgroundCustomUrl !== 'string') return false;
     const trimmed = backgroundCustomUrl.trim();
+    if (/["'\r\n\\()<>]/.test(trimmed)) return false;
+    if (/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]+$/i.test(trimmed)) {
+      return true;
+    }
     if (!isSafeNavigationUrl(trimmed)) return false;
     try {
       const parsed = new URL(trimmed);
-      return parsed.protocol === 'https:' || parsed.protocol === 'http:' || (parsed.protocol === 'data:' && trimmed.startsWith('data:image/'));
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
     } catch {
       return false;
     }
@@ -1210,10 +1214,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const safeBgCssUrl = useMemo(() => {
     if (!isSafeBgUrl || !backgroundCustomUrl) return '';
-    return backgroundCustomUrl.replace(/["'\r\n\\]/g, '');
+    return backgroundCustomUrl.trim().replace(/["'\r\n\\()<>]/g, '');
   }, [isSafeBgUrl, backgroundCustomUrl]);
 
-  const isVideoBg = newTabBackground === 'custom_url' && isSafeBgUrl && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
+  const isVideoBg =
+    newTabBackground === 'custom_url' &&
+    isSafeBgUrl &&
+    Boolean(safeBgCssUrl) &&
+    (safeBgCssUrl.toLowerCase().endsWith('.mp4') || safeBgCssUrl.toLowerCase().endsWith('.webm'));
 
   const layout = useMemo(
     () => resolveNewTabLayout(newTabLayout, showTasksWidget),
@@ -1338,7 +1346,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             key={unsplashUrl}
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 animate-in fade-in"
             style={{
-              backgroundImage: `url('${(unsplashUrl || '').replace(/["'\r\n\\]/g, '')}')`
+              backgroundImage: `url('${(unsplashUrl || '').trim().replace(/["'\r\n\\()<>]/g, '')}')`
             }}
           />
           <div className="absolute inset-0 bg-black/10"></div>
@@ -1356,7 +1364,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               muted
               playsInline
               className="absolute inset-0 w-full h-full object-cover"
-              src={backgroundCustomUrl}
+              src={safeBgCssUrl}
             />
           ) : (
             <div

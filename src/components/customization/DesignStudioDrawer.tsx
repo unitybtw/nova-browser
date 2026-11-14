@@ -339,6 +339,12 @@ export const DesignStudioDrawer: React.FC = () => {
           });
         }
       };
+      reader.onerror = () => {
+        setImportStatus({
+          type: 'error',
+          message: 'Failed to read theme pack file from disk',
+        });
+      };
       reader.readAsText(file);
       e.target.value = '';
     },
