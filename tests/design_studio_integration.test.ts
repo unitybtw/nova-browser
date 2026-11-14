@@ -651,6 +651,32 @@ async function main() {
 
   const surfacePresets = drawer!.querySelectorAll('[data-surface-preset]');
   assert.strictEqual(surfacePresets.length, 4, 'All 4 quick surface presets must be rendered in Style tab');
+  assert.ok(
+    drawer!.className.includes('bg-white/95') && drawer!.className.includes('dark:bg-slate-900/95'),
+    'DesignStudioDrawer must adapt cleanly to both light and dark themes'
+  );
+
+  // Verify Frosted Glass preset adapts contrast to Light vs Dark theme
+  const frostedBtn = drawer!.querySelector('[data-surface-preset="frosted-glass"]') as HTMLButtonElement;
+  dom.window.document.documentElement.classList.remove('dark');
+  await React.act(async () => {
+    frostedBtn.click();
+  });
+  assert.strictEqual(
+    capturedState!.draftProfile.surfaces.toolbar?.textColor,
+    '#0f172a',
+    'Frosted Glass in Light Mode must apply dark legible textColor'
+  );
+  dom.window.document.documentElement.classList.add('dark');
+  await React.act(async () => {
+    frostedBtn.click();
+  });
+  assert.strictEqual(
+    capturedState!.draftProfile.surfaces.toolbar?.textColor,
+    '#f8fafc',
+    'Frosted Glass in Dark Mode must apply light legible textColor'
+  );
+  dom.window.document.documentElement.classList.remove('dark');
 
   const fontOptions = drawer!.querySelectorAll('[data-font-option]');
   assert.ok(fontOptions.length >= 6, 'At least 6 font family options must be rendered in Style tab');

@@ -341,7 +341,7 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
       <div
         className={`absolute top-full mt-1.5 ${
           controlsAlign === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2'
-        } z-30 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full shadow-md text-[10px] bg-neutral-900/95 text-neutral-100 dark:bg-neutral-800/95 dark:text-neutral-200 border border-neutral-700/70 opacity-0 pointer-events-none group-hover/slot:opacity-100 group-hover/slot:pointer-events-auto group-focus-within/slot:opacity-100 group-focus-within/slot:pointer-events-auto transition-opacity duration-150 whitespace-nowrap before:content-[''] before:absolute before:-top-2 before:inset-x-0 before:h-2`}
+        } z-30 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full shadow-md text-[10px] bg-white/95 text-slate-700 dark:bg-neutral-800/95 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700/70 opacity-0 pointer-events-none group-hover/slot:opacity-100 group-hover/slot:pointer-events-auto group-focus-within/slot:opacity-100 group-focus-within/slot:pointer-events-auto transition-opacity duration-150 whitespace-nowrap before:content-[''] before:absolute before:-top-2 before:inset-x-0 before:h-2`}
         role="toolbar"
         aria-label={`Slot controls for ${spec.label}`}
         onClick={(e) => e.stopPropagation()}
@@ -350,7 +350,7 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
         <span
           aria-hidden="true"
           title={`Drag to reorder ${spec.label}`}
-          className="p-0.5 text-neutral-300 select-none cursor-grab active:cursor-grabbing flex items-center justify-center"
+          className="p-0.5 text-slate-400 dark:text-neutral-300 select-none cursor-grab active:cursor-grabbing flex items-center justify-center"
         >
           <GripVertical className="w-2.5 h-2.5" />
         </span>
@@ -373,12 +373,12 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
               : `Show ${spec.label}`
           }
           disabled={isCritical}
-          className="p-0.5 rounded hover:bg-white/20 active:bg-white/30 text-neutral-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-0.5 rounded hover:bg-slate-200/80 dark:hover:bg-white/20 active:bg-slate-300 dark:active:bg-white/30 text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           {item.visible ? (
             <Eye className="w-2.5 h-2.5" />
           ) : (
-            <EyeOff className="w-2.5 h-2.5 text-amber-400" />
+            <EyeOff className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
           )}
         </button>
 
@@ -392,7 +392,7 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
             }}
             aria-label={`Remove ${spec.label}`}
             title={`Remove ${spec.label}`}
-            className="p-0.5 rounded hover:bg-rose-600/80 active:bg-rose-600 text-neutral-300 hover:text-white transition-colors"
+            className="p-0.5 rounded hover:bg-rose-500 dark:hover:bg-rose-600/80 active:bg-rose-600 text-slate-600 dark:text-neutral-300 hover:text-white transition-colors"
           >
             <X className="w-2.5 h-2.5" />
           </button>
