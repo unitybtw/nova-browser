@@ -22,7 +22,7 @@ export function FeatureProofs({ t }: FeatureProofsProps) {
               data-reveal
               style={{ '--d': `${Math.min(idx * 65, 260)}ms` } as CSSProperties}
             >
-              <div className={`proof-panel ${item.id === 'shield-sync' ? 'proof-panel--contained' : ''}`}>
+              <div className="proof-panel">
                 <img
                   src={item.image}
                   alt={item.alt}
@@ -32,16 +32,6 @@ export function FeatureProofs({ t }: FeatureProofsProps) {
                   loading="lazy"
                   decoding="async"
                 />
-                {item.uiOverlay && (
-                  <div className="proof-ui-strip" data-ui aria-hidden="true">
-                    {item.uiOverlay.rows.map((row) => (
-                      <div key={row.label} className="proof-ui-row">
-                        <span>{row.label}</span>
-                        <span className="proof-ui-status">{row.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div className="proof-copy">

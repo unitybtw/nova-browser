@@ -10,7 +10,7 @@
   <br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Release](https://img.shields.io/badge/Release-v1.5.1-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.2-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser/releases)
   [![Electron](https://img.shields.io/badge/Electron-43.x-47848F?style=for-the-badge&logo=electron)](https://www.electronjs.org/)
   [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -129,7 +129,16 @@ Current English interface in Clean Minimalist mode with the light theme.
 
 <br/>
 
-### 3. Nova Sync
+### 3. Live Design Studio
+
+<div align="center">
+  <img src="public/screenshots/live-design-studio.jpg" alt="Nova Live Design Studio Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
+  <p><em>Live Design Studio: Real-time tab bar geometries, drag-and-drop toolbar layout, and workspace theme editor</em></p>
+</div>
+
+<br/>
+
+### 4. Nova Sync
 
 <div align="center">
   <img src="public/screenshots/sync-clean-light.jpg" alt="Nova Sync Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
@@ -334,7 +343,7 @@ Nova Browser runs fully offline out of the box with zero required configuration.
 
 Download the latest prebuilt installer for your operating system directly from [GitHub Releases](https://github.com/unitybtw/nova-browser/releases):
 - **macOS**: `Nova-Browser-arm64.dmg` (Apple Silicon) or `Nova-Browser-x64.dmg` (Intel)
-- **Windows**: `Nova-Browser-Setup-1.5.1-x64.exe` (64-bit NSIS Installer)
+- **Windows**: `Nova-Browser-Setup-1.5.2-x64.exe` (64-bit NSIS Installer)
 - **Linux**: `Nova-Browser-x86_64.AppImage` or `Nova-Browser-amd64.deb`
 
 ### Option B: Build from Source

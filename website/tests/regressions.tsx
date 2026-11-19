@@ -44,9 +44,8 @@ async function run() {
   })
 
   let loads = 0
-  let pauses = 0
   w.HTMLMediaElement.prototype.play = (() => Promise.resolve()) as any
-  w.HTMLMediaElement.prototype.pause = () => { pauses++ }
+  w.HTMLMediaElement.prototype.pause = () => {}
   w.HTMLMediaElement.prototype.load = () => { loads++ }
 
   const root = createRoot(document.getElementById('root')!)
@@ -70,7 +69,7 @@ async function run() {
   // 1. Footer brand star mark & Back-to-top focus return + reduced-motion scroll behavior
   assert.ok(
     document.querySelector('.footer-monument img[src="/images/nova-mark.svg"]'),
-    'Footer must render the Nova star mark alongside the monumental wordmark'
+    'Footer must render the Nova orbital ring mark alongside the monumental wordmark'
   )
   const toTop = document.querySelector('.back-to-top') as HTMLAnchorElement
   toTop.focus()
@@ -88,34 +87,60 @@ async function run() {
     'Hero monumental NOVA heading must render the Nova logo mark as the letter O'
   )
 
-  // 3. Live Browser Studio preview pause/play control (WCAG 2.2.2)
-  const pauseBtn = buttonByText('Pause preview')
-  assert.ok(pauseBtn, 'Live Studio looping preview video must expose a Pause control')
-  assert.equal(pauseBtn.getAttribute('aria-pressed'), null, 'Pause/Play button whose label changes must not set aria-pressed')
-  const pausesBefore = pauses
-  await click(pauseBtn)
-  assert.equal(pauseBtn.textContent?.trim(), 'Play preview')
-  assert.ok(pauses > pausesBefore, 'Clicking Pause preview must pause the live preview video')
+  // 3. Real Embedded Nova Browser Live Demo: scenario switching, Dark/Light postMessage & keyboard ARIA tablist
+  const demoShell = document.querySelector('[data-ui].live-browser-shell')!
+  const iframe = demoShell.querySelector('iframe.live-browser-frame') as HTMLIFrameElement
+  assert.ok(iframe, 'Live Demo must embed the real Nova Browser iframe')
+  assert.ok(
+    iframe.getAttribute('src')?.startsWith('/browser-demo/index.html?demo=true&feature=studio&tabs=horizontal&theme=dark'),
+    `Unexpected initial demo src: ${iframe.getAttribute('src')}`
+  )
+  assert.equal(demoShell.getAttribute('data-scenario'), 'studio')
+  assert.equal(demoShell.getAttribute('data-surface'), 'dark')
 
-  // 3. Live Browser Studio: layout, workspace, surface & keyboard ARIA tablist
-  const browserUi = document.querySelector('[data-ui].studio-browser')!
-  assert.equal(browserUi.getAttribute('data-layout'), 'vertical')
-  await click(buttonByText('Compact'))
-  assert.equal(browserUi.getAttribute('data-layout'), 'compact')
-  await click(buttonByText('Below bar'))
-  assert.equal(browserUi.getAttribute('data-layout'), 'below')
+  const postedMessages: Array<{ msg: any; targetOrigin: string }> = []
+  Object.defineProperty(iframe, 'contentWindow', {
+    configurable: true,
+    value: {
+      postMessage: (msg: any, targetOrigin: string) => {
+        postedMessages.push({ msg, targetOrigin })
+      },
+    },
+  })
+
   await click(buttonByText('Light'))
-  assert.equal(browserUi.getAttribute('data-surface'), 'light')
-  await click(buttonByText('Work'))
-  assert.equal(browserUi.getAttribute('data-workspace'), 'work')
+  assert.equal(demoShell.getAttribute('data-surface'), 'light')
+  assert.ok(
+    postedMessages.some((entry) => entry.msg?.type === 'NOVA_THEME_CHANGE' && entry.msg?.theme === 'light'),
+    'Switching theme must sync live via postMessage without forcing a reload'
+  )
 
-  const tourTab = document.getElementById('tour-tab-0')!
-  await act(async () => tourTab.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'End', bubbles: true })))
-  assert.equal(document.activeElement?.id, 'tour-tab-2')
-  assert.equal(document.getElementById('tour-panel')?.getAttribute('aria-labelledby'), 'tour-tab-2')
+  const tourTab0 = document.getElementById('tour-tab-0')!
+  await act(async () => tourTab0.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'End', bubbles: true })))
+  assert.equal(document.activeElement?.id, 'tour-tab-3')
+  assert.equal(document.getElementById('tour-panel')?.getAttribute('aria-labelledby'), 'tour-tab-3')
+  assert.equal(demoShell.getAttribute('data-scenario'), 'split')
+  assert.ok(
+    iframe.getAttribute('src')?.includes('feature=split&tabs=horizontal&theme=light'),
+    `Switching scenario must preserve current theme and load split view: ${iframe.getAttribute('src')}`
+  )
+
+  await click(document.getElementById('tour-tab-1'))
+  assert.equal(demoShell.getAttribute('data-scenario'), 'vertical')
+  assert.ok(iframe.getAttribute('src')?.includes('feature=vertical_tabs&tabs=vertical'))
   assertAriaControls()
 
-  // 4. Platform download picker: keyboard + official v1.5.2 release assets
+  // 4. All 5 Feature Proof screenshots point to fresh v1.5.2 captures
+  const proofImgs = [...document.querySelectorAll('.proof-panel img')].map((img) => img.getAttribute('src'))
+  assert.deepEqual(proofImgs, [
+    '/images/shot-studio.jpg',
+    '/images/shot-ai.jpg',
+    '/images/shot-split.jpg',
+    '/images/shot-extensions.jpg',
+    '/images/shot-sync.jpg',
+  ])
+
+  // 5. Platform download picker: keyboard + official v1.5.2 release assets
   await click(document.getElementById('platform-tab-1'))
   const winLinks = [...document.querySelectorAll('.download-file')]
   assert.equal(winLinks.length, 2, 'Windows tab must show both Installer and Portable v1.5.2 downloads')
@@ -125,7 +150,7 @@ async function run() {
   assert.equal(linuxLinks.length, 2, 'Linux tab must show both AppImage and Debian downloads')
   assertAriaControls()
 
-  // 5. Bilingual language switch (EN <-> TR)
+  // 6. Bilingual language switch (EN <-> TR)
   const langBtn = document.querySelector('.lang-switch')!
   await click(langBtn)
   assert.equal(document.documentElement.lang, 'tr')
@@ -133,7 +158,7 @@ async function run() {
   await click(langBtn)
   assert.equal(document.documentElement.lang, 'en')
 
-  // 6. Mobile drawer open, outside click, Escape focus return & desktop breakpoint close
+  // 7. Mobile drawer open, outside click, Escape focus return & desktop breakpoint close
   const menu = document.querySelector('.menu-button')!
   await click(menu)
   assert.equal(menu.getAttribute('aria-expanded'), 'true')
@@ -148,7 +173,7 @@ async function run() {
   await act(async () => mediaListeners.forEach((fn) => fn({ matches: true })))
   assert.equal(menu.getAttribute('aria-expanded'), 'false', 'Desktop breakpoint closes mobile menu')
 
-  // 7. Native <dialog> video player (no body overflow lock, EN/TR tracks, retry recovery)
+  // 8. Native <dialog> video player (no body overflow lock, EN/TR tracks, retry recovery)
   const dialog = document.querySelector('dialog.video-dialog') as HTMLDialogElement
   assert.equal(dialog.getAttribute('role'), null, 'Native modal <dialog> must not set redundant role="dialog"')
   assert.equal(dialog.getAttribute('aria-modal'), null, 'Native modal <dialog> must not set redundant aria-modal')
@@ -168,7 +193,7 @@ async function run() {
   await click(dialog.querySelector('.dialog-close'))
   assert.equal(dialog.open, false)
 
-  // 8. FAQ disclosures are non-exclusive native <details> with zero headings inside <summary>
+  // 9. FAQ disclosures are non-exclusive native <details> with zero headings inside <summary>
   const faqDetails = [...document.querySelectorAll('.faq-item')]
   assert.equal(faqDetails.length, 6)
   for (const d of faqDetails) {
@@ -177,7 +202,7 @@ async function run() {
   }
 
   await act(async () => root.unmount())
-  console.log('[PASS] Website regression suite passed: Live Studio, hero pause, ARIA tabs, bilingual switch, native dialog, FAQ, and mobile menu.')
+  console.log('[PASS] Website regression suite passed: Embedded live Nova demo, fresh v1.5.2 screenshots, ARIA tabs, bilingual switch, native dialog, FAQ, and mobile menu.')
   dom.window.close()
 }
 

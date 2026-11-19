@@ -1,8 +1,20 @@
 export type Lang = 'en' | 'tr'
 
-export type StudioLayoutId = 'vertical' | 'top' | 'compact' | 'below'
-export type StudioWorkspaceId = 'personal' | 'work' | 'research'
 export type StudioSurface = 'dark' | 'light'
+export type StudioScenarioId = 'studio' | 'vertical' | 'ai' | 'split'
+
+export interface StudioScenarioSpec {
+  id: StudioScenarioId
+  feature: 'studio' | 'vertical_tabs' | 'ai' | 'split'
+  tabs: 'horizontal' | 'vertical'
+}
+
+export const STUDIO_SCENARIOS: readonly StudioScenarioSpec[] = [
+  { id: 'studio', feature: 'studio', tabs: 'horizontal' },
+  { id: 'vertical', feature: 'vertical_tabs', tabs: 'vertical' },
+  { id: 'ai', feature: 'ai', tabs: 'vertical' },
+  { id: 'split', feature: 'split', tabs: 'horizontal' },
+] as const
 
 export interface FeatureProofItem {
   id: string
@@ -13,11 +25,6 @@ export interface FeatureProofItem {
   width: number
   height: number
   cropPosition: string
-  uiOverlay?: {
-    kind: 'mcp-crx'
-    badge: string
-    rows: Array<{ label: string; status: string }>
-  }
 }
 
 export interface SiteCopy {
@@ -33,26 +40,18 @@ export interface SiteCopy {
   heroIntro: string
   download: string
   watchFilm: string
-  heroVideoPause: string
-  heroVideoPlay: string
-  heroVideoAlt: string
   heroMeta: string
   studioSectionLabel: string
-  studioTabs: [string, string, string]
-  studioTabTitles: [string, string, string]
-  studioTabDescriptions: [string, string, string]
-  studioLayoutLabel: string
-  studioLayouts: Record<StudioLayoutId, string>
-  studioWorkspaceLabel: string
-  studioWorkspaces: Record<StudioWorkspaceId, { name: string; url: string; tabs: [string, string, string] }>
+  studioTabs: [string, string, string, string]
+  studioTabTitles: [string, string, string, string]
+  studioTabDescriptions: [string, string, string, string]
   studioSurfaceLabel: string
   studioSurfaces: Record<StudioSurface, string>
+  studioIframeTitle: string
+  studioOpenFull: string
   studioPrimaryAction: string
   studioSecondaryAction: string
   studioCaption: string
-  studioBrowserAddressPlaceholder: string
-  studioShieldLabel: string
-  studioAiLabel: string
   featuresHeading: string
   featuresLead: string
   features: FeatureProofItem[]
@@ -121,7 +120,7 @@ export const copy: Record<Lang, SiteCopy> = {
     skip: 'Skip to content',
     homeLabel: 'Nova home',
     navLabel: 'Main navigation',
-    nav: ['Studio', 'Capabilities', 'Open source', 'FAQ'],
+    nav: ['Live demo', 'Capabilities', 'Open source', 'FAQ'],
     get: 'Get Nova',
     languageLabel: 'Switch to Turkish',
     menuOpen: 'Open navigation',
@@ -129,56 +128,33 @@ export const copy: Record<Lang, SiteCopy> = {
     heroIntro: 'The open-source desktop browser you reshape live, with local WebGPU AI, workspaces, and encrypted sync.',
     download: 'Download Nova',
     watchFilm: 'Watch 36s film',
-    heroVideoPause: 'Pause preview',
-    heroVideoPlay: 'Play preview',
-    heroVideoAlt: 'Nova Browser desktop interface walkthrough showing split view and workspace navigation',
     heroMeta: 'MIT open source for macOS, Windows, and Linux.',
-    studioSectionLabel: 'Interactive browser studio',
-    studioTabs: ['Your space', 'Your assistant', 'Your devices'],
-    studioTabTitles: ['Shape every bar.', 'Help on your GPU.', 'Synced and encrypted.'],
-    studioTabDescriptions: [
-      'Move your tabs to a vertical sidebar, compact single row, or below the address bar. Each workspace keeps its own tabs and visual surface.',
-      'Open the local AI sidebar beside any page. Supported models run directly on your device through WebGPU after the initial download.',
-      'Keep bookmarks and passwords encrypted on-device with AES-256-GCM through your Nova Cloud account across desktop computers.',
+    studioSectionLabel: 'Interactive Nova Browser demo',
+    studioTabs: ['Live Design Studio', 'Vertical Tabs', 'Local AI', 'Split View'],
+    studioTabTitles: [
+      'Reshape Nova live.',
+      'Vertical workspaces.',
+      'Assistant on your GPU.',
+      'Two pages, one window.',
     ],
-    studioLayoutLabel: 'Tab geometry',
-    studioLayouts: {
-      vertical: 'Vertical',
-      top: 'Top bar',
-      compact: 'Compact',
-      below: 'Below bar',
-    },
-    studioWorkspaceLabel: 'Workspace',
-    studioWorkspaces: {
-      personal: {
-        name: 'Personal',
-        url: 'nova://newtab',
-        tabs: ['Start Page', 'Reading List', 'Music'],
-      },
-      work: {
-        name: 'Work',
-        url: 'https://github.com/unitybtw/nova-browser',
-        tabs: ['nova-browser', 'Release v1.5.2', 'Pull Requests'],
-      },
-      research: {
-        name: 'Research',
-        url: 'https://react.dev/reference/react',
-        tabs: ['React 19 Docs', 'Tailwind Oxide', 'WebGPU Spec'],
-      },
-    },
-    studioSurfaceLabel: 'Surface',
+    studioTabDescriptions: [
+      'This is the real Nova Browser interface running inside your page. Switch between Classic Top, Compact Row, and Vertical layouts or reorder toolbar slots right inside the window.',
+      'Pin daily tools, group tabs into collapsible folders, and isolate Personal, Work, and Research workspaces without losing focus.',
+      'Open Nova AI beside any tab to query open pages or manage tabs. Supported models run directly on your device through WebGPU after the initial download.',
+      'Inspect documentation and live repositories side by side inside a single window with a resizable split divider.',
+    ],
+    studioSurfaceLabel: 'Theme',
     studioSurfaces: {
       dark: 'Dark',
       light: 'Light',
     },
+    studioIframeTitle: 'Interactive Nova Browser v1.5.2 live demo',
+    studioOpenFull: 'Open fullscreen',
     studioPrimaryAction: 'Download Nova',
     studioSecondaryAction: 'Watch 36s film',
-    studioCaption: 'Live preview of Nova’s layout engine. Actual desktop rendering adapts to your operating system.',
-    studioBrowserAddressPlaceholder: 'Search or enter address',
-    studioShieldLabel: 'Shield on',
-    studioAiLabel: 'Local AI',
+    studioCaption: 'Running the real Nova v1.5.2 React interface inside the browser. Desktop builds add native Chromium tabs, CRX3 extensions, and local MCP.',
     featuresHeading: 'Built into the frame.',
-    featuresLead: 'Every capability lives directly inside the native desktop shell, shown here as real interface captures.',
+    featuresLead: 'Every capability lives directly inside the native desktop shell, captured fresh from Nova v1.5.2.',
     features: [
       {
         id: 'live-studio',
@@ -187,11 +163,11 @@ export const copy: Record<Lang, SiteCopy> = {
           'Rearrange toolbar controls by drag and drop, switch between four tab-bar geometries, and customize every New Tab widget while watching the browser update immediately.',
           'Apply one global design or assign distinct themes per workspace, then export and share your setup as a portable theme pack.',
         ],
-        image: '/images/studio-layout.png',
-        alt: 'Nova Live Design Studio showing Classic Top, Compact Row, Vertical Left, and Vertical Right shell layout controls',
+        image: '/images/shot-studio.jpg',
+        alt: 'Nova v1.5.2 Live Design Studio showing Classic Top, Compact Row, Vertical Left, and Vertical Right shell layout controls in dark mode',
         width: 1440,
         height: 900,
-        cropPosition: '100% 15%',
+        cropPosition: '100% 0%',
       },
       {
         id: 'local-ai',
@@ -200,45 +176,37 @@ export const copy: Record<Lang, SiteCopy> = {
           'Ask questions about open pages or manage tabs from the sidebar assistant without routing every prompt through a hosted browser cloud.',
           'Supported models run locally on your graphics hardware via WebGPU. An initial model download and compatible GPU memory are required.',
         ],
-        image: '/images/assistant-clean-light.jpg',
-        alt: 'Nova Browser with the Local WebGPU AI assistant open beside the New Tab page',
+        image: '/images/shot-ai.jpg',
+        alt: 'Nova v1.5.2 with vertical tabs and the Local WebGPU AI assistant sidebar open in dark mode',
         width: 1440,
         height: 900,
-        cropPosition: '100% 30%',
+        cropPosition: '100% 0%',
       },
       {
         id: 'workspaces-split',
         title: 'Workspaces and split view',
         body: [
-          'Keep Personal, Work, and Research contexts isolated so tabs never bleed across projects. Open two live documents side by side inside one window.',
+          'Keep Personal, Work, and Research contexts isolated so tabs never bleed across projects. Open two live pages side by side inside one window.',
           'Background tabs automatically sleep after inactivity to preserve system memory during heavy research sessions.',
         ],
-        image: '/images/tour-poster.jpg',
-        alt: 'Nova Browser dark interface displaying two documentation pages side by side in Split View',
-        width: 1280,
-        height: 800,
+        image: '/images/shot-split.jpg',
+        alt: 'Nova v1.5.2 displaying a GitHub repository and New Tab side by side in dark Split View',
+        width: 1440,
+        height: 900,
         cropPosition: '50% 0%',
       },
       {
         id: 'mcp-extensions',
-        title: 'Local MCP and CRX3',
+        title: 'Chrome Web Store and local MCP',
         body: [
+          'Install extensions directly from the Chrome Web Store or by pasting a store URL or 32-character extension ID with CRX3 signature parsing and Manifest V3 popup support.',
           'Connect compatible coding agents directly to Nova through its built-in local MCP server so tools can inspect and navigate tabs under your control.',
-          'Install extensions directly from the Chrome Web Store or by URL and ID with CRX3 signature parsing, permission review, and Manifest V3 popup support.',
         ],
-        image: '/images/studio-dark.png',
-        alt: 'Nova Browser dark theme with the Advanced Surface Inspector and modular extension toolbar controls',
+        image: '/images/shot-extensions.jpg',
+        alt: 'Nova v1.5.2 Extensions modal with direct Chrome Web Store URL and extension ID installer bar',
         width: 1440,
         height: 900,
-        cropPosition: '100% 0%',
-        uiOverlay: {
-          kind: 'mcp-crx',
-          badge: 'Local runtime',
-          rows: [
-            { label: 'Local MCP Server (127.0.0.1)', status: 'Ready' },
-            { label: 'Chrome Web Store (CRX3)', status: 'Verified' },
-          ],
-        },
+        cropPosition: '50% 45%',
       },
       {
         id: 'shield-sync',
@@ -247,10 +215,10 @@ export const copy: Record<Lang, SiteCopy> = {
           'Built-in network filtering blocks ads and known trackers before pages paint, while private tabs run in isolated per-tab partitions.',
           'Nova Sync encrypts bookmarks and passwords on your device with AES-256-GCM through your Nova Cloud account. Code-based device pairing is not in this build.',
         ],
-        image: '/images/sync-clean-light.jpg',
-        alt: 'Nova Sync sign-in dialog explaining encrypted bookmark and password syncing via Nova Cloud',
-        width: 512,
-        height: 280,
+        image: '/images/shot-sync.jpg',
+        alt: 'Nova v1.5.2 Sync sign-in dialog in dark mode explaining encrypted bookmark and password syncing via Nova Cloud',
+        width: 1440,
+        height: 900,
         cropPosition: '50% 50%',
       },
     ],
@@ -329,7 +297,7 @@ export const copy: Record<Lang, SiteCopy> = {
     skip: 'İçeriğe geç',
     homeLabel: 'Nova ana sayfa',
     navLabel: 'Ana gezinme',
-    nav: ['Stüdyo', 'Yetenekler', 'Açık kaynak', 'SSS'],
+    nav: ['Canlı demo', 'Yetenekler', 'Açık kaynak', 'SSS'],
     get: 'Nova’yı edin',
     languageLabel: 'Switch to English',
     menuOpen: 'Menüyü aç',
@@ -337,56 +305,33 @@ export const copy: Record<Lang, SiteCopy> = {
     heroIntro: 'Canlı olarak şekillendirdiğin açık kaynak masaüstü tarayıcı. Yerel WebGPU yapay zekâ, çalışma alanları ve şifreli eşitleme.',
     download: 'Nova’yı indir',
     watchFilm: '36 sn filmi izle',
-    heroVideoPause: 'Önizlemeyi duraklat',
-    heroVideoPlay: 'Önizlemeyi oynat',
-    heroVideoAlt: 'Bölünmüş görünüm ve çalışma alanı geçişlerini gösteren Nova tarayıcı masaüstü önizlemesi',
     heroMeta: 'macOS, Windows ve Linux için MIT açık kaynak.',
-    studioSectionLabel: 'Etkileşimli tarayıcı stüdyosu',
-    studioTabs: ['Senin alanın', 'Senin asistanın', 'Senin cihazların'],
-    studioTabTitles: ['Her çubuğu şekillendir.', 'GPU’nda yerel destek.', 'Cihazlarda şifreli.'],
-    studioTabDescriptions: [
-      'Sekmelerini dikey kenar çubuğuna, kompakt tek satıra veya adres çubuğunun altına taşı. Her çalışma alanı kendi sekmelerini ve yüzeyini korur.',
-      'Herhangi bir sayfanın yanında yerel yapay zekâ kenar çubuğunu aç. Desteklenen modeller ilk indirmeden sonra WebGPU ile doğrudan cihazında çalışır.',
-      'Yer imlerin ve parolaların Nova Cloud hesabın üzerinden cihazında AES-256-GCM ile şifrelenerek masaüstü bilgisayarların arasında eşitlenir.',
+    studioSectionLabel: 'Etkileşimli Nova Browser demosu',
+    studioTabs: ['Live Design Studio', 'Dikey Sekmeler', 'Yerel AI', 'Bölünmüş Ekran'],
+    studioTabTitles: [
+      'Nova’yı canlı şekillendir.',
+      'Dikey çalışma alanları.',
+      'GPU’nda yerel asistan.',
+      'Tek pencerede iki sayfa.',
     ],
-    studioLayoutLabel: 'Sekme düzeni',
-    studioLayouts: {
-      vertical: 'Dikey',
-      top: 'Üst bar',
-      compact: 'Kompakt',
-      below: 'Alt şerit',
-    },
-    studioWorkspaceLabel: 'Çalışma alanı',
-    studioWorkspaces: {
-      personal: {
-        name: 'Kişisel',
-        url: 'nova://newtab',
-        tabs: ['Başlangıç', 'Okuma Listesi', 'Müzik'],
-      },
-      work: {
-        name: 'İş',
-        url: 'https://github.com/unitybtw/nova-browser',
-        tabs: ['nova-browser', 'Sürüm v1.5.2', 'İncelemeler'],
-      },
-      research: {
-        name: 'Araştırma',
-        url: 'https://react.dev/reference/react',
-        tabs: ['React 19 Doküman', 'Tailwind Oxide', 'WebGPU Şartnamesi'],
-      },
-    },
-    studioSurfaceLabel: 'Yüzey',
+    studioTabDescriptions: [
+      'Bu pencere içinde çalışan gerçek Nova Browser arayüzüdür. Klasik Üst, Kompakt Satır ve Dikey düzenler arasında geç veya araç çubuğu yuvalarını doğrudan içeriden değiştir.',
+      'Günlük araçlarını sabitle, sekmelerini klasörlerde topla ve Kişisel, İş ile Araştırma çalışma alanlarını birbirinden ayır.',
+      'Herhangi bir sekmenin yanında Nova AI’ı açarak açık sayfaları sorgula veya sekmeleri yönet. Desteklenen modeller ilk indirmeden sonra WebGPU ile cihazında çalışır.',
+      'Dokümantasyonu ve canlı depoları tek pencere içinde boyutlandırılabilir bölünmüş ekranla yan yana incele.',
+    ],
+    studioSurfaceLabel: 'Tema',
     studioSurfaces: {
       dark: 'Koyu',
       light: 'Açık',
     },
+    studioIframeTitle: 'Etkileşimli Nova Browser v1.5.2 canlı demosu',
+    studioOpenFull: 'Tam ekran aç',
     studioPrimaryAction: 'Nova’yı indir',
     studioSecondaryAction: '36 sn filmi izle',
-    studioCaption: 'Nova düzen motorunun canlı önizlemesi. Masaüstü görünümü işletim sistemine göre uyarlanır.',
-    studioBrowserAddressPlaceholder: 'Ara veya adres gir',
-    studioShieldLabel: 'Kalkan açık',
-    studioAiLabel: 'Yerel AI',
+    studioCaption: 'Gerçek Nova v1.5.2 React arayüzü doğrudan sayfada çalışıyor. Masaüstü sürümü yerel Chromium sekmeleri, CRX3 eklentileri ve yerel MCP ekler.',
     featuresHeading: 'Tarayıcının içinde.',
-    featuresLead: 'Tüm yetenekler doğrudan yerel masaüstü çekirdeğinde çalışır ve burada gerçek arayüz görüntüleriyle yer alır.',
+    featuresLead: 'Tüm yetenekler doğrudan yerel masaüstü çekirdeğinde çalışır ve burada güncel Nova v1.5.2 görüntüleriyle yer alır.',
     features: [
       {
         id: 'live-studio',
@@ -395,11 +340,11 @@ export const copy: Record<Lang, SiteCopy> = {
           'Araç çubuğu düğmelerini sürükleyip bırakarak sırala, dört farklı sekme geometrisi arasında anında geç ve Yeni Sekme bileşenlerini canlı düzenle.',
           'Tek bir genel tasarım uygula veya her çalışma alanına ayrı tema ata; kurduğun düzeni tema paketi olarak dışa aktar.',
         ],
-        image: '/images/studio-layout.png',
-        alt: 'Klasik Üst, Kompakt Satır, Dikey Sol ve Dikey Sağ düzen seçeneklerini gösteren Nova Live Design Studio arayüzü',
+        image: '/images/shot-studio.jpg',
+        alt: 'Koyu temada Klasik Üst, Kompakt Satır, Dikey Sol ve Dikey Sağ düzen seçeneklerini gösteren Nova v1.5.2 Live Design Studio arayüzü',
         width: 1440,
         height: 900,
-        cropPosition: '100% 15%',
+        cropPosition: '100% 0%',
       },
       {
         id: 'local-ai',
@@ -408,11 +353,11 @@ export const copy: Record<Lang, SiteCopy> = {
           'Açık sayfalar hakkında sorular sor veya sekmelerini kenar çubuğu asistanıyla yönet; her istemi harici bir tarayıcı bulutuna göndermeden çalış.',
           'Desteklenen modeller WebGPU üzerinden doğrudan kendi ekran kartında çalışır. İlk kullanımda model indirmesi ve uyumlu donanım gerekir.',
         ],
-        image: '/images/assistant-clean-light.jpg',
-        alt: 'Yeni Sekme sayfasının yanında açık duran yerel WebGPU Nova AI asistanı',
+        image: '/images/shot-ai.jpg',
+        alt: 'Koyu temada dikey sekmeler ve açık yerel WebGPU Nova AI kenar çubuğu ile Nova v1.5.2',
         width: 1440,
         height: 900,
-        cropPosition: '100% 30%',
+        cropPosition: '100% 0%',
       },
       {
         id: 'workspaces-split',
@@ -421,32 +366,24 @@ export const copy: Record<Lang, SiteCopy> = {
           'Kişisel, İş ve Araştırma bağlamlarını birbirinden ayırarak sekme karmaşasını bitir. Tek pencere içinde iki canlı sayfayı yan yana aç.',
           'Arka planda bekleyen sekmeler otomatik uykuya geçerek yoğun araştırma oturumlarında sistem belleğini korur.',
         ],
-        image: '/images/tour-poster.jpg',
-        alt: 'Bölünmüş görünümde iki dokümantasyon sayfasını yan yana gösteren koyu temalı Nova tarayıcı',
-        width: 1280,
-        height: 800,
+        image: '/images/shot-split.jpg',
+        alt: 'Koyu temada bölünmüş görünümde GitHub deposu ve Yeni Sekmeyi yan yana gösteren Nova v1.5.2',
+        width: 1440,
+        height: 900,
         cropPosition: '50% 0%',
       },
       {
         id: 'mcp-extensions',
-        title: 'Yerel MCP ve CRX3 eklentileri',
+        title: 'Chrome Web Store ve yerel MCP',
         body: [
+          'Chrome Web Store sayfasından tek tıkla ya da mağaza URL’si ve 32 karakterli kimlik yapıştırarak CRX3 paketlerini kur; izin incelemesi ve MV3 açılır pencere desteği yerleşiktir.',
           'Uyumlu kodlama ajanlarını yerleşik yerel MCP sunucusu üzerinden doğrudan Nova’ya bağla; sekmeleri kontrolün altında incele ve yönet.',
-          'Chrome Web Store sayfasından tek tıkla ya da URL ve eklenti kimliğiyle CRX3 paketlerini kur; izin incelemesi ve MV3 açılır pencere desteği yerleşiktir.',
         ],
-        image: '/images/studio-dark.png',
-        alt: 'Koyu temada Gelişmiş Yüzey Denetçisi ve modüler eklenti araç çubuğu ile Nova Browser',
+        image: '/images/shot-extensions.jpg',
+        alt: 'Doğrudan Chrome Web Store URL ve kimlik kurucu çubuğunu gösteren Nova v1.5.2 Eklentiler penceresi',
         width: 1440,
         height: 900,
-        cropPosition: '100% 0%',
-        uiOverlay: {
-          kind: 'mcp-crx',
-          badge: 'Yerel çalışma zamanı',
-          rows: [
-            { label: 'Yerel MCP Sunucusu (127.0.0.1)', status: 'Hazır' },
-            { label: 'Chrome Web Store (CRX3)', status: 'Doğrulandı' },
-          ],
-        },
+        cropPosition: '50% 45%',
       },
       {
         id: 'shield-sync',
@@ -455,10 +392,10 @@ export const copy: Record<Lang, SiteCopy> = {
           'Yerleşik ağ filtresi reklamları ve bilinen izleyicileri sayfa yüklenmeden engeller; gizli sekmeler birbirinden yalıtılmış oturumlarda çalışır.',
           'Nova Sync yer imlerini ve parolalarını cihazında AES-256-GCM ile şifreleyerek Nova Cloud hesabınla eşitler. Bu sürümde kodla eşleştirme bulunmaz.',
         ],
-        image: '/images/sync-clean-light.jpg',
-        alt: 'Nova Cloud üzerinden şifreli yer imi ve parola eşitlemesini açıklayan Nova Sync giriş penceresi',
-        width: 512,
-        height: 280,
+        image: '/images/shot-sync.jpg',
+        alt: 'Koyu temada Nova Cloud üzerinden şifreli yer imi ve parola eşitlemesini açıklayan Nova v1.5.2 Sync penceresi',
+        width: 1440,
+        height: 900,
         cropPosition: '50% 50%',
       },
     ],

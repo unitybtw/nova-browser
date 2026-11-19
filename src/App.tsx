@@ -269,7 +269,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         try {
           const originUrl = new URL(e.origin);
           const isSameOrigin = e.origin === window.location.origin;
-          const isOfficialPages = originUrl.protocol === 'https:' && (originUrl.hostname === 'unitybtw.github.io' || originUrl.hostname === 'novabrowser.pages.dev');
+          const isOfficialPages = originUrl.protocol === 'https:' && (originUrl.hostname === 'unitybtw.github.io' || originUrl.hostname === 'novabrowser.pages.dev' || originUrl.hostname === 'nova-browser.org');
           const isLocal = (originUrl.protocol === 'http:' || originUrl.protocol === 'https:') && (originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1');
           if (!isSameOrigin && !isOfficialPages && !isLocal) {
             return;
@@ -297,7 +297,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false }
         ];
       }
-      if (demoParams.feature === 'website') {
+      if (demoParams.feature === 'website' || demoParams.feature === 'studio' || demoParams.feature === 'extensions') {
         return [
           { id: '1', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false },
           { id: '2', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser - GitHub', isLoading: false, canGoBack: false, canGoForward: false },
@@ -316,8 +316,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
       if (demoParams.feature === 'split') {
         return [
-          { id: '1', url: 'https://react.dev/reference/react', title: 'React Documentation', isLoading: false, splitWith: '2', canGoBack: false, canGoForward: false },
-          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, splitWith: '1', canGoBack: false, canGoForward: false }
+          { id: '1', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser - GitHub', isLoading: false, splitWith: '2', canGoBack: false, canGoForward: false },
+          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, splitWith: '1', canGoBack: false, canGoForward: false }
         ];
       }
       if (demoParams.feature === 'settings_ai') {
@@ -723,6 +723,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (next) customize.openCustomizeMode();
     else customize.discard();
   }, [customize]);
+
+  const demoAutoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!demoParams.isDemo || demoAutoOpenedRef.current) return;
+    if (demoParams.feature === 'studio') {
+      demoAutoOpenedRef.current = true;
+      customize.openCustomizeMode();
+    } else if (demoParams.feature === 'extensions') {
+      demoAutoOpenedRef.current = true;
+      setIsExtensionsOpen(true);
+    }
+  }, [demoParams.isDemo, demoParams.feature, customize, setIsExtensionsOpen]);
 
   // Tema + dil yan etkileri useThemeLanguage hookunda (birebir tasindi; ayni committe calisir, flash yok).
   const isActiveTabIncognito = Boolean((tabs.find(t => t.id === activeTabId) || tabs[0])?.isIncognito);

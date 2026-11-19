@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateA
 import { defaultSettings, type UserSettings } from '../types/browser';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
 import { registerPendingLegacyCustomAiApiKey, sanitizeSettingsForPersistence } from '../services/aiSecretStore';
+import { createDefaultDesignProfile } from '../utils/designDefaults';
 
 export interface UseSettingsOptions {
   isDemo?: boolean;
@@ -17,15 +18,24 @@ export function useSettings(options: UseSettingsOptions = {}) {
   const isMac = options.isMac ?? (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac'));
 
   const [settings, setSettingsState] = useState<UserSettings>(() => {
+    const useVertical = options.isDemo
+      ? options.demoFeature === 'website'
+        ? false
+        : options.demoTabs === 'vertical'
+      : defaultSettings.useVerticalTabs;
+    const demoDesignProfile = options.isDemo && useVertical
+      ? (() => {
+          const profile = createDefaultDesignProfile();
+          profile.layout.chromeMode = 'vertical-left';
+          return profile;
+        })()
+      : undefined;
     const initialSettings: UserSettings = {
       ...defaultSettings,
       theme: options.isDemo && options.demoTheme ? options.demoTheme : defaultSettings.theme,
       showTasksWidget: options.showTasksWidget ?? (options.demoFeature === 'website' ? false : defaultSettings.showTasksWidget ?? true),
-      useVerticalTabs: options.isDemo
-        ? options.demoFeature === 'website'
-          ? false
-          : options.demoTabs === 'vertical'
-        : defaultSettings.useVerticalTabs,
+      useVerticalTabs: useVertical,
+      ...(demoDesignProfile ? { designProfile: demoDesignProfile } : {}),
       newTabBackground: (options.demoBg as any) || (options.demoFeature === 'vertical_tabs' ? 'cyber_grid' : options.demoFeature === 'ai' ? 'nebula' : defaultSettings.newTabBackground),
       shortcuts: {
         ...defaultSettings.shortcuts,

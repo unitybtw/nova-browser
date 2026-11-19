@@ -90,7 +90,7 @@ export default function App() {
   }
 
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, group: 'tour' | 'platform', current: number) {
-    const count = group === 'tour' ? 3 : PLATFORMS.length
+    const count = group === 'tour' ? 4 : PLATFORMS.length
     let next = current
     if (event.key === 'ArrowRight') next = (current + 1) % count
     else if (event.key === 'ArrowLeft') next = (current + count - 1) % count

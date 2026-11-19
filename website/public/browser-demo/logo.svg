@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
+  <defs>
+    <linearGradient id="nova-sq-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#171b24"/>
+      <stop offset="45%" stop-color="#0d0f14"/>
+      <stop offset="100%" stop-color="#07080b"/>
+    </linearGradient>
+    <linearGradient id="nova-sq-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(238,240,243,0.22)"/>
+      <stop offset="50%" stop-color="rgba(238,240,243,0.08)"/>
+      <stop offset="100%" stop-color="rgba(238,240,243,0.03)"/>
+    </linearGradient>
+    <mask id="nova-eclipse-app">
+      <rect width="1024" height="1024" fill="#ffffff"/>
+      <circle cx="536" cy="488" r="176" fill="#000000"/>
+      <path d="M684 186 C684 288 632 340 530 340 C632 340 684 392 684 494 C684 392 736 340 838 340 C736 340 684 288 684 186 Z" fill="#000000" stroke="#000000" stroke-width="48" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <rect x="80" y="80" width="864" height="864" rx="200" fill="url(#nova-sq-bg)" stroke="url(#nova-sq-rim)" stroke-width="4"/>
+  <circle cx="502" cy="522" r="296" fill="#eef0f3" mask="url(#nova-eclipse-app)"/>
+  <path d="M684 208 C684 294 640 340 554 340 C640 340 684 386 684 472 C684 386 728 340 814 340 C728 340 684 294 684 208 Z" fill="#1f2de6"/>
+</svg>
