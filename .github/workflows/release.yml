@@ -176,6 +176,20 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Setup Node.js for Release Manifest
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Manifest Dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Generate Release Changelog & Media Manifest
+        shell: bash
+        run: |
+          node scripts/generate-release-manifest.mjs --tag "${{ steps.vars.outputs.tag }}" --out release-assets/changelog-media.json
+
       - name: Generate SHA-256 Checksums
         shell: bash
         run: |

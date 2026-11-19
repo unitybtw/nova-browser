@@ -355,7 +355,7 @@ webview, iframe {
 
 /* Premium Interactive Globals - global transition removed to eliminate window resize & split-resizer layout thrashing */
 button:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
   transition: transform 0.1s var(--ease-spring);
 }
 
@@ -659,4 +659,47 @@ button:active:not(:disabled) {
 .nova-sidebar-manage-spaces:hover { background: var(--sidebar-hover); }
 @media (prefers-reduced-motion: reduce) {
   .nova-vertical-sidebar *, .nova-vertical-sidebar *::before, .nova-vertical-sidebar *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Smooth interaction layer. Lives in @layer base so Tailwind utilities
+   (transition-transform, transition-none, ...) always win. Only paint-level
+   properties are animated, so there is no layout thrash during window resize.
+   --------------------------------------------------------------------------- */
+@layer base {
+  :where(button, a, [role='button'], [role='tab'], [role='menuitem'], input, select, textarea, summary) {
+    transition-property: color, background-color, border-color, box-shadow, opacity, fill, stroke;
+    transition-duration: 140ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  :where(svg) {
+    transition: color 140ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes nova-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.nova-page-enter {
+  animation: nova-page-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes nova-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.nova-fade-in {
+  animation: nova-fade-in 180ms ease-out both;
+}
+
+/* Gentle, GPU-friendly scrolling inside internal pages */
+.nova-smooth-scroll {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nova-page-enter,
+  .nova-fade-in { animation: none !important; }
 }

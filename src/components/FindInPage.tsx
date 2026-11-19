@@ -92,12 +92,12 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
           initial={{ opacity: 0, y: -20, x: '-50%', scale: 0.95 }}
           animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
           exit={{ opacity: 0, y: -20, x: '-50%', scale: 0.95 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-          className="absolute top-12 left-1/2 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-2 outline-none w-full max-w-lg"
+          transition={{ duration: 0.14, ease: 'easeOut' }}
+          className="absolute top-12 left-1/2 z-50 bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl border border-neutral-200/90 dark:border-white/[0.1] shadow-2xl rounded-xl p-1.5 flex items-center gap-1.5 outline-none w-full max-w-md"
           tabIndex={-1}
         >
-          <div className="relative flex-1 flex items-center bg-slate-100/60 dark:bg-slate-800/60 rounded-xl px-3 py-1 border border-transparent focus-within:border-cyan-500/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-colors">
-            <Search className={`w-4 h-4 mr-2 ${noMatches ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`} />
+          <div className="relative flex-1 flex items-center bg-neutral-100/90 dark:bg-white/[0.06] rounded-lg px-2.5 py-1 border border-neutral-200/80 dark:border-white/[0.08] focus-within:border-neutral-400 dark:focus-within:border-white/30 transition-colors">
+            <Search className={`w-3.5 h-3.5 mr-2 shrink-0 ${noMatches ? 'text-red-500' : 'text-neutral-400 dark:text-neutral-500'}`} />
             <input
               ref={inputRef}
               type="text"
@@ -105,33 +105,43 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               placeholder={t('find.placeholder')}
-              className={`flex-1 bg-transparent py-1.5 text-sm outline-none transition-colors placeholder-slate-400 dark:placeholder-slate-500 ${noMatches ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}`}
+              className={`flex-1 bg-transparent py-1 text-xs outline-none transition-colors placeholder:text-neutral-400 dark:placeholder:text-neutral-500 ${noMatches ? 'text-red-500' : 'text-neutral-900 dark:text-neutral-100'}`}
               autoFocus
             />
-            
+
             <div className="flex items-center gap-1 shrink-0">
               {searchText && (
-                <span className={`text-xs font-medium mr-2 ${noMatches ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                <span className={`text-[11px] font-mono tabular-nums mr-1.5 ${noMatches ? 'text-red-500' : 'text-neutral-500 dark:text-neutral-400'}`}>
                   {matchCount > 0 ? `${matchIndex}/${matchCount}` : '0/0'}
                 </span>
               )}
-              
+
               <button
+                type="button"
                 onClick={() => {
                   setMatchCase(!matchCase);
                   triggerSearch(searchText, true, !matchCase, wholeWord);
                 }}
-                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors ${matchCase ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                className={`w-6 h-6 flex items-center justify-center rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                  matchCase
+                    ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-950'
+                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/70 dark:hover:bg-white/[0.08]'
+                }`}
                 title={t('find.matchCase')}
               >
                 Aa
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setWholeWord(!wholeWord);
                   triggerSearch(searchText, true, matchCase, !wholeWord);
                 }}
-                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors mr-1 ${wholeWord ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                className={`w-6 h-6 flex items-center justify-center rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                  wholeWord
+                    ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-950'
+                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/70 dark:hover:bg-white/[0.08]'
+                }`}
                 title={t('find.wholeWord')}
               >
                 W
@@ -139,33 +149,33 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 px-1 border-l border-slate-200/80 dark:border-white/10">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
+          <div className="flex items-center gap-0.5 shrink-0 pl-1 border-l border-neutral-200/80 dark:border-white/[0.08]">
+            <button
+              type="button"
               onClick={() => triggerSearch(searchText, false)}
-              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.07] transition-colors cursor-pointer"
               title={t('find.previous')}
             >
-              <ChevronUp className="w-4 h-4" />
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
               onClick={() => triggerSearch(searchText, true)}
-              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.07] transition-colors cursor-pointer"
               title={t('find.next')}
             >
-              <ChevronDown className="w-4 h-4" />
-            </motion.button>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.9 }}
+          <button
+            type="button"
             onClick={handleClose}
-            className="p-2 ml-1 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.07] transition-colors shrink-0 cursor-pointer"
             title={t('find.close')}
           >
-            <X className="w-4 h-4" />
-          </motion.button>
+            <X className="w-3.5 h-3.5" />
+          </button>
         </motion.div>
       )}
     </AnimatePresence>

@@ -163,9 +163,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           initial={{ opacity: 0, scale: 0.96, y: -4 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
           style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
-          className="fixed z-[99999] w-58 max-h-[calc(100vh-20px)] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default font-medium outline-none"
+          className="fixed z-[99999] w-56 max-h-[calc(100vh-20px)] overflow-y-auto bg-white/95 dark:bg-[#16171b]/95 backdrop-blur-xl border border-neutral-200/90 dark:border-white/[0.1] rounded-xl shadow-2xl p-1 flex flex-col gap-0.5 text-xs text-neutral-700 dark:text-neutral-200 select-none cursor-default font-medium outline-none"
         >
         {/* New Tab to Right */}
         <button
@@ -173,10 +173,10 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label="New tab to the right"
           onClick={() => { onNewTabRight(tab.id); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <Plus className="w-3.5 h-3.5 opacity-70" />
+            <Plus className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
             New tab to the right
           </span>
         </button>
@@ -187,13 +187,13 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label="Reload tab"
           onClick={() => { onReloadTab(tab.id); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <RotateCw className="w-3.5 h-3.5 opacity-70" />
+            <RotateCw className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
             Reload
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘R' : 'Ctrl+R'}</span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">{isMac ? '⌘R' : 'Ctrl+R'}</span>
         </button>
 
         {/* Duplicate Tab */}
@@ -202,10 +202,10 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label="Duplicate tab"
           onClick={() => { onDuplicateTab(tab.id); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <Copy className="w-3.5 h-3.5 opacity-70" />
+            <Copy className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
             Duplicate tab
           </span>
         </button>
@@ -216,10 +216,10 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label={tab.isPinned ? 'Unpin tab' : 'Pin tab'}
           onClick={() => { onTogglePinTab(tab.id); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            {tab.isPinned ? <PinOff className="w-3.5 h-3.5 text-cyan-500" /> : <Pin className="w-3.5 h-3.5 opacity-70" />}
+            {tab.isPinned ? <PinOff className="w-3.5 h-3.5 text-neutral-900 dark:text-white" /> : <Pin className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />}
             {tab.isPinned ? 'Unpin tab' : 'Pin tab'}
           </span>
         </button>
@@ -230,10 +230,10 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label={tab.isMuted ? 'Unmute site' : 'Mute site'}
           onClick={() => { onToggleMuteTab(tab.id); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            {tab.isMuted ? <Volume2 className="w-3.5 h-3.5 text-cyan-500" /> : <VolumeX className="w-3.5 h-3.5 opacity-70" />}
+            {tab.isMuted ? <Volume2 className="w-3.5 h-3.5 text-neutral-900 dark:text-white" /> : <VolumeX className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />}
             {tab.isMuted ? 'Unmute site' : 'Mute site'}
           </span>
         </button>
@@ -244,13 +244,13 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark tab'}
           onClick={() => { onBookmarkTab(tab); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'text-amber-500 fill-amber-500' : 'opacity-70'}`} />
+            <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'text-amber-500 fill-amber-500' : 'text-neutral-400 dark:text-neutral-500'}`} />
             {isBookmarked ? 'Remove bookmark' : 'Bookmark tab'}
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘D' : 'Ctrl+D'}</span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">{isMac ? '⌘D' : 'Ctrl+D'}</span>
         </button>
 
         {/* Copy URL */}
@@ -260,23 +260,19 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           aria-label="Copy page link"
           onClick={() => {
             if (tab.url && tab.url !== 'nova://newtab') {
-              // `navigator.clipboard.writeText` rejects outright in a non-secure
-              // context, and an unhandled rejection is a global error that takes
-              // the tab strip with it. The helper falls back to execCommand and
-              // reports real success.
               void copyTextToClipboard(tab.url);
             }
             onClose();
           }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] hover:text-neutral-950 dark:hover:text-white transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <Link className="w-3.5 h-3.5 opacity-70" />
+            <Link className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
             Copy page link
           </span>
         </button>
 
-        <div className="my-1 border-t border-slate-200/60 dark:border-white/10" />
+        <div className="my-1 border-t border-neutral-200/80 dark:border-white/[0.08]" />
 
         {/* Close Tab */}
         <button
@@ -284,13 +280,13 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           tabIndex={-1}
           aria-label="Close tab"
           onClick={() => { onCloseTab(tab.id); onClose(); }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
             <X className="w-3.5 h-3.5 opacity-70" />
             Close tab
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘W' : 'Ctrl+W'}</span>
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">{isMac ? '⌘W' : 'Ctrl+W'}</span>
         </button>
 
         {/* Close Other Tabs */}
@@ -300,7 +296,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
             tabIndex={-1}
             aria-label="Close other tabs"
             onClick={() => { onCloseOtherTabs(tab.id); onClose(); }}
-            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors text-left cursor-pointer"
           >
             <span className="flex items-center gap-2">
               <Trash2 className="w-3.5 h-3.5 opacity-70" />
@@ -316,7 +312,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
             tabIndex={-1}
             aria-label="Close tabs to the right"
             onClick={() => { onCloseTabsToRight(tab.id); onClose(); }}
-            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors text-left cursor-pointer"
           >
             <span className="flex items-center gap-2">
               <ArrowRightToLine className="w-3.5 h-3.5 opacity-70" />
@@ -328,19 +324,19 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
         {/* Reopen Closed Tab */}
         {canReopenClosedTab && (
           <>
-            <div className="my-1 border-t border-slate-200/60 dark:border-white/10" />
+            <div className="my-1 border-t border-neutral-200/80 dark:border-white/[0.08]" />
             <button
               role="menuitem"
               tabIndex={-1}
               aria-label="Reopen closed tab"
               onClick={() => { onReopenClosedTab(); onClose(); }}
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer text-cyan-600 dark:text-cyan-400"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.08] text-neutral-900 dark:text-neutral-100 transition-colors text-left cursor-pointer"
             >
-              <span className="flex items-center gap-2 font-semibold">
-                <Undo2 className="w-3.5 h-3.5" />
+              <span className="flex items-center gap-2 font-medium">
+                <Undo2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
                 Reopen closed tab
               </span>
-              <span className="text-[10px] font-mono opacity-80">{isMac ? '⇧⌘T' : 'Ctrl+Shift+T'}</span>
+              <span className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500">{isMac ? '⇧⌘T' : 'Ctrl+Shift+T'}</span>
             </button>
           </>
         )}

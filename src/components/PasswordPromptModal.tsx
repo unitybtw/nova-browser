@@ -60,20 +60,20 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 420 }}
-            className="absolute top-14 right-4 w-88 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-[9999] overflow-hidden select-none"
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className="absolute top-14 right-4 w-88 bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-neutral-200/90 dark:border-white/[0.1] z-[9999] overflow-hidden select-none"
           >
-            <div className="p-4 flex flex-col gap-3.5">
+            <div className="p-4 flex flex-col gap-3">
               {/* Header */}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 flex items-center justify-center text-cyan-500 dark:text-cyan-400 border border-cyan-500/25 shrink-0 shadow-xs">
-                  <KeyRound size={20} />
+                <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-white/[0.06] flex items-center justify-center text-neutral-700 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/[0.08] shrink-0">
+                  <KeyRound size={17} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 id="password-prompt-title" className="font-semibold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <h3 id="password-prompt-title" className="font-semibold text-xs text-neutral-950 dark:text-neutral-100">
                     {isUpdate ? 'Update Password?' : 'Save Password?'}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5" title={hostname}>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate flex items-center gap-1 mt-0.5" title={hostname}>
                     <Globe size={11} className="opacity-70 shrink-0" />
                     <span className="truncate">{hostname}</span>
                   </p>
@@ -81,21 +81,20 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/[0.07] transition-colors cursor-pointer"
                   title="Close"
                   aria-label="Close"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
-              
+
               {/* Credential Fields */}
               <div className="space-y-2">
-                {/* Username Input */}
-                <div className="bg-slate-50 dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200/70 dark:border-white/5 flex items-center gap-2">
-                  <User size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-1" />
+                <div className="bg-neutral-100/80 dark:bg-white/[0.04] p-2 rounded-lg border border-neutral-200/80 dark:border-white/[0.08] flex items-center gap-2">
+                  <User size={13} className="text-neutral-400 shrink-0 ml-1" />
                   <div className="flex-1 min-w-0">
-                    <label htmlFor="password-prompt-username" className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    <label htmlFor="password-prompt-username" className="block text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                       Username / Email
                     </label>
                     <input
@@ -104,17 +103,16 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
                       value={editedUsername}
                       onChange={(e) => setEditedUsername(e.target.value)}
                       placeholder="user@example.com"
-                      className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400"
+                      className="w-full bg-transparent text-xs font-medium text-neutral-900 dark:text-neutral-100 outline-none placeholder:text-neutral-400"
                     />
                   </div>
                 </div>
 
-                {/* Password Input */}
                 {initialPassword && (
-                  <div className="bg-slate-50 dark:bg-slate-950/60 p-2 rounded-xl border border-slate-200/70 dark:border-white/5 flex items-center gap-2">
-                    <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-1" />
+                  <div className="bg-neutral-100/80 dark:bg-white/[0.04] p-2 rounded-lg border border-neutral-200/80 dark:border-white/[0.08] flex items-center gap-2">
+                    <Lock size={13} className="text-neutral-400 shrink-0 ml-1" />
                     <div className="flex-1 min-w-0">
-                      <label htmlFor="password-prompt-password" className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      <label htmlFor="password-prompt-password" className="block text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                         Password
                       </label>
                       <input
@@ -122,39 +120,41 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.mem
                         type={showPassword ? 'text' : 'password'}
                         value={editedPassword}
                         onChange={(e) => setEditedPassword(e.target.value)}
-                        className="w-full bg-transparent text-xs font-mono font-medium text-slate-900 dark:text-slate-100 outline-none"
+                        className="w-full bg-transparent text-xs font-mono font-medium text-neutral-900 dark:text-neutral-100 outline-none"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                      title={showPassword ? "Hide Password" : "Show Password"}
-                      aria-label={showPassword ? "Hide Password" : "Show Password"}
+                      className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                      title={showPassword ? 'Hide Password' : 'Show Password'}
+                      aria-label={showPassword ? 'Hide Password' : 'Show Password'}
                     >
                       {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
                 )}
               </div>
-            
-            {/* Actions */}
-            <div className="flex gap-2 mt-0.5">
-              <button
-                onClick={onClose}
-                className="flex-1 py-2 px-3 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-medium text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Not Now</span>
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 py-2 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Check size={14} />
-                <span>{isUpdate ? 'Update' : 'Save'}</span>
-              </button>
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-0.5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-2 px-3 rounded-lg bg-neutral-100 hover:bg-neutral-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-neutral-200/80 dark:border-white/[0.08] text-neutral-700 dark:text-neutral-300 font-medium text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Not Now</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="flex-1 py-2 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 font-medium text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                >
+                  <Check size={14} />
+                  <span>{isUpdate ? 'Update' : 'Save'}</span>
+                </button>
+              </div>
             </div>
-          </div>
         </motion.div>
       )}
     </AnimatePresence>

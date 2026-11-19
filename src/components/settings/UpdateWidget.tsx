@@ -1,10 +1,6 @@
 import React from 'react';
 import { Check, Download, RefreshCw, ExternalLink, X, AlertTriangle } from 'lucide-react';
-
-interface UpdateInfo {
-  version: string;
-  releaseDate: string;
-}
+import { SettingsButton } from './SettingsPrimitives';
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return '0 B';
@@ -13,7 +9,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-export const UpdateWidget = () => {
+export const UpdateWidget = ({ hideChangelogButton = false }: { hideChangelogButton?: boolean } = {}) => {
   const [status, setStatus] = React.useState<'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = React.useState('');
   const [progress, setProgress] = React.useState(0);
@@ -25,17 +21,12 @@ export const UpdateWidget = () => {
   const [releaseNotes, setReleaseNotes] = React.useState('');
   const [downloadUrl, setDownloadUrl] = React.useState('');
   const [downloadedFilePath, setDownloadedFilePath] = React.useState('');
-  // Whether the downloaded package was checked against a published digest.
-  // `null` until a download completes. Electron cannot verify a CRX signature
-  // (it loads extensions unpacked), so the published SHA-256 from the GitHub
-  // release asset is the only integrity check there is - when it is absent the
-  // user must be told, rather than the download quietly counting as verified.
   const [integrityVerified, setIntegrityVerified] = React.useState<boolean | null>(null);
   const [isRestarting, setIsRestarting] = React.useState(false);
   const [showNotesModal, setShowNotesModal] = React.useState(false);
 
   React.useEffect(() => {
-    let unsubs: (() => void)[] = [];
+    const unsubs: (() => void)[] = [];
     const api = (window as any).electronAPI;
     if (api) {
       if (api.getUpdateInfo) {
@@ -164,79 +155,63 @@ export const UpdateWidget = () => {
         if (ok) return;
       } catch (_) {}
     }
-    // No window.open fallback on purpose: it carries a URL straight from the
-    // update feed with no scheme check, and the main window now denies popups
-    // outright. Surface the URL instead of silently doing nothing.
     setErrorMsg(`Could not open the download automatically. Open it manually: ${url}`);
   };
 
   if (status === 'downloaded') {
     return (
       <div className="flex flex-col gap-1.5 items-end">
-        <div className="flex items-center gap-2.5">
-          <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
-            <Check className="w-4 h-4" /> v{updateVersion || 'new'} ready to install
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+            <Check className="w-3.5 h-3.5" /> v{updateVersion || 'new'} ready
           </span>
-          <button
-            onClick={install}
-            disabled={isRestarting}
-            className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
-          >
+          <SettingsButton variant="primary" onClick={install} disabled={isRestarting}>
             {isRestarting ? (
-              <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              <div className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
             ) : (
               <RefreshCw className="w-3.5 h-3.5" />
             )}
-            {isRestarting ? 'Updating & Restarting...' : 'Restart & Update'}
-          </button>
+            <span>{isRestarting ? 'Restarting...' : 'Restart & Update'}</span>
+          </SettingsButton>
           {downloadedFilePath && (
-            <button
-              onClick={showInFolder}
-              className="px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-              title="Show downloaded package in folder"
-            >
+            <SettingsButton variant="ghost" onClick={showInFolder}>
               Show file
-            </button>
+            </SettingsButton>
           )}
         </div>
         {integrityVerified === false && (
-          <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+          <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300 max-w-sm">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
-              This release published no checksum, so the package could not be
-              integrity-checked. It was downloaded from the official GitHub
-              release over HTTPS, but it is not verified.
+              This release published no checksum, so the package could not be integrity-checked.
             </span>
           </div>
         )}
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
-          Nova Browser will close, apply update, and automatically restart.
-        </p>
       </div>
     );
   }
 
   if (status === 'downloading') {
     return (
-      <div className="flex flex-col gap-1.5 w-full max-w-xs">
-        <div className="flex justify-between text-xs">
-          <span className="text-blue-600 dark:text-blue-400 font-medium">
+      <div className="flex flex-col gap-1.5 w-56">
+        <div className="flex justify-between text-[11px]">
+          <span className="text-neutral-700 dark:text-neutral-300 font-medium">
             Downloading{updateVersion ? ` v${updateVersion}` : ''}...
           </span>
-          <span className="text-slate-600 dark:text-slate-300 font-mono font-medium">
-            {progress}% {speed > 0 ? `(${formatBytes(speed)}/s)` : ''}
+          <span className="text-neutral-500 dark:text-neutral-400 font-mono tabular-nums">
+            {progress}%{speed > 0 ? ` · ${formatBytes(speed)}/s` : ''}
           </span>
         </div>
-        <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-neutral-200 dark:bg-white/[0.1] rounded-full overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out"
+            className="h-full bg-neutral-900 dark:bg-white rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
         {total > 0 && (
-          <div className="flex justify-between text-[10px] text-slate-400">
-            <span>{formatBytes(transferred)} transferred</span>
-            <span>{formatBytes(total)} total</span>
+          <div className="flex justify-between text-[10px] font-mono text-neutral-400 dark:text-neutral-500">
+            <span>{formatBytes(transferred)}</span>
+            <span>{formatBytes(total)}</span>
           </div>
         )}
       </div>
@@ -246,75 +221,63 @@ export const UpdateWidget = () => {
   if (status === 'available') {
     return (
       <>
-        <div className="flex items-center gap-2.5">
-          <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-mono text-neutral-600 dark:text-neutral-300">
             v{updateVersion || 'new'} available
           </span>
-          <button
-            onClick={handleDownload}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" /> Download & Install
-          </button>
+          <SettingsButton variant="primary" onClick={handleDownload}>
+            <Download className="w-3.5 h-3.5" />
+            <span>Download</span>
+          </SettingsButton>
           {releaseNotes && (
-            <button
-              onClick={() => setShowNotesModal(true)}
-              className="px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-            >
-              What's New
-            </button>
+            <SettingsButton variant="secondary" onClick={() => setShowNotesModal(true)}>
+              Notes
+            </SettingsButton>
           )}
-          <button
+          <SettingsButton
+            variant="ghost"
             onClick={() => openDownload(downloadUrl || `https://github.com/unitybtw/nova-browser/releases/tag/v${updateVersion || 'latest'}`)}
-            className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-            title="View release notes on GitHub"
+            title="View release on GitHub"
           >
-            <ExternalLink className="w-3 h-3" /> GitHub
-          </button>
-          <button
-            onClick={check}
-            className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-          >
-            Check again
-          </button>
+            <ExternalLink className="w-3 h-3" />
+          </SettingsButton>
         </div>
 
         {showNotesModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4">
+            <div className="bg-white dark:bg-[#141518] rounded-xl max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl border border-neutral-200 dark:border-white/[0.09] overflow-hidden">
+              <div className="px-5 py-4 border-b border-neutral-200 dark:border-white/[0.08] flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-base">
+                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm">
                     {releaseName || `Nova Browser v${updateVersion}`}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Release Notes</p>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Release Notes</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowNotesModal(false)}
-                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/[0.08] text-neutral-500 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="p-4 overflow-y-auto flex-1 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
+              <div className="p-5 overflow-y-auto flex-1 text-xs text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap font-sans leading-relaxed">
                 {releaseNotes || 'No release notes provided.'}
               </div>
-              <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
-                <button
-                  onClick={() => setShowNotesModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer"
-                >
+              <div className="px-5 py-3 border-t border-neutral-200 dark:border-white/[0.08] bg-neutral-50 dark:bg-white/[0.02] flex justify-end gap-2">
+                <SettingsButton variant="ghost" onClick={() => setShowNotesModal(false)}>
                   Close
-                </button>
-                <button
+                </SettingsButton>
+                <SettingsButton
+                  variant="primary"
                   onClick={() => {
                     setShowNotesModal(false);
                     handleDownload();
                   }}
-                  className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium cursor-pointer flex items-center gap-1"
                 >
-                  <Download className="w-3.5 h-3.5" /> Download & Install
-                </button>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download &amp; Install</span>
+                </SettingsButton>
               </div>
             </div>
           </div>
@@ -325,19 +288,21 @@ export const UpdateWidget = () => {
 
   if (status === 'up-to-date') {
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
-          <Check className="w-4 h-4" /> Up to date (v{updateVersion || '?'})
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+          <Check className="w-3.5 h-3.5" /> Up to date
         </span>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent('open-changelog'))}
-          className="px-3 py-1.5 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg font-medium transition-colors cursor-pointer"
-        >
-          View Changelog
-        </button>
-        <button onClick={check} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer">
+        {!hideChangelogButton && (
+          <SettingsButton
+            variant="secondary"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-changelog'))}
+          >
+            Changelog
+          </SettingsButton>
+        )}
+        <SettingsButton variant="ghost" onClick={check}>
           Check again
-        </button>
+        </SettingsButton>
       </div>
     );
   }
@@ -345,35 +310,39 @@ export const UpdateWidget = () => {
   if (status === 'error') {
     const isZipError = errorMsg.includes('ZIP file not provided');
     return (
-      <div className="flex items-center gap-2.5">
-        <span className="text-xs text-red-500 max-w-[240px] truncate" title={errorMsg}>
-          {isZipError ? 'Update ready via GitHub' : `Failed: ${errorMsg.substring(0, 45)}`}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-red-600 dark:text-red-400 max-w-[200px] truncate" title={errorMsg}>
+          {isZipError ? 'Update ready via GitHub' : errorMsg.substring(0, 40)}
         </span>
-        <button
-          onClick={handleDownload}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
-        >
-          <Download className="w-3.5 h-3.5" /> Download
-        </button>
-        <button onClick={check} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-xs cursor-pointer">
-          Try Again
-        </button>
+        <SettingsButton variant="primary" onClick={handleDownload}>
+          <Download className="w-3.5 h-3.5" />
+          <span>Download</span>
+        </SettingsButton>
+        <SettingsButton variant="secondary" onClick={check}>
+          Retry
+        </SettingsButton>
       </div>
     );
   }
 
   return (
     <div className="flex items-center gap-2">
-      <button onClick={check} disabled={status === 'checking'} className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl font-medium transition-colors text-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer">
-        {status === 'checking' ? <div className="w-4 h-4 rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-        {status === 'checking' ? 'Checking...' : 'Check for Updates'}
-      </button>
-      <button
-        onClick={() => window.dispatchEvent(new CustomEvent('open-changelog'))}
-        className="px-3.5 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium transition-colors cursor-pointer"
-      >
-        View Changelog
-      </button>
+      <SettingsButton variant="secondary" onClick={check} disabled={status === 'checking'}>
+        {status === 'checking' ? (
+          <div className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+        ) : (
+          <RefreshCw className="w-3.5 h-3.5" />
+        )}
+        <span>{status === 'checking' ? 'Checking...' : 'Check for Updates'}</span>
+      </SettingsButton>
+      {!hideChangelogButton && (
+        <SettingsButton
+          variant="ghost"
+          onClick={() => window.dispatchEvent(new CustomEvent('open-changelog'))}
+        >
+          Changelog
+        </SettingsButton>
+      )}
     </div>
   );
 };

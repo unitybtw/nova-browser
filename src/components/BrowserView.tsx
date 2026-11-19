@@ -1201,19 +1201,18 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return (
       <div
         onClick={() => onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() })}
-        className="w-full h-full flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100 cursor-pointer relative overflow-hidden group"
+        className="w-full h-full flex flex-col items-center justify-center p-6 select-none bg-[#fbfbfc] dark:bg-[#0e0f12] text-neutral-900 dark:text-neutral-100 cursor-pointer relative overflow-hidden group"
       >
-        <div className="absolute inset-0 bg-slate-950/95" />
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
-          <div className="w-24 h-24 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl flex items-center justify-center mb-6 backdrop-blur-xl group-hover:scale-105 transition-transform duration-300">
+          <div className="w-16 h-16 rounded-2xl bg-white dark:bg-[#141518] border border-neutral-200/90 dark:border-white/[0.08] shadow-sm flex items-center justify-center mb-5">
             {tab.favicon ? (
-              <img src={tab.favicon} alt="" className="w-12 h-12 rounded-xl object-contain" />
+              <img src={tab.favicon} alt="" className="w-9 h-9 rounded-lg object-contain" />
             ) : (
-              <Moon className="w-10 h-10 text-cyan-400" />
+              <Moon className="w-7 h-7 text-neutral-500 dark:text-neutral-400" />
             )}
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">{tab.title || tab.url}</h2>
-          <p className="text-sm text-slate-400 mb-8 leading-relaxed">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-1.5 line-clamp-1">{tab.title || tab.url}</h2>
+          <p className="text-[13px] text-neutral-500 dark:text-neutral-400 mb-6 leading-relaxed">
             This tab was suspended to save memory. Click to wake it up instantly.
           </p>
           <button
@@ -1221,9 +1220,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               e.stopPropagation();
               onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
             }}
-            className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold text-sm transition-[background-color,transform,box-shadow] shadow-md shadow-cyan-950/50 flex items-center gap-2 group-hover:scale-[1.02] cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 font-medium text-xs transition-colors flex items-center gap-2 cursor-pointer"
           >
-            <Zap className="w-4 h-4" />
+            <Zap className="w-3.5 h-3.5" />
             Reload Tab
           </button>
         </div>
@@ -1395,7 +1394,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               }
             }}
             style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%' }}
-            className="absolute top-0 left-0 right-0 h-[2px] bg-cyan-500 z-50"
+            className="absolute top-0 left-0 right-0 h-[2px] bg-neutral-900 dark:bg-white z-50"
           />
         )}
       </AnimatePresence>
@@ -1523,16 +1522,16 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             top: Math.min((autofillMenu.rect?.bottom || 100) + 6, (typeof window !== 'undefined' ? window.innerHeight : 600) - 200),
             zIndex: 9999
           }}
-          className="w-64 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none text-xs"
+          className="w-64 bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl border border-neutral-200/90 dark:border-white/[0.1] rounded-xl shadow-2xl overflow-hidden select-none text-xs"
         >
-          <div className="px-3 py-2 bg-slate-800/80 border-b border-slate-700/50 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+          <div className="px-3 py-2 bg-[#fbfbfc] dark:bg-white/[0.03] border-b border-neutral-200/80 dark:border-white/[0.08] flex items-center justify-between text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
             <span className="flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-blue-400" />
+              <Key className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
               Saved Accounts ({autofillMenu.accounts.length})
             </span>
-            <span className="text-[10px] text-slate-500 font-mono truncate max-w-[100px]">{autofillMenu.hostname}</span>
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono truncate max-w-[100px]">{autofillMenu.hostname}</span>
           </div>
-          <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/60 p-1">
+          <div className="max-h-48 overflow-y-auto divide-y divide-neutral-100 dark:divide-white/[0.06] p-1">
             {autofillMenu.accounts.map((acc, i) => (
               <button
                 key={i}
@@ -1541,10 +1540,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   e.preventDefault();
                   handleSelectAutofill(acc, autofillMenu.origin, autofillMenu.hostname);
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/[0.06] text-neutral-800 dark:text-neutral-200 transition-colors flex flex-col gap-0.5 cursor-pointer"
               >
-                <span className="font-medium text-slate-100">{acc.username || 'Unnamed Account'}</span>
-                <span className="text-[10px] text-slate-400">Click to fill password</span>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">{acc.username || 'Unnamed Account'}</span>
+                <span className="text-[10px] text-neutral-500 dark:text-neutral-400">Click to fill password</span>
               </button>
             ))}
           </div>

@@ -254,8 +254,8 @@ export function getSearchBoxClasses(
     case 'solid':
       return {
         formClass: 'w-full relative group rounded-xl',
-        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-md border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25',
-        submitBtnClass: 'p-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer',
+        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-md border bg-white dark:bg-[#141518] border-neutral-200/90 dark:border-white/[0.1] text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:border-neutral-400 dark:focus:border-white/30',
+        submitBtnClass: 'p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 transition-colors cursor-pointer',
       };
     case 'minimal':
       return {
@@ -263,26 +263,26 @@ export function getSearchBoxClasses(
         inputClass: `w-full py-3.5 ps-11 pe-22 text-base rounded-none outline-none transition-colors duration-200 border-0 border-b-2 bg-transparent focus:ring-0 ${
           useDarkCanvasStyle
             ? 'border-white/30 text-white placeholder-white/55 focus:border-white'
-            : 'border-slate-300 text-slate-900 placeholder-slate-400 focus:border-slate-900'
+            : 'border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-neutral-900'
         }`,
         submitBtnClass: `p-2 rounded-lg bg-transparent transition-colors cursor-pointer ${
           useDarkCanvasStyle
             ? 'text-white/85 hover:text-white hover:bg-white/10'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-900/5'
+            : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-900/5'
         }`,
       };
     case 'pill':
       return {
         formClass: 'nova-newtab-glass w-full relative group rounded-full',
-        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-full outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25',
-        submitBtnClass: 'p-2 rounded-full bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer',
+        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-full outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-[#141518]/80 border-neutral-200/80 dark:border-white/[0.12] text-neutral-900 dark:text-white placeholder-neutral-400 focus:bg-white dark:focus:bg-[#141518]/95 focus:border-neutral-400 dark:focus:border-white/30',
+        submitBtnClass: 'p-2 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 transition-colors cursor-pointer',
       };
     case 'glass':
     default:
       return {
         formClass: 'nova-newtab-glass w-full relative group rounded-xl',
-        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25',
-        submitBtnClass: 'p-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer',
+        inputClass: 'w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-[#141518]/80 border-neutral-200/80 dark:border-white/[0.12] text-neutral-900 dark:text-white placeholder-neutral-400 focus:bg-white dark:focus:bg-[#141518]/95 focus:border-neutral-400 dark:focus:border-white/30',
+        submitBtnClass: 'p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 transition-colors cursor-pointer',
       };
   }
 }
@@ -569,16 +569,16 @@ const WidgetCustomizeFrame: React.FC<WidgetCustomizeFrameProps> = ({
       data-customize-widget={widgetId}
       className={`relative group/widget rounded-2xl p-1.5 px-2.5 transition-colors ring-1 ring-dashed ${
         useDarkCanvasStyle
-          ? 'ring-cyan-400/60 hover:ring-cyan-300 bg-slate-950/20'
-          : 'ring-accent/60 hover:ring-accent bg-white/45'
+          ? 'ring-white/35 hover:ring-white/60 bg-black/25'
+          : 'ring-neutral-400/70 hover:ring-neutral-600 bg-white/55'
       } ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
         <span
           className={`px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold text-[10px] pointer-events-none select-none shadow-xs shrink-0 ${
             useDarkCanvasStyle
-              ? 'bg-slate-900/90 text-cyan-300 border border-white/15'
-              : 'bg-white/95 text-slate-700 border border-slate-300/80'
+              ? 'bg-[#141518]/90 text-neutral-200 border border-white/15'
+              : 'bg-white/95 text-neutral-700 border border-neutral-300/80'
           }`}
         >
           {label}
@@ -1315,9 +1315,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="button"
                 onClick={onExitIncognito}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors duration-200 text-sm font-medium shadow-xs cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#141518] hover:bg-white/[0.08] text-neutral-200 hover:text-white border border-white/[0.1] hover:border-white/[0.18] transition-colors duration-200 text-sm font-medium shadow-xs cursor-pointer"
               >
-                <Compass className="w-4 h-4 text-cyan-400" />
+                <Compass className="w-4 h-4 text-neutral-300" />
                 <span>{language === 'tr' ? 'Normal Sekmeye Geç' : 'Switch to Normal Tab'}</span>
               </button>
             </motion.div>
@@ -1848,7 +1848,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             }
           >
           <form onSubmit={handleSearch} className={searchBoxClasses.formClass}>
-            <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
+            <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-neutral-400 group-focus-within:text-neutral-800 dark:group-focus-within:text-neutral-200 transition-colors">
               <Search className="w-5 h-5" />
             </div>
             <input
@@ -1899,7 +1899,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50 py-1.5 divide-y divide-slate-100 dark:divide-white/5"
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#141518] border border-neutral-200/90 dark:border-white/[0.1] rounded-xl shadow-xl overflow-hidden z-50 py-1.5 divide-y divide-neutral-100 dark:divide-white/[0.06]"
               >
                 {suggestions.map((s, idx) => (
                   <button
@@ -1913,12 +1913,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 text-start text-sm transition-colors cursor-pointer ${
                       idx === selectedIndex
-                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-s-2 border-cyan-500'
-                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 font-normal'
+                        ? 'bg-neutral-100 dark:bg-white/[0.08] text-neutral-950 dark:text-white font-medium'
+                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-white/[0.04] font-normal'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <Search className={`w-4 h-4 shrink-0 ${idx === selectedIndex ? 'text-cyan-500' : 'text-slate-400'}`} />
+                      <Search className={`w-4 h-4 shrink-0 ${idx === selectedIndex ? 'text-neutral-900 dark:text-white' : 'text-neutral-400'}`} />
                       <span className="truncate">{s}</span>
                     </div>
                     <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
@@ -2291,19 +2291,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             role="dialog"
             aria-modal="true"
             aria-labelledby="shortcut-modal-title"
-            className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200/90 dark:border-white/10 text-slate-900 dark:text-slate-100 select-auto outline-none"
+            className="bg-white dark:bg-[#141518] p-6 rounded-xl shadow-2xl w-full max-w-sm border border-neutral-200/90 dark:border-white/[0.1] text-neutral-900 dark:text-neutral-100 select-auto outline-none"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100 dark:border-white/10">
+            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-200/80 dark:border-white/[0.08]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                <div className="p-2 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] text-neutral-700 dark:text-neutral-300">
                   <Globe className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 id="shortcut-modal-title" className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                  <h3 id="shortcut-modal-title" className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-tight">
                     {editingDial.id !== null ? t('newtab.editShortcutTitle') : t('newtab.addShortcutTitle')}
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                     {editingDial.id !== null
                       ? (language === 'tr' ? 'Kısayol bilgilerini güncelleyin' : 'Update shortcut details')
                       : (language === 'tr' ? 'Hızlı erişim için yeni bir web sitesi ekleyin' : 'Add a new website for quick access')}
@@ -2314,30 +2314,30 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 type="button"
                 onClick={handleCloseEditModal}
                 aria-label={t('common.close')}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Live Visual Preview */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-white/10 mb-4 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center p-2 shadow-xs border border-slate-200/80 dark:border-white/10 shrink-0">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-[#fbfbfc] dark:bg-[#0e0f12] border border-neutral-200/80 dark:border-white/[0.08] mb-4 transition-colors">
+              <div className="w-10 h-10 rounded-lg bg-white dark:bg-[#141518] flex items-center justify-center p-2 shadow-xs border border-neutral-200/80 dark:border-white/[0.08] shrink-0">
                 {previewDomain || previewUrl ? (
                   <SpeedDialIcon name={previewName} url={previewUrl} domain={previewDomain} />
                 ) : (
-                  <Globe className="w-5 h-5 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                  <Globe className="w-5 h-5 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className={`text-xs font-semibold truncate ${
                   previewDomain || editingDial.name.trim()
-                    ? 'text-slate-900 dark:text-slate-100'
-                    : 'text-slate-400 dark:text-slate-500'
+                    ? 'text-neutral-900 dark:text-neutral-100'
+                    : 'text-neutral-400 dark:text-neutral-500'
                 }`}>
                   {previewName}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-mono mt-0.5">
+                <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate font-mono mt-0.5">
                   {previewDomain || (language === 'tr' ? 'Önizleme için URL girin' : 'Enter URL to preview')}
                 </div>
               </div>
@@ -2346,7 +2346,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             {/* Form Inputs */}
             <div className="space-y-3.5">
               <div>
-                <label htmlFor="shortcut-name-input" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                <label htmlFor="shortcut-name-input" className="text-xs font-medium text-neutral-700 dark:text-neutral-300 block mb-1.5">
                   {t('newtab.shortcutName')}
                 </label>
                 <input
@@ -2359,11 +2359,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder={language === 'tr' ? 'Örn. YouTube, GitHub...' : 'e.g. YouTube, GitHub...'}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20 transition-all"
+                  className="w-full px-3 py-2 bg-[#fbfbfc] dark:bg-[#0e0f12] border border-neutral-200/90 dark:border-white/[0.1] rounded-lg text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none focus:border-neutral-400 dark:focus:border-white/30 transition-colors"
                 />
               </div>
               <div>
-                <label htmlFor="shortcut-url-input" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                <label htmlFor="shortcut-url-input" className="text-xs font-medium text-neutral-700 dark:text-neutral-300 block mb-1.5">
                   {t('newtab.shortcutUrl')}
                 </label>
                 <input
@@ -2373,14 +2373,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   onChange={(e) => handleUrlChange(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder={language === 'tr' ? 'Örn. https://youtube.com veya youtube.com' : 'e.g. https://youtube.com or youtube.com'}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all ${
+                  className={`w-full px-3 py-2 bg-[#fbfbfc] dark:bg-[#0e0f12] border rounded-lg text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none transition-colors ${
                     urlError
-                      ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                      : 'border-slate-200 dark:border-slate-700/80 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20'
+                      ? 'border-red-500 focus:border-red-500'
+                      : 'border-neutral-200/90 dark:border-white/[0.1] focus:border-neutral-400 dark:focus:border-white/30'
                   }`}
                 />
                 {urlError && (
-                  <p className="text-xs text-rose-500 dark:text-rose-400 mt-1.5 flex items-center gap-1 font-medium">
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1 font-medium">
                     {urlError}
                   </p>
                 )}
@@ -2388,7 +2388,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
               {editingDial.id === null && (
                 <div className="pt-0.5">
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                  <div className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-1.5">
                     {language === 'tr' ? 'Hızlı öneriler:' : 'Quick suggestions:'}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -2404,7 +2404,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                           });
                           if (urlError) setUrlError('');
                         }}
-                        className="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
                       >
                         {preset.name}
                       </button>
@@ -2415,7 +2415,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             </div>
 
             {/* Footer Actions */}
-            <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-white/10">
+            <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-neutral-200/80 dark:border-white/[0.08]">
               {editingDial.id !== null ? (
                 <button
                   type="button"
@@ -2425,7 +2425,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                       handleCloseEditModal();
                     }
                   }}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>{t('common.delete')}</span>
@@ -2437,7 +2437,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <button
                   type="button"
                   onClick={handleCloseEditModal}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 border border-neutral-200/90 dark:border-white/[0.1] hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
                 >
                   {t('common.cancel')}
                 </button>
@@ -2445,10 +2445,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   type="button"
                   onClick={handleAddSpeedDial}
                   disabled={!editingDial.url.trim()}
-                  className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs ${
+                  className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
                     !editingDial.url.trim()
-                      ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
-                      : 'bg-accent hover:bg-accent-hover text-white cursor-pointer active:scale-[0.98]'
+                      ? 'bg-neutral-200 dark:bg-white/[0.06] text-neutral-400 dark:text-neutral-600 cursor-not-allowed'
+                      : 'bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 cursor-pointer'
                   }`}
                 >
                   {t('common.save')}

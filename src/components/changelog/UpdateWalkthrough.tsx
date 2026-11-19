@@ -1,31 +1,47 @@
-import { useId, useState } from 'react';
-import { Check, Download, RefreshCw, ArrowRight, Monitor } from 'lucide-react';
+import { useId } from 'react';
+import { ArrowUpRight } from 'lucide-react';
 import { useTranslation } from '../../services/i18n';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { UpdateWidget } from '../settings/UpdateWidget';
 
+/** Quiet canvas-level update control row anchored below the changelog ledger. */
 export function UpdateWalkthrough() {
   const { t } = useTranslation();
-  const [step, setStep] = useState(0);
   const titleId = useId();
-  const icons = [RefreshCw, Download, Check];
-  const Icon = icons[step];
-  return <section className="journal-updates" aria-labelledby={titleId}>
-    <div className="journal-update-intro"><h2 id={titleId}>{t('releaseJournal.updateTitle')}</h2><p>{t('releaseJournal.updateIntro')}</p></div>
-    <div className="journal-update-grid">
-      <div>
-        <div className="journal-step-tabs" role="group" aria-label={t('releaseJournal.walkthrough')}>
-          {icons.map((StepIcon, i) => <button key={i} aria-pressed={step === i} onClick={() => setStep(i)}><StepIcon size={17} />{t(`releaseJournal.step${i}Title`)}</button>)}
-        </div>
-        <div className="journal-step-detail">
-          <div className="journal-step-art" aria-hidden="true"><img src="./logo.svg" alt="" /><span><Icon size={26} /></span></div>
-          <div><h3>{t(`releaseJournal.step${step}Heading`)}</h3><p>{t(`releaseJournal.step${step}Body`)}</p><button className="journal-text-button" onClick={() => setStep((step + 1) % 3)}>{t('releaseJournal.nextStep')}<ArrowRight size={16} /></button></div>
-        </div>
-        <p className="journal-demo-note">{t('releaseJournal.illustration')}</p>
+  const canCheckUpdates = Boolean(getElectronAPI()?.checkForUpdates);
+
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="border-t border-neutral-200/70 dark:border-white/[0.07] py-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+    >
+      <div className="min-w-0">
+        <h2
+          id={titleId}
+          className="text-[14px] font-medium text-neutral-900 dark:text-neutral-100 tracking-[-0.01em]"
+        >
+          {t('releaseJournal.updateTitle')}
+        </h2>
+        <p className="text-[13px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
+          {t('releaseJournal.updateIntro')}
+        </p>
       </div>
-      <aside className="journal-update-live"><div className="journal-update-live-heading"><Monitor size={18} /><h3>{t('releaseJournal.thisDevice')}</h3></div>
-        {getElectronAPI()?.checkForUpdates ? <div className="journal-device-widget"><UpdateWidget /></div> : <><p>{t('releaseJournal.desktopOnly')}</p><a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noopener noreferrer">{t('changelog.githubReleases')}<ArrowRight size={16} /></a></>}
-      </aside>
-    </div>
-  </section>;
+
+      <div className="shrink-0 flex items-center">
+        {canCheckUpdates ? (
+          <UpdateWidget hideChangelogButton />
+        ) : (
+          <a
+            href="https://github.com/unitybtw/nova-browser/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[13px] font-medium text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white transition-colors"
+          >
+            <span>{t('changelog.githubReleases')}</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
+          </a>
+        )}
+      </div>
+    </section>
+  );
 }

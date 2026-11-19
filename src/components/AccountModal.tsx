@@ -181,43 +181,44 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs select-none"
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
           onClick={onClose}
         >
           <motion.div
             ref={containerRef}
             onClick={(e) => e.stopPropagation()}
             tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            initial={{ opacity: 0, scale: 0.98, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}
-            className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
+            exit={{ opacity: 0, scale: 0.98, y: 6 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className="w-full max-w-lg bg-white dark:bg-[#141518] rounded-xl shadow-2xl border border-neutral-200/90 dark:border-white/[0.1] overflow-hidden flex flex-col outline-none"
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50/80 dark:bg-slate-800/40">
+            <div className="px-5 py-4 border-b border-neutral-200/80 dark:border-white/[0.08] flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <Cloud className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] text-neutral-700 dark:text-neutral-200 flex items-center justify-center shrink-0">
+                  <Cloud className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-neutral-950 dark:text-neutral-100 flex items-center gap-2">
                     Nova Sync
                     {syncStatus.isLoggedIn && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
                         Active
                       </span>
                     )}
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     {syncStatus.isLoggedIn ? 'Your browser data is securely synced across devices' : 'Sign in with your Nova Cloud account to sync your browser data'}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-xl hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/[0.07] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -225,48 +226,46 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             </div>
 
             {/* Content Body */}
-            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* Alert Messages */}
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
               {errorMessage && (
-                <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span className="flex-1">{errorMessage}</span>
                 </div>
               )}
               {successMessage && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center gap-2">
                   <Check className="w-4 h-4 shrink-0" />
                   <span className="flex-1">{successMessage}</span>
                 </div>
               )}
 
               {syncStatus.isLoggedIn ? (
-                /* ACTIVE SYNC CHAIN VIEW */
-                <div className="space-y-5">
-                  {/* Sync Code Card - hidden until the pairing join flow exists */}
+                <div className="space-y-4">
                   {NovaSyncService.PAIRING_AVAILABLE && (
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-white/10 space-y-2.5">
+                  <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                        <Link2 className="w-4 h-4 text-cyan-500" />
+                      <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-neutral-500" />
                         Your Device Sync Code
                       </span>
-                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                      <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-500/12 border border-emerald-500/20 px-1.5 py-0.5 rounded-md">
                         Encrypted Sync
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                       Enter this code on your other laptop or computer to sync instantly:
                     </p>
 
-                    <div className="flex items-center gap-2 pt-1">
-                      <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-cyan-600 dark:text-cyan-400 select-all font-semibold truncate">
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <div className="flex-1 bg-white dark:bg-white/[0.05] border border-neutral-200/80 dark:border-white/[0.09] rounded-lg px-3 py-2 text-xs font-mono text-neutral-900 dark:text-neutral-100 select-all truncate">
                         {syncStatus.syncCode || generatedCode || 'Generating...'}
                       </div>
                       <button
+                        type="button"
                         onClick={() => handleCopyCode(syncStatus.syncCode || generatedCode || '')}
-                        className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                        className="px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
                       >
                         {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                         <span>{copiedCode ? 'Copied' : 'Copy'}</span>
@@ -276,29 +275,31 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   )}
 
                   {/* Sync Controls */}
-                  <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] flex items-center justify-between">
                     <div>
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+                      <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100 block">
                         Sync Status
                       </span>
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
                         Last sync: {formatLastSync(syncStatus.lastSyncedAt)}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={handleManualSync}
                         disabled={isManualSyncing || syncStatus.isSyncing}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-600 text-white transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing || syncStatus.isSyncing ? 'animate-spin' : ''}`} />
                         <span>{isManualSyncing || syncStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
                       </button>
 
                       <button
+                        type="button"
                         onClick={handleLeaveChain}
-                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                         title="Disconnect Sync"
                       >
                         <LogOut className="w-4 h-4" />
@@ -306,20 +307,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Synced Categories Checklist */}
+                  {/* Synced Categories */}
                   <div className="space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 px-0.5">
                       Synced Data
                     </span>
 
-                    <div className="space-y-1.5">
+                    <div className="rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] divide-y divide-neutral-200/80 dark:divide-white/[0.07] overflow-hidden">
                       {[
                         { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark },
                         { key: 'syncPasswords', label: 'Saved Passwords (Encrypted)', icon: Key },
                         { key: 'syncHistory', label: 'Browsing History', icon: Clock },
                         { key: 'syncSettings', label: 'Settings & Themes', icon: Settings },
                         { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree },
-                      ].map(item => {
+                      ].map((item) => {
                         const isEnabled = syncStatus.user?.syncPreferences[item.key as keyof SyncPreferences] ?? true;
                         const Icon = item.icon;
 
@@ -331,17 +332,15 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                             aria-checked={isEnabled}
                             aria-label={item.label}
                             onClick={() => handleTogglePreference(item.key as keyof SyncPreferences)}
-                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] hover:bg-slate-100/80 dark:hover:bg-white/[0.05] border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer text-left"
+                            className="w-full flex items-center justify-between px-3.5 py-2.5 hover:bg-neutral-100/70 dark:hover:bg-white/[0.03] transition-colors cursor-pointer text-left"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                                <Icon className="w-4 h-4" />
-                              </div>
-                              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{item.label}</span>
+                            <div className="flex items-center gap-2.5">
+                              <Icon className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+                              <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{item.label}</span>
                             </div>
 
-                            <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isEnabled ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
-                              <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                            <div className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEnabled ? 'bg-neutral-900 dark:bg-white' : 'bg-neutral-200 dark:bg-white/[0.14]'}`}>
+                              <div className={`h-3.5 w-3.5 rounded-full shadow-xs transition-transform duration-150 ${isEnabled ? 'translate-x-[18px] bg-white dark:bg-neutral-950' : 'translate-x-[3px] bg-white dark:bg-neutral-200'}`} />
                             </div>
                           </button>
                         );
@@ -350,33 +349,29 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   </div>
                 </div>
               ) : NovaSyncService.PAIRING_AVAILABLE ? (
-                /* PAIRING SETUP (NO EMAIL / NO PASSWORD NEEDED) */
-                <div className="space-y-5">
-                  {/* Option 1: Enter Code from another device */}
-                  <form onSubmit={handleJoinChain} className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-3.5">
+                <div className="space-y-4">
+                  <form onSubmit={handleJoinChain} className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] space-y-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                        <Laptop className="w-4 h-4" />
-                      </div>
+                      <Laptop className="w-4 h-4 text-neutral-500" />
                       <div>
-                        <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">I have a Sync Code</h3>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Enter the code from your other device to connect instantly:</p>
+                        <h3 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">I have a Sync Code</h3>
+                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Enter the code from your other device to connect instantly:</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2">
                       <input
                         type="text"
                         required
                         value={inputSyncCode}
                         onChange={(e) => setInputSyncCode(e.target.value)}
                         placeholder="nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx"
-                        className="flex-1 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
+                        className="flex-1 bg-white dark:bg-white/[0.06] border border-neutral-200/90 dark:border-white/[0.09] rounded-lg px-3 py-2 text-xs text-neutral-900 dark:text-neutral-100 outline-none focus:border-neutral-400 dark:focus:border-white/30 font-mono"
                       />
                       <button
                         type="submit"
                         disabled={isLoading || !inputSyncCode.trim()}
-                        className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
+                        className="px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 rounded-lg text-xs font-medium transition-colors disabled:opacity-45 cursor-pointer flex items-center gap-1.5 shrink-0"
                       >
                         <span>Connect</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -384,27 +379,25 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     </div>
                   </form>
 
-                  {/* Option 2: Generate Code on this device */}
-                  <div className="p-5 rounded-xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-3.5">
+                  <div className="p-4 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] space-y-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                        <Key className="w-4 h-4" />
-                      </div>
+                      <Key className="w-4 h-4 text-neutral-500" />
                       <div>
-                        <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">This is my primary device</h3>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Generate a pairing code to link other laptops or desktops:</p>
+                        <h3 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">This is my primary device</h3>
+                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Generate a pairing code to link other laptops or desktops:</p>
                       </div>
                     </div>
 
                     {generatedCode ? (
-                      <div className="space-y-2 pt-1">
+                      <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-cyan-600 dark:text-cyan-400 select-all truncate font-semibold">
+                          <div className="flex-1 bg-white dark:bg-white/[0.05] border border-neutral-200/80 dark:border-white/[0.09] rounded-lg px-3 py-2 text-xs font-mono text-neutral-900 dark:text-neutral-100 select-all truncate">
                             {generatedCode}
                           </div>
                           <button
+                            type="button"
                             onClick={() => handleCopyCode(generatedCode)}
-                            className="px-3.5 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                            className="px-3 py-2 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
                           >
                             {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                             <span>{copiedCode ? 'Copied' : 'Copy'}</span>
@@ -419,35 +412,34 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         type="button"
                         onClick={handleGenerateCode}
                         disabled={isLoading}
-                        className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                        className="w-full py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 font-medium text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <Key className="w-3.5 h-3.5 text-cyan-400 dark:text-cyan-600" />
+                        <Key className="w-3.5 h-3.5" />
                         <span>Generate Sync Code</span>
                       </button>
                     )}
                   </div>
 
-                  {/* Security Note */}
-                  <div className="p-3.5 rounded-2xl bg-cyan-500/5 border border-cyan-500/15 flex items-start gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                      <strong className="font-semibold text-cyan-600 dark:text-cyan-400">Encrypted sync:</strong> Cloud sign-in uses email and password. Sync data is encrypted before upload; the authentication provider remains part of the trust boundary.
+                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] flex items-start gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                      <strong className="font-semibold text-neutral-900 dark:text-neutral-100">Encrypted sync:</strong> Cloud sign-in uses email and password. Sync data is encrypted before upload; the authentication provider remains part of the trust boundary.
                     </p>
                   </div>
                 </div>
               ) : (
                 /* Pairing is not built yet: say so instead of offering a code
                    that can never be redeemed. */
-                <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-2.5 text-center">
+                <div className="p-6 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] space-y-2.5 text-center">
                   <div className="flex justify-center">
-                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                    <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] text-neutral-500 dark:text-neutral-400 flex items-center justify-center">
                       <Laptop className="w-4 h-4" />
                     </div>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  <h4 className="text-sm font-semibold text-neutral-950 dark:text-neutral-100">
                     Sign in to sync this browser
                   </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-sm mx-auto">
                     Your bookmarks, history, tabs and workspaces sync through your Nova Cloud
                     account. Pairing a second device with a sync code is not available yet.
                   </p>
@@ -455,7 +447,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               )}
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

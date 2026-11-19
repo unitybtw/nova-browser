@@ -117,21 +117,21 @@ export const UpdateToast: React.FC = React.memo(() => {
           initial={{ opacity: 0, y: 50, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          transition={{ type: 'spring', damping: 22, stiffness: 320 }}
-          className="fixed bottom-6 right-6 z-[9999] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 p-4 rounded-2xl shadow-2xl flex items-start gap-3.5 max-w-sm w-full"
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="fixed bottom-5 right-5 z-[9999] bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl border border-neutral-200/90 dark:border-white/[0.1] p-3.5 rounded-xl shadow-2xl flex items-start gap-3 max-w-sm w-full"
         >
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 dark:bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] flex items-center justify-center shrink-0">
             {isDownloading || isInstalling ? (
-              <RefreshCw className="w-5 h-5 text-cyan-600 dark:text-cyan-400 animate-spin" />
+              <RefreshCw className="w-4 h-4 text-neutral-700 dark:text-neutral-200 animate-spin" />
             ) : error ? (
-              <AlertCircle className="w-5 h-5 text-rose-500" />
+              <AlertCircle className="w-4 h-4 text-red-500" />
             ) : (
-              <ArrowUpCircle className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+              <ArrowUpCircle className="w-4 h-4 text-neutral-700 dark:text-neutral-200" />
             )}
           </div>
 
           <div className="flex-1 pt-0.5 min-w-0">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-0.5 truncate">
+            <h3 className="text-xs font-semibold text-neutral-950 dark:text-neutral-100 mb-0.5 truncate">
               {isDownloaded
                 ? 'Update Ready to Install'
                 : isDownloading
@@ -140,7 +140,7 @@ export const UpdateToast: React.FC = React.memo(() => {
                 ? 'Update Warning'
                 : 'Update Available'}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5 leading-relaxed">
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-2.5 leading-relaxed">
               {error
                 ? error
                 : isDownloaded
@@ -151,14 +151,14 @@ export const UpdateToast: React.FC = React.memo(() => {
             </p>
 
             {isDownloading && downloadProgress && (
-              <div className="mb-3 space-y-1.5">
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div className="mb-2.5 space-y-1">
+                <div className="w-full bg-neutral-200 dark:bg-white/[0.1] h-1 rounded-full overflow-hidden">
                   <div
-                    className="bg-cyan-500 h-full rounded-full transition-all duration-300"
+                    className="bg-neutral-900 dark:bg-white h-full rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(100, Math.max(0, downloadProgress.percent))}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <div className="flex justify-between text-[10px] text-neutral-500 dark:text-neutral-400 font-mono tabular-nums">
                   <span>{Math.round(downloadProgress.percent)}%</span>
                   {downloadProgress.total > 0 && (
                     <span>
@@ -173,9 +173,10 @@ export const UpdateToast: React.FC = React.memo(() => {
             <div className="flex items-center gap-2">
               {isDownloaded ? (
                 <button
+                  type="button"
                   onClick={handleInstall}
                   disabled={isInstalling}
-                  className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 disabled:opacity-50 text-white dark:text-neutral-950 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   {isInstalling ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -186,16 +187,18 @@ export const UpdateToast: React.FC = React.memo(() => {
                 </button>
               ) : !isDownloading ? (
                 <button
+                  type="button"
                   onClick={handleDownload}
-                  className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" /> Download & Install
                 </button>
               ) : null}
 
               <button
+                type="button"
                 onClick={() => setIsVisible(false)}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors"
+                className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-neutral-200/80 dark:border-white/[0.08] text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
               >
                 Dismiss
               </button>
@@ -203,8 +206,9 @@ export const UpdateToast: React.FC = React.memo(() => {
           </div>
 
           <button
+            type="button"
             onClick={() => setIsVisible(false)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-md transition-colors"
+            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded-md transition-colors cursor-pointer"
             title="Dismiss"
           >
             <X className="w-3.5 h-3.5" />

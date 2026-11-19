@@ -141,6 +141,7 @@ export interface ElectronAPI {
     arch: string;
   } | null>;
   getChangelogReleases: (forceRefresh?: boolean) => Promise<any[] | null>;
+  onChangelogReleasesUpdated?: (callback: (event: null, releases: any[]) => void) => () => void;
   checkForUpdates: () => Promise<{ success: boolean; version?: string; error?: string }>;
   getUpdateInfo: () => Promise<ElectronUpdateInfo | null>;
   downloadUpdate: (url?: string) => Promise<{ success: boolean; filePath?: string; version?: string; error?: string }>;

@@ -59,65 +59,67 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
           initial={{ opacity: 0, y: -6, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute top-full right-0 mt-2.5 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/15 shadow-xl select-none overflow-hidden z-[99999]"
+          transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute top-full right-0 mt-2 w-80 rounded-xl bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl border border-neutral-200/90 dark:border-white/[0.1] shadow-2xl select-none overflow-hidden z-[99999]"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/5">
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-neutral-200/80 dark:border-white/[0.08]">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
-                <Languages className="w-3.5 h-3.5" />
-              </div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+              <Languages className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+              <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 tracking-[-0.01em]">
                 Page Translation
               </span>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="p-1 rounded-md hover:bg-neutral-100 dark:hover:bg-white/[0.07] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Content Body */}
-          <div className="p-4 space-y-3.5">
+          <div className="p-3.5 space-y-3">
             {/* Language Direction Row */}
-            <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5">
+            <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-neutral-100/80 dark:bg-white/[0.04] border border-neutral-200/80 dark:border-white/[0.07]">
               <div className="flex items-center gap-1.5 min-w-0">
-                <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">
+                <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300 truncate">
                   {sourceLangObj ? sourceLangObj.name : (currentSourceLang === 'auto' ? 'Auto Detect' : currentSourceLang.toUpperCase())}
                 </span>
               </div>
 
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <ArrowRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
 
               {/* Target Language Dropdown Selector */}
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs font-semibold text-cyan-600 dark:text-cyan-400 shadow-xs hover:border-cyan-500 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-[#141518] border border-neutral-200/90 dark:border-white/[0.1] text-xs font-medium text-neutral-900 dark:text-neutral-100 hover:border-neutral-400 dark:hover:border-white/25 transition-colors cursor-pointer"
                 >
                   <span>{currentLangObj.name}</span>
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 max-h-52 overflow-y-auto rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/15 shadow-xl z-50 py-1 scrollbar-thin">
+                  <div className="absolute right-0 top-full mt-1.5 w-44 max-h-52 overflow-y-auto rounded-xl bg-white dark:bg-[#16171b] border border-neutral-200/90 dark:border-white/[0.1] shadow-2xl z-50 p-1 scrollbar-thin">
                     {SUPPORTED_LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
+                        type="button"
                         onClick={() => {
                           setSelectedTargetLang(lang.code);
                           setIsDropdownOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 dark:hover:bg-white/10 transition-colors ${
-                          lang.code === selectedTargetLang ? 'text-cyan-600 dark:text-cyan-400 font-semibold bg-cyan-500/10' : 'text-slate-700 dark:text-slate-200'
+                        className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                          lang.code === selectedTargetLang
+                            ? 'text-neutral-950 dark:text-white font-semibold bg-neutral-100 dark:bg-white/[0.08]'
+                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100/70 dark:hover:bg-white/[0.05]'
                         }`}
                       >
                         <span>{lang.name} ({lang.nativeName})</span>
-                        {lang.code === selectedTargetLang && <Check className="w-3 h-3 text-cyan-500 shrink-0" />}
+                        {lang.code === selectedTargetLang && <Check className="w-3 h-3 shrink-0" />}
                       </button>
                     ))}
                   </div>
@@ -125,23 +127,20 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
               </div>
             </div>
 
-            {/* Error Message if any */}
             {error && (
-              <div className="text-[11px] text-red-500 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl">
+              <div className="text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">
                 {error}
               </div>
             )}
 
-            {/* Status Information */}
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-1">
-              <span>Status:</span>
-              <span className={`font-semibold ${isTranslated ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'}`}>
+            <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 px-0.5">
+              <span>Status</span>
+              <span className={`font-medium ${isTranslated ? 'text-emerald-600 dark:text-emerald-400' : 'text-neutral-700 dark:text-neutral-300'}`}>
                 {isLoading ? 'Translating...' : isTranslated ? `Translated to ${currentLangObj.name}` : 'Original page'}
               </span>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               {isTranslated && (
                 <button
                   type="button"
@@ -149,9 +148,9 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
                   onClick={async () => {
                     await onRestoreOriginal();
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-neutral-200/80 dark:border-white/[0.08] bg-neutral-100 hover:bg-neutral-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-neutral-800 dark:text-neutral-200 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  <RotateCcw className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                  <RotateCcw className="w-3 h-3" />
                   <span>Show Original</span>
                 </button>
               )}
@@ -162,11 +161,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
                 onClick={async () => {
                   await onTranslate(selectedTargetLang, currentSourceLang);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
-                  isLoading
-                    ? 'bg-cyan-600/70'
-                    : 'bg-cyan-600 hover:bg-cyan-500'
-                }`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {isLoading ? (
                   <>

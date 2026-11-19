@@ -204,27 +204,30 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
           className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
         >
           <div
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
             onClick={onClose}
           />
 
           <motion.div
             ref={containerRef}
-            initial={{ opacity: 0, scale: 0.96, y: -10 }}
+            initial={{ opacity: 0, scale: 0.98, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -10 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-            className={`relative w-full max-w-2xl rounded-xl shadow-xl border overflow-hidden outline-none transition-colors duration-200 ${
-              isAIMode
-                ? 'bg-slate-900 border-cyan-500/40'
-                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-white/10'
-            }`}
+            exit={{ opacity: 0, scale: 0.98, y: -6 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
+            className="relative w-full max-w-xl rounded-xl shadow-2xl border overflow-hidden outline-none bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl border-neutral-200/90 dark:border-white/[0.1]"
             tabIndex={-1}
           >
-            <form onSubmit={handleSubmit} className={`flex items-center gap-3 px-5 py-4 border-b transition-colors ${
-              isAIMode ? 'border-cyan-500/20 bg-cyan-950/20' : 'border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/30'
-            }`}>
-              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-cyan-400' : 'text-slate-400 dark:text-slate-500'}`} />
+            <form
+              onSubmit={handleSubmit}
+              className="flex items-center gap-3 px-4 py-3.5 border-b border-neutral-200/80 dark:border-white/[0.08]"
+            >
+              {isAIMode ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shrink-0">
+                  AI
+                </span>
+              ) : (
+                <Search className="w-4 h-4 text-neutral-400 dark:text-neutral-500 shrink-0" />
+              )}
               <input
                 ref={inputRef}
                 type="text"
@@ -249,11 +252,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                   }
                 }}
                 placeholder={isAIMode ? t('nav.aiPlaceholder') : t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
-                className={`flex-1 bg-transparent border-none outline-none text-base font-sans transition-colors duration-200 ${
-                  isAIMode
-                    ? 'text-cyan-100 placeholder-cyan-400/70'
-                    : 'text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500'
-                }`}
+                className="flex-1 bg-transparent border-none outline-none text-sm font-sans text-neutral-950 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
                 autoFocus
               />
               {inputValue.length > 0 && (
@@ -263,28 +262,28 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     setInputValue('');
                     inputRef.current?.focus();
                   }}
-                  className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
-              <div className="flex gap-1.5 items-center">
-                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
+              <div className="flex gap-1 items-center">
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-white/[0.07] border border-neutral-200/80 dark:border-white/[0.08]">
                   ESC
                 </kbd>
-                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
-                  ↵ Enter
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-white/[0.07] border border-neutral-200/80 dark:border-white/[0.08]">
+                  ↵
                 </kbd>
               </div>
             </form>
 
-            <div className="max-h-[50vh] overflow-y-auto p-2 no-scrollbar">
+            <div className="max-h-[50vh] overflow-y-auto p-1.5 no-scrollbar">
               {items.length === 0 ? (
-                <div className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                <div className="p-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
                   Press Enter to search with {getSearchEngineName(searchEngine)}
                 </div>
               ) : (
-                <div className="space-y-1" role="listbox" aria-label="Omnibox results">
+                <div className="space-y-0.5" role="listbox" aria-label="Omnibox results">
                   {items.map((item, idx) => {
                     const isSelected = selectedIndex === idx;
 
@@ -297,13 +296,13 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                           ref={el => { itemRefs.current[idx] = el; }}
                           onMouseEnter={() => setSelectedIndex(idx)}
                           onClick={() => executeItem(item)}
-                          className={`group flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
+                          className={`group flex items-center justify-between py-2 px-2.5 rounded-lg cursor-pointer transition-colors ${
                             isSelected
-                              ? 'bg-cyan-500/15 text-cyan-900 dark:text-cyan-200 border border-cyan-500/30'
-                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/6'
+                              ? 'bg-neutral-100 dark:bg-white/[0.09] text-neutral-950 dark:text-white'
+                              : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100/70 dark:hover:bg-white/[0.05]'
                           }`}
                         >
-                          <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                          <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
                             {item.tab.favicon && !failedFavicons.has(item.tab.id) ? (
                               <img
                                 src={item.tab.favicon}
@@ -312,12 +311,12 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                                 onError={() => setFailedFavicons(prev => new Set(prev).add(item.tab.id))}
                               />
                             ) : (
-                              <Globe className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
+                              <Globe className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-neutral-700 dark:text-neutral-200' : 'text-neutral-400 dark:text-neutral-500'}`} />
                             )}
-                            <span className="truncate text-sm font-medium">{item.tab.title || item.tab.url || 'Tab'}</span>
+                            <span className="truncate text-[13px] font-medium">{item.tab.title || item.tab.url || 'Tab'}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                            <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-neutral-100 dark:bg-white/[0.07] text-neutral-500 dark:text-neutral-400 border border-neutral-200/80 dark:border-white/[0.08]">
                               Switch
                             </span>
                             {tabs.length > 1 && (
@@ -327,10 +326,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                                   e.stopPropagation();
                                   onCloseTab(item.tab.id);
                                 }}
-                                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                                className="p-1 rounded-md text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer"
                                 title="Close Tab"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
                             )}
                           </div>
@@ -346,17 +345,17 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                         ref={el => { itemRefs.current[idx] = el; }}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         onClick={() => executeItem(item)}
-                        className={`flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
+                        className={`flex items-center justify-between py-2 px-2.5 rounded-lg cursor-pointer transition-colors ${
                           isSelected
-                            ? 'bg-cyan-500/15 text-cyan-900 dark:text-cyan-200 border border-cyan-500/30'
-                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/6'
+                            ? 'bg-neutral-100 dark:bg-white/[0.09] text-neutral-950 dark:text-white'
+                            : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100/70 dark:hover:bg-white/[0.05]'
                         }`}
                       >
-                        <div className="flex items-center gap-3 overflow-hidden min-w-0">
-                          <Search className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
-                          <span className="truncate text-sm font-medium">{item.text}</span>
+                        <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+                          <Search className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-neutral-700 dark:text-neutral-200' : 'text-neutral-400 dark:text-neutral-500'}`} />
+                          <span className="truncate text-[13px] font-medium">{item.text}</span>
                         </div>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 ml-2">
+                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0 ml-2">
                           Search
                         </span>
                       </div>

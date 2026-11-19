@@ -541,13 +541,19 @@ async function main() {
     'DesignStudioDrawer must start below TopBar controls'
   );
   assert.ok(
-    drawer!.className.includes('bottom-[72px]'),
-    'DesignStudioDrawer must leave bottom clearance for CustomizeTopBanner'
+    drawer!.className.includes('bottom-0'),
+    'DesignStudioDrawer must dock flush to the bottom edge with its integrated sticky footer'
   );
   assert.ok(
     drawer!.className.includes('slide-in-from-right-4'),
     'DesignStudioDrawer must use explicit Tailwind slide-in class'
   );
+  const studioFooter = drawer!.querySelector('[data-studio-footer="true"]');
+  assert.ok(studioFooter, 'DesignStudioDrawer must include an integrated sticky footer');
+  assert.ok(studioFooter!.querySelector('[data-action="undo"]'), 'Footer must include Undo');
+  assert.ok(studioFooter!.querySelector('[data-action="reset"]'), 'Footer must include Reset');
+  assert.ok(studioFooter!.querySelector('[data-action="cancel"]'), 'Footer must include Cancel');
+  assert.ok(studioFooter!.querySelector('[data-action="save"]'), 'Footer must include Save');
 
   // Check 4 tab buttons exist (Themes, Layout, Style, New Tab)
   const tabButtons = drawer!.querySelectorAll('[data-studio-tab]');
@@ -652,7 +658,7 @@ async function main() {
   const surfacePresets = drawer!.querySelectorAll('[data-surface-preset]');
   assert.strictEqual(surfacePresets.length, 4, 'All 4 quick surface presets must be rendered in Style tab');
   assert.ok(
-    drawer!.className.includes('bg-white/95') && drawer!.className.includes('dark:bg-slate-900/95'),
+    drawer!.className.includes('bg-white/95') && drawer!.className.includes('dark:bg-[#111214]/96'),
     'DesignStudioDrawer must adapt cleanly to both light and dark themes'
   );
 

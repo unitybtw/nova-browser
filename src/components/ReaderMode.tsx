@@ -934,40 +934,44 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           `}</style>
 
           {/* Header Bar */}
-          <div className={`sticky top-0 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/10 bg-slate-950/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f6f0e2]/90' : 'border-black/5 bg-white/90'}`}>
+          <div className={`sticky top-0 px-4 py-2.5 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/[0.08] bg-[#0e0f12]/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f6f0e2]/90' : 'border-neutral-200/80 bg-white/90'}`}>
             <div className="flex items-center gap-2 no-drag">
               {isMac && <div className="w-[68px] shrink-0" />}
               <button
+                type="button"
                 onClick={onClose}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-colors text-sm font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/[0.08] text-neutral-200' : 'hover:bg-black/5 text-neutral-800'}`}
               >
-                <ArrowLeft className="w-4 h-4" /> Close
+                <ArrowLeft className="w-3.5 h-3.5" /> Close
               </button>
             </div>
 
             <div className="relative flex items-center gap-1.5 no-drag" ref={controlsRef}>
               {/* Audio Read Aloud Quick Button */}
-              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 mr-1 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+              <div className={`flex items-center gap-1 rounded-lg px-2 py-1 mr-1 no-drag border ${theme === 'dark' ? 'bg-white/[0.06] border-white/[0.08]' : 'bg-black/[0.04] border-black/[0.06]'}`}>
                 <button
+                  type="button"
                   onClick={toggleSpeech}
-                  className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                  title={isPlaying ? "Pause" : "Read Aloud with Natural Voice"}
+                  className={`p-1 rounded-md transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/[0.1] text-neutral-100' : 'hover:bg-black/10 text-neutral-900'}`}
+                  title={isPlaying ? 'Pause' : 'Read Aloud with Natural Voice'}
                 >
-                  {isPlaying ? <Pause className="w-4 h-4 text-cyan-400" /> : <Play className="w-4 h-4 ml-0.5 text-cyan-400" />}
+                  {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
                 </button>
                 {(isPlaying || isPaused) && (
                   <button
+                    type="button"
                     onClick={stopSpeech}
-                    className={`p-1.5 rounded-full transition-colors text-red-400 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                    className={`p-1 rounded-md transition-colors text-red-500 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/[0.1]' : 'hover:bg-black/10'}`}
                     title="Stop"
                   >
-                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <Square className="w-3 h-3 fill-current" />
                   </button>
                 )}
-                <div className={`h-4 w-px mx-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
+                <div className={`h-3.5 w-px mx-0.5 ${theme === 'dark' ? 'bg-white/[0.12]' : 'bg-black/15'}`} />
                 <button
+                  type="button"
                   onClick={changeSpeechRate}
-                  className={`flex items-center gap-1 p-1 rounded-full transition-colors text-xs font-bold w-10 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20 text-cyan-400' : 'hover:bg-black/10 text-cyan-600'}`}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors text-[11px] font-mono font-semibold w-9 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/[0.1] text-neutral-200' : 'hover:bg-black/10 text-neutral-800'}`}
                   title="Reading Speed"
                 >
                   {speechRate}x
@@ -975,65 +979,124 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
               </div>
 
               <button
+                type="button"
                 onClick={() => setShowControls(!showControls)}
-                className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-cyan-500 text-slate-950' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
+                className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
+                  showControls
+                    ? theme === 'dark'
+                      ? 'bg-white text-neutral-950'
+                      : 'bg-neutral-900 text-white'
+                    : theme === 'dark'
+                    ? 'hover:bg-white/[0.08] text-neutral-200'
+                    : 'hover:bg-black/5 text-neutral-800'
+                }`}
                 title="Appearance & Voice Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
 
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-900 border-white/10 shadow-black/50 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-800/20 text-[#4a3928]' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full right-0 mt-2 p-4 rounded-xl shadow-2xl border flex flex-col gap-4 min-w-[300px] z-[100] no-drag ${theme === 'dark' ? 'bg-[#141518] border-white/[0.1] text-neutral-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-900/15 text-[#4a3928]' : 'bg-white border-neutral-200/90 text-neutral-900'}`}>
                   {/* Theme */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Theme</div>
+                    <div className="text-[10px] font-semibold opacity-55 mb-2 tracking-wider uppercase">Theme</div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleThemeChange('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5"/></button>
-                      <button onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
-                      <button onClick={() => handleThemeChange('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-700'} bg-slate-950 text-white hover:scale-105`} title="Dark OLED Theme"><Moon className="w-5 h-5"/></button>
+                      <button type="button" onClick={() => handleThemeChange('light')} className={`flex-1 p-2 rounded-lg border transition-colors no-drag cursor-pointer flex items-center justify-center ${theme === 'light' ? 'border-neutral-900 ring-1 ring-neutral-900' : 'border-neutral-200'} bg-white text-neutral-900`} title="Light Theme"><Sun className="w-4 h-4" /></button>
+                      <button type="button" onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2 rounded-lg border transition-colors no-drag cursor-pointer flex items-center justify-center ${theme === 'sepia' ? 'border-amber-700 ring-1 ring-amber-700' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-base`} title="Sepia Theme">A</button>
+                      <button type="button" onClick={() => handleThemeChange('dark')} className={`flex-1 p-2 rounded-lg border transition-colors no-drag cursor-pointer flex items-center justify-center ${theme === 'dark' ? 'border-white ring-1 ring-white' : 'border-neutral-700'} bg-[#0e0f12] text-white`} title="Dark OLED Theme"><Moon className="w-4 h-4" /></button>
                     </div>
                   </div>
 
                   {/* Font */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Typeface</div>
+                    <div className="text-[10px] font-semibold opacity-55 mb-2 tracking-wider uppercase">Typeface</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => handleFontChange('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
-                      <button onClick={() => handleFontChange('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
-                      <button onClick={() => handleFontChange('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Mono</button>
+                      {(['sans', 'serif', 'mono'] as const).map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => handleFontChange(f)}
+                          className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-colors no-drag cursor-pointer ${
+                            f === 'sans' ? 'font-sans' : f === 'serif' ? 'font-serif' : 'font-mono'
+                          } ${
+                            font === f
+                              ? theme === 'dark'
+                                ? 'bg-white text-neutral-950 border-transparent font-medium'
+                                : 'bg-neutral-900 text-white border-transparent font-medium'
+                              : theme === 'dark'
+                              ? 'border-white/[0.1] hover:bg-white/[0.06]'
+                              : 'border-neutral-200 hover:bg-neutral-100'
+                          }`}
+                        >
+                          {f === 'sans' ? 'Modern' : f === 'serif' ? 'Classic' : 'Mono'}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   {/* Font Size */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Text Size</div>
-                    <div className="flex gap-2 items-center">
-                      <button onClick={() => handleFontSizeChange('sm')} className={`flex-1 py-1.5 rounded-lg border text-xs transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
-                      <button onClick={() => handleFontSizeChange('md')} className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
-                      <button onClick={() => handleFontSizeChange('lg')} className={`flex-1 py-1.5 rounded-lg border text-base font-bold transition-all no-drag cursor-pointer ${fontSize==='lg' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
+                    <div className="text-[10px] font-semibold opacity-55 mb-2 tracking-wider uppercase">Text Size</div>
+                    <div className="flex gap-1.5 items-center">
+                      {([
+                        { id: 'sm', label: 'A-', cls: 'text-xs' },
+                        { id: 'md', label: 'A', cls: 'text-sm font-medium' },
+                        { id: 'lg', label: 'A+', cls: 'text-base font-semibold' },
+                      ] as const).map((sz) => (
+                        <button
+                          key={sz.id}
+                          type="button"
+                          onClick={() => handleFontSizeChange(sz.id)}
+                          className={`flex-1 py-1.5 rounded-lg border transition-colors no-drag cursor-pointer ${sz.cls} ${
+                            fontSize === sz.id
+                              ? theme === 'dark'
+                                ? 'bg-white text-neutral-950 border-transparent'
+                                : 'bg-neutral-900 text-white border-transparent'
+                              : theme === 'dark'
+                              ? 'border-white/[0.1] hover:bg-white/[0.06]'
+                              : 'border-neutral-200 hover:bg-neutral-100'
+                          }`}
+                        >
+                          {sz.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   {/* Column Width */}
                   <div>
-                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Column Width</div>
+                    <div className="text-[10px] font-semibold opacity-55 mb-2 tracking-wider uppercase">Column Width</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => handleColumnWidthChange('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Narrow</button>
-                      <button onClick={() => handleColumnWidthChange('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Normal</button>
-                      <button onClick={() => handleColumnWidthChange('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Wide</button>
+                      {(['narrow', 'normal', 'wide'] as const).map((cw) => (
+                        <button
+                          key={cw}
+                          type="button"
+                          onClick={() => handleColumnWidthChange(cw)}
+                          className={`flex-1 py-1.5 px-2 rounded-lg border text-xs capitalize transition-colors no-drag cursor-pointer ${
+                            columnWidth === cw
+                              ? theme === 'dark'
+                                ? 'bg-white text-neutral-950 border-transparent font-medium'
+                                : 'bg-neutral-900 text-white border-transparent font-medium'
+                              : theme === 'dark'
+                              ? 'border-white/[0.1] hover:bg-white/[0.06]'
+                              : 'border-neutral-200 hover:bg-neutral-100'
+                          }`}
+                        >
+                          {cw}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   {/* Natural Voice & Language Settings */}
-                  <div className="border-t pt-4 border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
-                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Natural Voice & Audio Settings
+                  <div className={`border-t pt-3.5 ${theme === 'dark' ? 'border-white/[0.08]' : 'border-neutral-200/80'}`}>
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold opacity-55 mb-2.5 tracking-wider uppercase">
+                      <Volume2 className="w-3.5 h-3.5" /> Natural Voice & Audio
                     </div>
 
-                    <div className="space-y-2.5">
-                      {/* Language Selection */}
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <span className="text-xs font-medium opacity-75 flex items-center gap-1">
                           <Globe className="w-3 h-3" /> Language
                         </span>
                         <select
@@ -1042,8 +1105,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                             setSelectedLanguage(e.target.value as any);
                             setSelectedVoiceName('');
                           }}
-                          className={`text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${
-                            theme === 'dark' ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                          className={`text-xs px-2.5 py-1 rounded-lg border outline-none cursor-pointer ${
+                            theme === 'dark' ? 'bg-white/[0.06] border-white/[0.1] text-neutral-200' : 'bg-neutral-100 border-neutral-200 text-neutral-800'
                           }`}
                         >
                           <option value="auto">Auto ({detectedLang.startsWith('tr') ? 'Turkish' : detectedLang.startsWith('de') ? 'German' : detectedLang.startsWith('fr') ? 'French' : detectedLang.startsWith('es') ? 'Spanish' : 'English'})</option>
@@ -1055,16 +1118,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                         </select>
                       </div>
 
-                      {/* Native / System Voice Picker */}
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Volume2 className="w-3 h-3 text-cyan-400" /> Voice
+                        <span className="text-xs font-medium opacity-75 flex items-center gap-1">
+                          <Volume2 className="w-3 h-3" /> Voice
                         </span>
                         <select
                           value={selectedVoiceName}
                           onChange={(e) => setSelectedVoiceName(e.target.value)}
-                          className={`text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer max-w-[190px] truncate ${
-                            theme === 'dark' ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                          className={`text-xs px-2.5 py-1 rounded-lg border outline-none cursor-pointer max-w-[180px] truncate ${
+                            theme === 'dark' ? 'bg-white/[0.06] border-white/[0.1] text-neutral-200' : 'bg-neutral-100 border-neutral-200 text-neutral-800'
                           }`}
                         >
                           <option value="">
@@ -1101,16 +1163,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
           <div className={`${columnWidths[columnWidth]} mx-auto px-6 py-12 pb-36 transition-all duration-300`}>
             {isLoading && (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-8 h-8 border-4 border-slate-700 border-t-cyan-500 rounded-full animate-spin mb-4" />
-                <p className="text-sm font-medium">Extracting article content...</p>
+              <div className="flex flex-col items-center justify-center py-20 opacity-60">
+                <div className="w-6 h-6 border-2 border-current/20 border-t-current rounded-full animate-spin mb-3" />
+                <p className="text-xs font-medium">Extracting article content...</p>
               </div>
             )}
 
             {error && (
-              <div className="text-center py-20 text-red-400">
-                <ShieldAlert className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="text-base font-medium">{error}</p>
+              <div className="text-center py-20 text-red-500">
+                <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-60" />
+                <p className="text-sm font-medium">{error}</p>
               </div>
             )}
 
@@ -1119,7 +1181,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight tracking-tight">{title}</h1>
 
                 {/* Article Metadata Bar */}
-                <div className="flex flex-wrap items-center gap-4 text-xs opacity-70 mb-8 border-b pb-4 border-current/10">
+                <div className="flex flex-wrap items-center gap-4 text-xs opacity-65 mb-8 border-b pb-4 border-current/10">
                   {author && <span className="font-semibold uppercase tracking-wider">{author}</span>}
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
@@ -1129,8 +1191,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     <BookOpen className="w-3.5 h-3.5" />
                     {wordCount.toLocaleString()} words
                   </span>
-                  <span className="flex items-center gap-1 text-cyan-400 font-medium">
-                    <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="flex items-center gap-1 font-medium">
+                    <Volume2 className="w-3.5 h-3.5" />
                     {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Natural Voice' : 'macOS Samantha Natural Voice') : 'Natural Human Voice'}
                   </span>
                 </div>
@@ -1143,7 +1205,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   onContextMenu={event => {
                     if (isIncognito && (event.target as Element).closest?.('a')) event.preventDefault();
                   }}
-                  className={`reader-content prose prose-lg max-w-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
+                  className={`reader-content prose prose-lg max-w-none prose-a:underline prose-a:decoration-current/40 hover:prose-a:decoration-current prose-img:rounded-xl prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
                   dangerouslySetInnerHTML={{
                     __html: sanitizedContent
                   }}
@@ -1156,57 +1218,56 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           <AnimatePresence>
             {(isPlaying || isPaused) && sentences.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 40, scale: 0.96 }}
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 40, scale: 0.96 }}
-                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[92%] backdrop-blur-2xl rounded-2xl shadow-2xl border p-3.5 flex flex-col gap-2.5 no-drag"
+                exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[92%] backdrop-blur-xl rounded-xl shadow-2xl border p-3.5 flex flex-col gap-2.5 no-drag"
                 style={{
-                  backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.94)' : theme === 'sepia' ? 'rgba(246, 240, 226, 0.96)' : 'rgba(255, 255, 255, 0.96)',
-                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : theme === 'sepia' ? 'rgba(91, 70, 54, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-                  color: theme === 'dark' ? '#f8fafc' : theme === 'sepia' ? '#4a3928' : '#0f172a'
+                  backgroundColor: theme === 'dark' ? 'rgba(20, 21, 24, 0.96)' : theme === 'sepia' ? 'rgba(246, 240, 226, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : theme === 'sepia' ? 'rgba(91, 70, 54, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+                  color: theme === 'dark' ? '#f5f5f5' : theme === 'sepia' ? '#4a3928' : '#171717'
                 }}
               >
-                {/* Header: Status and Progress */}
-                <div className="flex items-center justify-between text-xs font-semibold px-1">
+                <div className="flex items-center justify-between text-xs font-medium px-0.5">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-cyan-400 animate-ping' : 'bg-amber-400'}`} />
-                    <span className="text-cyan-400 font-bold">
+                    <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className="font-semibold">
                       {isPlaying ? 'Reading Aloud' : 'Paused'}
                     </span>
-                    <span className="opacity-60 text-[11px]">
-                      ({currentSentenceIndex + 1} / {sentences.length} sentences)
+                    <span className="opacity-55 text-[11px] font-mono tabular-nums">
+                      ({currentSentenceIndex + 1} / {sentences.length})
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] opacity-70 font-medium truncate max-w-[140px]">
+                    <span className="text-[11px] opacity-65 truncate max-w-[140px]">
                       {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : 'Natural Voice')}
                     </span>
                     <button
+                      type="button"
                       onClick={changeSpeechRate}
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 transition-colors cursor-pointer"
+                      className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md bg-current/10 hover:bg-current/15 transition-colors cursor-pointer"
                     >
                       {speechRate}x
                     </button>
                   </div>
                 </div>
 
-                {/* Active Sentence Caption Preview */}
-                <div className="text-xs px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 line-clamp-2 italic leading-relaxed opacity-90 border border-black/5 dark:border-white/5">
-                  "{sentences[currentSentenceIndex] || '...'}"
+                <div className="text-xs px-3 py-2 rounded-lg bg-black/5 dark:bg-white/[0.04] line-clamp-2 italic leading-relaxed opacity-85 border border-black/5 dark:border-white/[0.06]">
+                  &ldquo;{sentences[currentSentenceIndex] || '...'}&rdquo;
                 </div>
 
-                {/* Progress bar */}
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-black/10 dark:bg-white/10 h-1 rounded-full overflow-hidden">
                   <div
-                    className="bg-cyan-500 h-full transition-all duration-300 rounded-full"
+                    className="bg-current h-full transition-all duration-300 rounded-full"
                     style={{ width: `${((currentSentenceIndex + 1) / Math.max(1, sentences.length)) * 100}%` }}
                   />
                 </div>
 
-                {/* Audio Controls */}
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between pt-0.5">
+                  <div className="flex items-center gap-1.5">
                     <button
+                      type="button"
                       onClick={prevSentence}
                       disabled={currentSentenceIndex <= 0}
                       className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
@@ -1215,13 +1276,17 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       <SkipBack className="w-4 h-4" />
                     </button>
                     <button
+                      type="button"
                       onClick={toggleSpeech}
-                      className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                      title={isPlaying ? "Pause" : "Resume"}
+                      className={`p-2 rounded-lg font-medium transition-colors active:scale-95 cursor-pointer ${
+                        theme === 'dark' ? 'bg-white text-neutral-950 hover:bg-neutral-200' : 'bg-neutral-900 text-white hover:bg-neutral-800'
+                      }`}
+                      title={isPlaying ? 'Pause' : 'Resume'}
                     >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                      {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
                     </button>
                     <button
+                      type="button"
                       onClick={nextSentence}
                       disabled={currentSentenceIndex >= sentences.length - 1}
                       className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
@@ -1232,11 +1297,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </div>
 
                   <button
+                    type="button"
                     onClick={stopSpeech}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Stop Reading"
                   >
-                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <Square className="w-3 h-3 fill-current" />
                     <span>Stop</span>
                   </button>
                 </div>
@@ -1248,28 +1314,29 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           <AnimatePresence>
             {popoverState.visible && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="fixed z-[100] shadow-2xl rounded-2xl p-3.5 border w-72 text-sm"
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                className="fixed z-[100] shadow-2xl rounded-xl p-3.5 border w-72 text-sm"
                 style={{
                   top: Math.max(10, popoverState.top - 10),
                   left: popoverState.left,
                   transform: 'translate(-50%, -100%)',
-                  backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
-                  borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-                  color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                  backgroundColor: theme === 'dark' ? '#141518' : '#ffffff',
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#e5e5e5',
+                  color: theme === 'dark' ? '#f5f5f5' : '#171717'
                 }}
                 onMouseDown={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider opacity-55">Color</span>
                   <div className="flex gap-2">
                     {highlightColors.map(c => (
                       <button
+                        type="button"
                         key={c.name}
                         onClick={() => setHighlightColor(c.hex)}
-                        className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-cyan-500 scale-110 shadow-xs' : 'border-transparent'}`}
+                        className={`w-5 h-5 rounded-full border-2 transition-transform cursor-pointer ${highlightColor === c.hex ? (theme === 'dark' ? 'border-white scale-110' : 'border-neutral-900 scale-110') : 'border-transparent'}`}
                         style={{ backgroundColor: c.hex }}
                         title={c.name}
                       />
@@ -1280,11 +1347,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
                   placeholder="Add note (optional)..."
-                  className="w-full h-20 p-2.5 rounded-xl mb-2.5 resize-none outline-none border text-xs transition-colors"
+                  className="w-full h-20 p-2.5 rounded-lg mb-2.5 resize-none outline-none border text-xs transition-colors"
                   style={{
-                    backgroundColor: theme === 'dark' ? '#020617' : '#f8fafc',
-                    borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-                    color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                    backgroundColor: theme === 'dark' ? '#0e0f12' : '#fafafa',
+                    borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#e5e5e5',
+                    color: theme === 'dark' ? '#f5f5f5' : '#171717'
                   }}
                 />
                 {highlightError && (
@@ -1301,17 +1368,21 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 )}
                 <div className="flex justify-end gap-2">
                   <button
+                    type="button"
                     onClick={closePopover}
-                    className="px-3 py-1.5 rounded-lg transition-colors text-xs font-medium"
+                    className="px-3 py-1.5 rounded-lg transition-colors text-xs font-medium cursor-pointer"
                     style={{
-                      color: theme === 'dark' ? '#cbd5e1' : '#64748b'
+                      color: theme === 'dark' ? '#a3a3a3' : '#525252'
                     }}
                   >
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={saveHighlight}
-                    className="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors text-xs font-bold shadow-xs"
+                    className={`px-3.5 py-1.5 rounded-lg transition-colors text-xs font-medium cursor-pointer ${
+                      theme === 'dark' ? 'bg-white text-neutral-950 hover:bg-neutral-200' : 'bg-neutral-900 text-white hover:bg-neutral-800'
+                    }`}
                   >
                     Highlight
                   </button>
@@ -1324,39 +1395,41 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           <AnimatePresence>
             {viewingNote.visible && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="fixed z-[100] shadow-2xl rounded-2xl p-4 border max-w-sm w-80"
+                exit={{ opacity: 0, scale: 0.96 }}
+                className="fixed z-[100] shadow-2xl rounded-xl p-3.5 border max-w-sm w-80"
                 style={{
                   top: viewingNote.top + 10,
                   left: viewingNote.left,
                   transform: 'translateX(-50%)',
-                  backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
-                  borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-                  color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                  backgroundColor: theme === 'dark' ? '#141518' : '#ffffff',
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#e5e5e5',
+                  color: theme === 'dark' ? '#f5f5f5' : '#171717'
                 }}
               >
-                <div className="flex justify-between items-center mb-2.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Highlight Note</span>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider opacity-55">Highlight Note</span>
                   <div className="flex items-center gap-1">
                     <button
+                      type="button"
                       onClick={() => deleteHighlight(viewingNote.id)}
-                      className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
+                      className="p-1 rounded-md text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                       title="Delete Highlight"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-200 transition-colors text-sm"
+                      className="p-1 rounded-md opacity-60 hover:opacity-100 transition-opacity text-sm cursor-pointer"
                     >
                       &times;
                     </button>
                   </div>
                 </div>
                 <div className="text-xs whitespace-pre-wrap leading-relaxed">
-                  {viewingNote.note || <span className="italic text-slate-400">No note attached to this highlight.</span>}
+                  {viewingNote.note || <span className="italic opacity-60">No note attached to this highlight.</span>}
                 </div>
               </motion.div>
             )}

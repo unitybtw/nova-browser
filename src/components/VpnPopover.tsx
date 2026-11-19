@@ -106,29 +106,38 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
             ref={containerRef}
             style={{ top, right }}
-            className="fixed w-84 bg-white/95 dark:bg-[#121620]/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-50 overflow-hidden"
+            className="fixed w-80 bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-neutral-200/90 dark:border-white/[0.1] z-50 overflow-hidden"
           >
             {/* Header / Status */}
-            <div className={`p-5 text-center transition-colors ${isEnabled ? 'bg-emerald-500/90 text-white backdrop-blur-md' : 'bg-slate-50/80 dark:bg-white/5 text-slate-800 dark:text-slate-100 backdrop-blur-md'}`}>
-              <div className="flex justify-center mb-2.5">
-                <div className={`p-3 rounded-2xl ${isEnabled ? 'bg-white/20 text-white animate-pulse' : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20'}`}>
-                  {isEnabled ? <Shield className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
+            <div className="p-4 text-center border-b border-neutral-200/80 dark:border-white/[0.08]">
+              <div className="flex justify-center mb-2">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                    isEnabled
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                      : 'bg-neutral-100 dark:bg-white/[0.06] text-neutral-500 dark:text-neutral-400 border-neutral-200/80 dark:border-white/[0.08]'
+                  }`}
+                >
+                  {isEnabled ? <Shield className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
                 </div>
               </div>
-              <h3 className="text-sm font-bold mb-0.5">{isEnabled ? t('vpn.active') : t('vpn.inactive')}</h3>
-              <p className={`text-[11px] ${isEnabled ? 'text-emerald-100' : 'text-slate-500 dark:text-slate-400'}`}>
+              <h3 className="text-xs font-semibold text-neutral-950 dark:text-neutral-100 mb-0.5">
+                {isEnabled ? t('vpn.active') : t('vpn.inactive')}
+              </h3>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                 {isEnabled ? t('vpn.routedVia', { name: selectedLocation?.name ?? '' }) : t('vpn.direct')}
               </p>
-              
+
               <button
+                type="button"
                 onClick={() => onToggle(!isEnabled)}
-                className={`mt-3.5 w-full py-2 rounded-xl font-semibold text-xs transition-transform active:scale-95 shadow-xs cursor-pointer ${
-                  isEnabled 
-                    ? 'bg-white text-emerald-600 hover:bg-emerald-50 shadow-sm' 
-                    : 'bg-cyan-500 hover:bg-cyan-600 text-white'
+                className={`mt-3 w-full py-2 rounded-lg font-medium text-xs transition-colors active:scale-[0.98] cursor-pointer ${
+                  isEnabled
+                    ? 'bg-red-500/10 hover:bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20'
+                    : 'bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950'
                 }`}
               >
                 {isEnabled ? t('vpn.disconnect') : t('vpn.connect')}
@@ -137,13 +146,14 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
 
             {/* Server List */}
             <div className="p-2.5 max-h-56 overflow-y-auto">
-              <div className="flex items-center justify-between px-2.5 py-1.5">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center justify-between px-2 py-1">
+                <span className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                   {t('vpn.serversTitle')}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setIsAdding(!isAdding)}
-                  className="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Plus className="w-3 h-3" />
                   <span>{t('vpn.customProxy')}</span>
@@ -152,33 +162,33 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
 
               {/* Add Custom Proxy Form */}
               {isAdding && (
-                <form onSubmit={handleAddCustom} className="p-2.5 mb-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl space-y-2">
+                <form onSubmit={handleAddCustom} className="p-2.5 mb-2 bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/80 dark:border-white/[0.08] rounded-lg space-y-2">
                   <input
                     type="text"
                     placeholder={t('vpn.namePlaceholder')}
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-white/[0.06] border border-neutral-200/90 dark:border-white/[0.1] rounded-md text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/30"
                   />
                   <input
                     type="text"
                     placeholder={t('vpn.urlPlaceholder')}
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-white/[0.06] border border-neutral-200/90 dark:border-white/[0.1] rounded-md text-xs font-mono text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-400 dark:focus:border-white/30"
                   />
-                  {error && <p className="text-[10px] text-rose-500">{error}</p>}
-                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                  {error && <p className="text-[10px] text-red-500">{error}</p>}
+                  <div className="flex items-center justify-end gap-1.5 pt-0.5">
                     <button
                       type="button"
                       onClick={() => { setIsAdding(false); setError(''); }}
-                      className="px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg cursor-pointer"
+                      className="px-2.5 py-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-white/[0.07] rounded-md cursor-pointer"
                     >
                       {t('common.cancel')}
                     </button>
                     <button
                       type="submit"
-                      className="px-3 py-1 bg-cyan-500 text-white font-medium text-xs rounded-lg hover:bg-cyan-600 cursor-pointer"
+                      className="px-3 py-1 bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 font-medium text-xs rounded-md cursor-pointer"
                     >
                       {t('vpn.saveProxy')}
                     </button>
@@ -186,59 +196,66 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                 </form>
               )}
 
-              <div className="space-y-1">
+              <div className="space-y-0.5 mt-1">
                 {locations.length === 0 ? (
                   <div className="text-center py-4 px-2">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('vpn.noServers')}</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{t('vpn.noServersDesc')}</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('vpn.noServers')}</p>
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-1">{t('vpn.noServersDesc')}</p>
                   </div>
                 ) : (
-                  locations.map(loc => (
-                    <div
-                      key={loc.id}
-                      className={`w-full flex items-center justify-between p-2 px-2.5 rounded-xl transition-colors ${
-                        selectedLocation?.id === loc.id
-                          ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-semibold border border-cyan-500/30'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-medium'
-                      }`}
-                    >
-                      <button
-                        onClick={() => onSelectLocation(loc)}
-                        className="flex-1 flex items-center gap-2.5 text-left cursor-pointer"
+                  locations.map((loc) => {
+                    const selected = selectedLocation?.id === loc.id;
+                    return (
+                      <div
+                        key={loc.id}
+                        className={`w-full flex items-center justify-between p-2 px-2.5 rounded-lg transition-colors ${
+                          selected
+                            ? 'bg-neutral-100 dark:bg-white/[0.08] text-neutral-950 dark:text-white font-medium'
+                            : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100/70 dark:hover:bg-white/[0.04]'
+                        }`}
                       >
-                        {loc.type === 'custom' ? <MapPin className="w-3.5 h-3.5 text-purple-500 shrink-0" /> : <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />}
-                        <div className="truncate">
-                          <p className="text-xs truncate">{loc.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono truncate">{formatProxyDisplay(loc.url)}</p>
-                        </div>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => onSelectLocation(loc)}
+                          className="flex-1 flex items-center gap-2.5 text-left cursor-pointer min-w-0"
+                        >
+                          {loc.type === 'custom' ? (
+                            <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          ) : (
+                            <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          )}
+                          <div className="truncate">
+                            <p className="text-xs truncate">{loc.name}</p>
+                            <p className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono truncate">{formatProxyDisplay(loc.url)}</p>
+                          </div>
+                        </button>
 
-                      <div className="flex items-center gap-1.5">
-                        {selectedLocation?.id === loc.id && (
-                          <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-xs" />
-                        )}
-                        {loc.type === 'custom' && onRemoveLocation && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRemoveLocation(loc.id);
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-500 rounded-md transition-colors cursor-pointer"
-                            title={t('common.delete')}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {selected && <Check className="w-3.5 h-3.5 text-neutral-900 dark:text-white" />}
+                          {loc.type === 'custom' && onRemoveLocation && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveLocation(loc.id);
+                              }}
+                              className="p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors cursor-pointer"
+                              title={t('common.delete')}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
-            
+
             {/* Footer info */}
-            <div className="p-2.5 bg-slate-50/80 dark:bg-black/30 border-t border-slate-100 dark:border-white/5 text-center">
-              <p className="text-[10px] text-slate-400 dark:text-slate-500">
+            <div className="p-2.5 bg-neutral-50/70 dark:bg-white/[0.02] border-t border-neutral-200/80 dark:border-white/[0.07] text-center">
+              <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
                 {t('vpn.footerNote')}
               </p>
             </div>

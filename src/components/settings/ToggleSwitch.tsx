@@ -1,31 +1,50 @@
 import React from 'react';
 
 interface ToggleSwitchProps {
-  /** Undefined is treated as off, matching the previous inline `cond ? on : off` behavior. */
+  /** Undefined is treated as off. */
   checked: boolean | undefined;
   onToggle: () => void;
   ariaLabel: string;
-  /** Active (on-state) background color. Defaults to the most common variant. */
+  /** Optional active-state background override. Defaults to crisp monochrome Native macOS/Linear style. */
   activeColorClass?: string;
+  disabled?: boolean;
+  ariaBusy?: boolean;
+  title?: string;
 }
 
-/**
- * Standard h-6 w-11 settings toggle.
- * Class names are copied verbatim from the pre-existing inline toggles
- * in SettingsPage so there is zero visual difference.
- */
-export function ToggleSwitch({ checked, onToggle, ariaLabel, activeColorClass = 'bg-blue-500' }: ToggleSwitchProps) {
+export function ToggleSwitch({
+  checked,
+  onToggle,
+  ariaLabel,
+  activeColorClass,
+  disabled = false,
+  ariaBusy,
+  title,
+}: ToggleSwitchProps) {
   const isChecked = Boolean(checked);
+  const useCustomColor = Boolean(activeColorClass);
+  const trackOnClass = activeColorClass || 'bg-neutral-900 dark:bg-white';
+  const thumbOnClass = useCustomColor ? 'bg-white' : 'bg-white dark:bg-neutral-950';
+
   return (
     <button
       type="button"
       role="switch"
       aria-checked={isChecked}
       aria-label={ariaLabel}
+      aria-busy={ariaBusy}
+      disabled={disabled}
+      title={title}
       onClick={onToggle}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isChecked ? activeColorClass : 'bg-slate-300 dark:bg-slate-600'}`}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:focus-visible:ring-white/40 ${
+        isChecked ? trackOnClass : 'bg-neutral-200 dark:bg-white/[0.14]'
+      }`}
     >
-      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${isChecked ? 'translate-x-6' : 'translate-x-1'}`} />
+      <span
+        className={`inline-block h-3.5 w-3.5 rounded-full shadow-xs transition-transform duration-150 ${
+          isChecked ? `translate-x-[18px] ${thumbOnClass}` : 'translate-x-[3px] bg-white dark:bg-neutral-200'
+        }`}
+      />
     </button>
   );
 }

@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Cpu, Play, Square, Copy, Check, Users, Key, RefreshCw, Lock, Unlock, ShieldAlert } from 'lucide-react';
+import { Play, Square, Copy, Check, Users, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
+import { ToggleSwitch } from './ToggleSwitch';
+import {
+  SETTINGS_INPUT_CLS,
+  SettingsBadge,
+  SettingsButton,
+  SettingsGroup,
+  SettingsPageHeader,
+  SettingsRow,
+} from './SettingsPrimitives';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "nova_mcp_••••").
 // Never treat a masked value as the real secret.
@@ -24,7 +33,7 @@ const MCP_TOOLS = [
   { name: 'browser_go_forward', desc: 'Navigate forward in history', level: 'safe' },
   { name: 'browser_reload', desc: 'Reload the current page', level: 'safe' },
   { name: 'browser_wait', desc: 'Wait for N milliseconds', level: 'safe' },
-  { name: 'browser_get_element_text', desc: 'Get an element\'s text content', level: 'safe' },
+  { name: 'browser_get_element_text', desc: "Get an element's text content", level: 'safe' },
   { name: 'browser_scroll_to_element', desc: 'Scroll until element is visible', level: 'safe' },
 
   { name: 'browser_click', desc: 'Click an element by CSS selector', level: 'medium' },
@@ -41,12 +50,11 @@ const MCP_TOOLS = [
   { name: 'browser_type', desc: 'Type text into an input', level: 'sensitive' },
   { name: 'browser_press_key', desc: 'Simulate a keyboard key press', level: 'sensitive' },
   { name: 'browser_select_option', desc: 'Select a dropdown option', level: 'sensitive' },
-];
+] as const;
 
 export const McpSection: React.FC<McpSectionProps> = ({
   onUpdateSettings,
 }) => {
-  // MCP Server state
   const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);
   const [mcpToken, setMcpToken] = useState<string>('');
   const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
@@ -80,14 +88,16 @@ export const McpSection: React.FC<McpSectionProps> = ({
     let cleanupStatus: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
       cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
-        setMcpStatus(prev => prev ? { ...prev, clientCount: data.count, clients: data.clients } : null);
+        setMcpStatus((prev) => (prev ? { ...prev, clientCount: data.count, clients: data.clients } : null));
       });
     }
     if ((window as any).electronAPI?.onMcpStatusChanged) {
       cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, status: any) => {
         const isRunning = typeof status === 'object' && status !== null ? Boolean(status.running) : Boolean(status);
         const port = typeof status === 'object' && status?.port ? Number(status.port) : 3020;
-        setMcpStatus(prev => prev ? { ...prev, running: isRunning, port: port || prev.port } : { running: isRunning, port, clientCount: 0, clients: [] });
+        setMcpStatus((prev) =>
+          prev ? { ...prev, running: isRunning, port: port || prev.port } : { running: isRunning, port, clientCount: 0, clients: [] }
+        );
       });
     }
     return () => {
@@ -139,7 +149,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
 
   const handleToggleTool = async (toolName: string, currentlyDisabled: boolean) => {
     if ((window as any).electronAPI?.setMcpToolEnabled) {
-      await (window as any).electronAPI.setMcpToolEnabled(toolName, currentlyDisabled); // true means enable it, false means disable it
+      await (window as any).electronAPI.setMcpToolEnabled(toolName, currentlyDisabled);
       fetchMcpStatus();
     }
   };
@@ -175,167 +185,180 @@ export const McpSection: React.FC<McpSectionProps> = ({
     }
   };
 
+  const isRunning = Boolean(mcpStatus?.running);
+  const enabledCount = MCP_TOOLS.length - disabledTools.length;
+
   return (
-    <div className="p-8 space-y-8 max-w-3xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
-            <Cpu className="w-6 h-6 text-blue-500" />
-            MCP Server
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Model Context Protocol — Let AI tools control Nova Browser</p>
-        </div>
-        <button
-          onClick={handleToggleMcp}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all ${
-            mcpStatus?.running
-              ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400'
-              : 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-400'
-          }`}
-        >
-          {mcpStatus?.running ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          {mcpStatus?.running ? 'Stop Server' : 'Start Server'}
-        </button>
-      </div>
+    <div className="space-y-6">
+      <SettingsPageHeader
+        title="MCP Server"
+        description="Model Context Protocol — let local AI assistants inspect and control Nova Browser over SSE."
+        action={
+          <SettingsButton
+            variant={isRunning ? 'danger' : 'primary'}
+            onClick={handleToggleMcp}
+          >
+            {isRunning ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {isRunning ? 'Stop Server' : 'Start Server'}
+          </SettingsButton>
+        }
+      />
 
-      {/* Status Card */}
-      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full ${mcpStatus?.running ? 'bg-green-500' : 'bg-slate-400'}`} />
-            <span className="font-semibold text-slate-800 dark:text-slate-100">
-              {mcpStatus?.running ? 'Running' : 'Stopped'}
+      {/* Server Status */}
+      <SettingsGroup title="Server Status">
+        <SettingsRow
+          title={
+            <span className="inline-flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500' : 'bg-neutral-400 dark:bg-neutral-600'}`} />
+              <span>{isRunning ? 'Running' : 'Stopped'}</span>
             </span>
-            {mcpStatus?.running && (
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
-                http://localhost:{mcpStatus.port}/sse
+          }
+          description={
+            isRunning ? (
+              <span className="font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
+                http://localhost:{mcpStatus?.port || 3020}/sse
               </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Users className="w-4 h-4" />
-            <span>{mcpStatus?.clientCount || 0} connected</span>
-          </div>
-        </div>
+            ) : (
+              'Local SSE listener on port 3020 is inactive.'
+            )
+          }
+        >
+          <span className="inline-flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
+            <Users className="w-3.5 h-3.5" />
+            {mcpStatus?.clientCount || 0} connected
+          </span>
+        </SettingsRow>
 
-        {/* Connected clients list */}
         {(mcpStatus?.clients?.length || 0) > 0 && (
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Connected Clients</p>
+          <div className="px-4 sm:px-5 py-3 space-y-2 bg-neutral-50/70 dark:bg-white/[0.02]">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+              Connected Clients
+            </div>
             {mcpStatus?.clients?.map((c: any) => (
-              <div key={c.id} className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-slate-700 dark:text-slate-300 truncate">{c.userAgent}</span>
-                <span className="text-slate-400 text-xs ml-auto">
+              <div key={c.id} className="flex items-center gap-2 text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="text-neutral-700 dark:text-neutral-300 truncate font-mono">{c.userAgent}</span>
+                <span className="text-neutral-400 dark:text-neutral-500 text-[11px] ml-auto tabular-nums shrink-0">
                   {Math.round((Date.now() - c.connectedAt) / 1000)}s ago
                 </span>
               </div>
-            )) ?? null}
+            ))}
           </div>
         )}
-      </div>
+      </SettingsGroup>
 
-      {/* API Token Card */}
-      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <Key className="w-4 h-4 text-purple-500" />
-          <p className="font-semibold text-slate-800 dark:text-slate-100">API Token Authentication</p>
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-          <input
-            type={mcpTokenVisible ? "text" : "password"}
-            value={mcpToken}
-            readOnly
-            className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-600 dark:text-slate-300 focus:outline-none focus:border-purple-500 font-mono"
-          />
-          <button
-            onClick={() => setMcpTokenVisible(!mcpTokenVisible)}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            title={mcpTokenVisible ? "Hide Token" : "Show Token"}
-          >
-            {mcpTokenVisible ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={handleCopyToken}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-          >
-            {tokenCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-          </button>
-          <button
-            onClick={handleRotateToken}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
-            title="Revoke old token and generate a new one"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Rotate
-          </button>
-        </div>
-        <p className="text-xs text-slate-500">This token is required for all MCP clients to connect securely.</p>
-      </div>
-
-      {/* Config snippet */}
-      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Setup Guide</p>
-            <p className="text-xs text-slate-500 mt-0.5">Add this to your AI tool's MCP config (e.g., claude_desktop_config.json)</p>
+      {/* API Token Authentication */}
+      <SettingsGroup
+        title="API Token Authentication"
+        description="Bearer token required for all MCP clients to connect securely."
+      >
+        <div className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <input
+              type={mcpTokenVisible ? 'text' : 'password'}
+              value={mcpToken}
+              readOnly
+              className={`${SETTINGS_INPUT_CLS} font-mono pr-9`}
+            />
+            <button
+              type="button"
+              onClick={() => setMcpTokenVisible(!mcpTokenVisible)}
+              title={mcpTokenVisible ? 'Hide Token' : 'Show Token'}
+              aria-label={mcpTokenVisible ? 'Hide Token' : 'Show Token'}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+            >
+              {mcpTokenVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
           </div>
-          <button
-            onClick={handleCopyConfig}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-          >
-            {mcpCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-            {mcpCopied ? 'Copied!' : 'Copy'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <SettingsButton variant="secondary" onClick={handleCopyToken}>
+              {tokenCopied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {tokenCopied ? 'Copied' : 'Copy'}
+            </SettingsButton>
+            <SettingsButton
+              variant="danger"
+              onClick={handleRotateToken}
+              title="Revoke old token and generate a new one"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Rotate
+            </SettingsButton>
+          </div>
         </div>
-        <pre className="bg-slate-950 text-green-400 text-sm rounded-xl p-4 font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">
+      </SettingsGroup>
+
+      {/* Setup Guide / Config Snippet */}
+      <SettingsGroup
+        title="Client Configuration"
+        description="Add this block to your AI client config (e.g., claude_desktop_config.json or Cursor MCP settings)."
+        right={
+          <SettingsButton variant="secondary" onClick={handleCopyConfig}>
+            {mcpCopied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {mcpCopied ? 'Copied!' : 'Copy'}
+          </SettingsButton>
+        }
+        noDivide
+      >
+        <pre className="p-4 bg-neutral-950 text-neutral-200 text-xs font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">
           {mcpConfigSnippet}
         </pre>
-      </div>
+      </SettingsGroup>
 
-      {/* Tools list & Permissions */}
-      <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-orange-500" />
-          <p className="font-semibold text-slate-800 dark:text-slate-100">Tool Permissions ({MCP_TOOLS.length})</p>
-        </div>
-        <p className="text-xs text-slate-500 mb-2">Enable or disable specific browser capabilities. Sensitive actions are disabled by default.</p>
-        <div className="grid grid-cols-1 gap-1.5 max-h-[400px] overflow-y-auto pr-1">
-          {MCP_TOOLS.map(tool => {
+      {/* Tool Permissions */}
+      <SettingsGroup
+        title={`Tool Permissions (${MCP_TOOLS.length})`}
+        description="Enable or disable individual browser capabilities. Sensitive actions are disabled by default."
+        right={
+          <SettingsBadge>
+            {enabledCount} / {MCP_TOOLS.length} enabled
+          </SettingsBadge>
+        }
+        noDivide
+      >
+        <div className="max-h-[420px] overflow-y-auto divide-y divide-neutral-200/80 dark:divide-white/[0.07]">
+          {MCP_TOOLS.map((tool) => {
             const isDisabled = disabledTools.includes(tool.name);
-            let badgeClass = "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
-            let badgeText = "Safe";
-            if (tool.level === 'medium') {
-              badgeClass = "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
-              badgeText = "Medium";
-            } else if (tool.level === 'sensitive') {
-              badgeClass = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
-              badgeText = "Sensitive";
-            }
+            const tone =
+              tool.level === 'sensitive'
+                ? 'danger'
+                : tool.level === 'medium'
+                ? 'warning'
+                : 'success';
+            const badgeText =
+              tool.level === 'sensitive'
+                ? 'Sensitive'
+                : tool.level === 'medium'
+                ? 'Medium'
+                : 'Safe';
 
             return (
-              <div key={tool.name} className={`flex items-center justify-between py-2 px-3 rounded-lg border transition-colors ${isDisabled ? 'bg-slate-50 border-slate-200 dark:bg-slate-800/30 dark:border-slate-700/50 opacity-60' : 'bg-white border-slate-200 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
-                <div className="flex flex-col gap-1 pr-4 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs text-blue-600 dark:text-blue-400 font-mono font-medium truncate">{tool.name}</code>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${badgeClass}`}>{badgeText}</span>
+              <div
+                key={tool.name}
+                className={`px-4 sm:px-5 py-3 flex items-center justify-between gap-4 transition-opacity ${
+                  isDisabled ? 'opacity-55' : ''
+                }`}
+              >
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <code className="text-xs font-mono font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                      {tool.name}
+                    </code>
+                    <SettingsBadge tone={tone}>{badgeText}</SettingsBadge>
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{tool.desc}</span>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                    {tool.desc}
+                  </p>
                 </div>
-                <button
-                  onClick={() => handleToggleTool(tool.name, isDisabled)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${!isDisabled ? (tool.level === 'sensitive' ? 'bg-orange-500' : 'bg-blue-500') : 'bg-slate-200 dark:bg-slate-600'}`}
-                  role="switch"
-                  aria-checked={!isDisabled}
-                >
-                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${!isDisabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
+                <ToggleSwitch
+                  checked={!isDisabled}
+                  onToggle={() => handleToggleTool(tool.name, isDisabled)}
+                  ariaLabel={`Toggle ${tool.name}`}
+                />
               </div>
             );
           })}
         </div>
-      </div>
+      </SettingsGroup>
     </div>
   );
 };

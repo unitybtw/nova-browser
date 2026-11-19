@@ -56,6 +56,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getSystemVersions: () => ipcRenderer.invoke('get-system-versions'),
   getChangelogReleases: (forceRefresh?: boolean) => ipcRenderer.invoke('get-changelog-releases', forceRefresh),
+  onChangelogReleasesUpdated: (callback: (event: any, releases: any[]) => void) => {
+    const handler = (_event: any, releases: any[]) => callback(null, releases);
+    ipcRenderer.on('changelog-releases-updated', handler);
+    return () => ipcRenderer.removeListener('changelog-releases-updated', handler);
+  },
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getUpdateInfo: () => ipcRenderer.invoke('get-update-info'),
   downloadUpdate: (url?: string) => ipcRenderer.invoke('download-update', url),

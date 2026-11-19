@@ -6,7 +6,7 @@ import {
   Home,
   LayoutGrid,
   Search,
-  Sparkles,
+  Bot,
   Shield,
   Download,
   Puzzle,
@@ -84,7 +84,7 @@ export const TOOLBAR_ITEM_META: Record<ToolbarItemKind, ToolbarItemSpec> = {
     kind: 'ai',
     label: 'Nova AI Assistant',
     category: 'actions',
-    icon: Sparkles,
+    icon: Bot,
     isCritical: false,
   },
   shield: {
@@ -259,6 +259,36 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
     e.dataTransfer.setData('application/x-nova-toolbar-slot', item.id);
     e.dataTransfer.setData('application/x-nova-toolbar-kind', item.kind);
     setActiveToolbarDragPayload({ type: 'slot', draggedId: item.id, kind: item.kind });
+
+    // Replace the browser's default snapshot (dashed ring, hover pills, half-transparent blur)
+    // with a crisp compact ghost chip.
+    try {
+      const isDark = document.documentElement.classList.contains('dark');
+      const ghost = document.createElement('div');
+      ghost.textContent = spec.label;
+      Object.assign(ghost.style, {
+        position: 'fixed',
+        top: '-1000px',
+        left: '-1000px',
+        padding: '5px 10px',
+        borderRadius: '8px',
+        fontSize: '12px',
+        fontWeight: '500',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        whiteSpace: 'nowrap',
+        color: isDark ? '#fafafa' : '#171717',
+        background: isDark ? '#1c1d21' : '#ffffff',
+        border: isDark ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.16)',
+        boxShadow: '0 6px 16px rgba(0,0,0,0.22)',
+        pointerEvents: 'none',
+      } as Partial<CSSStyleDeclaration>);
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 12, 14);
+      setTimeout(() => ghost.remove(), 0);
+    } catch {
+      /* default drag image fallback */
+    }
+
     onDragStart?.(e, item);
   };
 
@@ -319,7 +349,7 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
       onKeyDown={handleKeyDown}
       className={`relative group/slot inline-flex items-center transition-all duration-150 rounded-md select-none no-drag cursor-grab active:cursor-grabbing outline-none ring-1 ring-dashed ring-[var(--nova-accent,#3b82f6)]/50 hover:ring-2 hover:ring-[var(--nova-accent,#3b82f6)] focus-visible:ring-2 focus-visible:ring-[var(--nova-accent,#3b82f6)] bg-[var(--nova-accent,#3b82f6)]/[0.04] hover:bg-[var(--nova-accent,#3b82f6)]/[0.08] ${
         !item.visible ? 'opacity-45 grayscale-[50%]' : ''
-      } ${isDragging ? 'opacity-35 scale-95 ring-blue-400' : ''} ${className}`}
+      } ${isDragging ? 'opacity-35' : ''} ${className}`}
       style={{
         WebkitAppRegion: 'no-drag',
         ...style,
@@ -328,20 +358,20 @@ export const CustomizeSlotWrapper: React.FC<CustomizeSlotWrapperProps> = ({
       {dropSide === 'before' && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0.5 -left-1.5 w-0.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.95)] z-40"
+          className="pointer-events-none absolute inset-y-0.5 -left-1.5 w-0.5 rounded-full bg-neutral-900 dark:bg-white z-40"
         />
       )}
       {dropSide === 'after' && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0.5 -right-1.5 w-0.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.95)] z-40"
+          className="pointer-events-none absolute inset-y-0.5 -right-1.5 w-0.5 rounded-full bg-neutral-900 dark:bg-white z-40"
         />
       )}
       {/* Chrome Pills Overlay: Drag Handle, Eye, Remove (revealed on hover/focus below slot to avoid adjacent collisions & top-edge clipping) */}
       <div
         className={`absolute top-full mt-1.5 ${
           controlsAlign === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2'
-        } z-30 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full shadow-md text-[10px] bg-white/95 text-slate-700 dark:bg-neutral-800/95 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700/70 opacity-0 pointer-events-none group-hover/slot:opacity-100 group-hover/slot:pointer-events-auto group-focus-within/slot:opacity-100 group-focus-within/slot:pointer-events-auto transition-opacity duration-150 whitespace-nowrap before:content-[''] before:absolute before:-top-2 before:inset-x-0 before:h-2`}
+        } z-30 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full shadow-md text-[10px] bg-white/95 text-slate-700 dark:bg-neutral-800/95 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700/70 opacity-0 pointer-events-none group-hover/slot:opacity-100 group-hover/slot:pointer-events-auto group-focus-within/slot:opacity-100 group-focus-within/slot:pointer-events-auto transition-opacity duration-150 whitespace-nowrap before:content-[''] before:absolute before:-top-2 before:inset-x-0 before:h-2 ${isDragging ? '!hidden' : ''}`}
         role="toolbar"
         aria-label={`Slot controls for ${spec.label}`}
         onClick={(e) => e.stopPropagation()}

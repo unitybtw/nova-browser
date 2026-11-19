@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
-import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X, Globe } from "lucide-react";
+import { Bot, Brain, Cpu, Zap, Image as ImageIcon, Check, AlertCircle, X, Globe } from "lucide-react";
 import { useTranslation } from "../../services/i18n";
 import {
   getPreferredVoiceLanguage,
@@ -49,21 +49,18 @@ function sanitizeAttachmentName(name: string): string {
 function ModelIcon({ model, className }: { model: string; className?: string }) {
   const m = (model || "").toLowerCase();
   if (m.includes("deepseek") || m.includes("r1")) {
-    return <Brain className={cn("size-3.5 text-purple-400 shrink-0", className)} />;
+    return <Brain className={cn("size-3.5 text-neutral-500 dark:text-neutral-400 shrink-0", className)} />;
   }
   if (m.includes("llama")) {
-    return <Zap className={cn("size-3.5 text-amber-400 shrink-0", className)} />;
+    return <Zap className={cn("size-3.5 text-neutral-500 dark:text-neutral-400 shrink-0", className)} />;
   }
   if (m.includes("vision") || m.includes("phi")) {
-    return <ImageIcon className={cn("size-3.5 text-emerald-400 shrink-0", className)} />;
+    return <ImageIcon className={cn("size-3.5 text-neutral-500 dark:text-neutral-400 shrink-0", className)} />;
   }
-  if (m.includes("qwen")) {
-    return <Cpu className={cn("size-3.5 text-cyan-400 shrink-0", className)} />;
+  if (m.includes("qwen") || m.includes("smol")) {
+    return <Cpu className={cn("size-3.5 text-neutral-500 dark:text-neutral-400 shrink-0", className)} />;
   }
-  if (m.includes("smol")) {
-    return <Sparkles className={cn("size-3.5 text-blue-400 shrink-0", className)} />;
-  }
-  return <Bot className={cn("size-3.5 text-cyan-500 shrink-0", className)} />;
+  return <Bot className={cn("size-3.5 text-neutral-500 dark:text-neutral-400 shrink-0", className)} />;
 }
 
 
@@ -186,7 +183,7 @@ function AttachmentThumb({
         className={cn(
           "absolute right-1 top-1 z-10 flex size-4 items-center justify-center rounded-full bg-background/90 text-foreground/70 shadow-sm transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-background hover:text-foreground hover:scale-110",
           isHovered ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none",
-          "focus:pointer-events-auto focus:opacity-100 focus:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+          "focus:pointer-events-auto focus:opacity-100 focus:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:focus-visible:ring-white/30"
         )}
         aria-label={`Remove ${attachment.name}`}
         title={`Remove ${attachment.name}`}
@@ -1129,7 +1126,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               overflow: expanded ? "visible" : "hidden",
             }}
             className={cn(
-              "relative w-full border border-border bg-card shadow-sm focus-within:border-cyan-500/60 focus-within:ring-2 focus-within:ring-cyan-500/40 hover:border-border/80 z-10",
+              "relative w-full border border-border bg-card shadow-xs focus-within:border-neutral-400 dark:focus-within:border-white/30 hover:border-border/80 z-10",
               expanded ? "cursor-text" : "cursor-default"
             )}
           >
@@ -1208,8 +1205,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               )}
             >
               {isTranscribing ? (
-                <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-300 text-xs font-medium max-w-full">
-                  <span className="size-2 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+                <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-neutral-100 dark:bg-white/[0.08] border border-neutral-200/80 dark:border-white/[0.1] text-neutral-700 dark:text-neutral-200 text-xs font-medium max-w-full">
+                  <span className="size-1.5 rounded-full bg-neutral-700 dark:bg-neutral-200 animate-pulse shrink-0" />
                   <span className="truncate">
                     {modelDownloadPercent !== null
                       ? t('ai.voiceDownloadingShort', { percent: modelDownloadPercent })
@@ -1274,7 +1271,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                             }}
                             className={cn(
                               "group relative flex h-8 w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs font-medium outline-none active:scale-[0.98] cursor-default transition-colors",
-                              model === selectedModel ? "text-cyan-600 dark:text-cyan-400 font-semibold" : "text-foreground/80 hover:text-foreground"
+                              model === selectedModel ? "text-neutral-950 dark:text-white font-semibold" : "text-foreground/75 hover:text-foreground"
                             )}
                           >
                             <span className="flex items-center gap-2">
@@ -1282,7 +1279,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                               {model}
                             </span>
                             {model === selectedModel && (
-                              <Check className="size-3 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                              <Check className="size-3 text-neutral-950 dark:text-white shrink-0" />
                             )}
                           </button>
                         ))}
@@ -1334,8 +1331,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                           className={cn(
                             "flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs outline-none transition-colors hover:bg-accent/70 cursor-default",
                             voiceLang === lang.code
-                              ? "text-cyan-600 dark:text-cyan-400 font-semibold"
-                              : "text-foreground/80"
+                              ? "text-neutral-950 dark:text-white font-semibold"
+                              : "text-foreground/75"
                           )}
                         >
                           <span className="truncate">{lang.name}</span>
@@ -1372,7 +1369,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                 {voiceLang.toUpperCase()}
               </span>
               {modelDownloadPercent !== null && (
-                <span className="text-[11px] text-cyan-500 font-medium truncate max-w-[110px]">
+                <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium font-mono truncate max-w-[110px]">
                   {modelDownloadPercent}%
                 </span>
               )}

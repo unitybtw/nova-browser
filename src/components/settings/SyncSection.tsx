@@ -7,6 +7,15 @@ import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 import { SmoothCollapse } from './SmoothCollapse';
+import { ToggleSwitch } from './ToggleSwitch';
+import {
+  SETTINGS_INPUT_CLS,
+  SettingsBadge,
+  SettingsButton,
+  SettingsGroup,
+  SettingsPageHeader,
+  SettingsRow,
+} from './SettingsPrimitives';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -33,7 +42,7 @@ export interface SyncSectionProps {
 
 export const SyncSection: React.FC<SyncSectionProps> = ({
   settings,
-  onPerformSync
+  onPerformSync,
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [syncLoading, setSyncLoading] = useState(false);
@@ -43,168 +52,160 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
   const { setSafeTimeout } = useSafeTimeout();
 
   useEffect(() => {
-    const unsub = syncService.subscribe(status => {
+    const unsub = syncService.subscribe((status) => {
       setSyncStatus(status);
     });
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   }, []);
 
+  const handleSyncNow = async () => {
+    if (syncLoading || syncStatus.isSyncing) return;
+    setSyncErr(null);
+    setSyncMsg(null);
+    setSyncLoading(true);
+    try {
+      if (onPerformSync) {
+        // Delegate directly to onPerformSync() to capture live in-memory React state
+        // rather than reading stale un-debounced localStorage entries.
+        await onPerformSync();
+      } else {
+        const rawB = localStorage.getItem('bookmarks');
+        const rawF = localStorage.getItem('folders_session');
+        const rawH = localStorage.getItem('browsing_history');
+        const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        const rawW = localStorage.getItem('workspaces_session');
+        const rawS = localStorage.getItem('user_settings');
+
+        const syncRes = await syncService.syncData({
+          bookmarks: safeParseArray(rawB),
+          folders: safeParseArray(rawF),
+          history: safeParseArray(rawH),
+          passwords: safeParsePasswords(rawP),
+          settings: safeParseObject(rawS, {} as any),
+          workspaces: safeParseArray(rawW),
+        });
+
+        if (syncRes && syncRes.mergedData) {
+          const md = syncRes.mergedData;
+          if (md.bookmarks) {
+            localStorage.setItem('bookmarks', JSON.stringify(md.bookmarks));
+            (window as any).electronAPI?.storeSet?.('bookmarks', JSON.stringify(md.bookmarks));
+          }
+          if (md.folders) {
+            localStorage.setItem('folders_session', JSON.stringify(md.folders));
+            (window as any).electronAPI?.storeSet?.('folders_session', JSON.stringify(md.folders));
+          }
+          if (md.history) {
+            localStorage.setItem('browsing_history', JSON.stringify(md.history));
+          }
+          if (md.workspaces) {
+            localStorage.setItem('workspaces_session', JSON.stringify(md.workspaces));
+            (window as any).electronAPI?.storeSet?.('workspaces_session', JSON.stringify(md.workspaces));
+          }
+          if (md.settings) {
+            localStorage.setItem('user_settings', JSON.stringify(md.settings));
+            (window as any).electronAPI?.storeSet?.('user_settings', JSON.stringify(md.settings));
+          }
+          if (md.passwords && (window as any).electronAPI?.secureStoreSet) {
+            await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(md.passwords));
+          }
+        }
+      }
+
+      setSyncMsg('Sync completed successfully!');
+      setSafeTimeout(() => setSyncMsg(null), 3000);
+    } catch (e: any) {
+      setSyncErr(e.message || 'Sync failed');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
-      <section className="space-y-6">
-        <div className="border-b border-slate-200 dark:border-slate-800/80 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-              <Cloud className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-                Nova Cloud Sync
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Access your bookmarks, saved passwords, browsing history, and settings from any computer.
-              </p>
-            </div>
+    <div className="space-y-6">
+      <SettingsPageHeader
+        title="Nova Cloud Sync"
+        description="Access your bookmarks, saved passwords, browsing history, and settings across your devices."
+      />
+
+      <SmoothCollapse isOpen={Boolean(syncMsg)}>
+        {syncMsg && (
+          <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center gap-2.5">
+            <Check className="w-4 h-4 shrink-0" />
+            <span>{syncMsg}</span>
           </div>
-        </div>
+        )}
+      </SmoothCollapse>
 
-        <SmoothCollapse isOpen={Boolean(syncMsg)}>
-          {syncMsg && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
-              <Check className="w-4 h-4 shrink-0" />
-              <span>{syncMsg}</span>
-            </div>
-          )}
-        </SmoothCollapse>
-        <SmoothCollapse isOpen={Boolean(syncErr)}>
-          {syncErr && (
-            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>{syncErr}</span>
-            </div>
-          )}
-        </SmoothCollapse>
+      <SmoothCollapse isOpen={Boolean(syncErr)}>
+        {syncErr && (
+          <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span>{syncErr}</span>
+          </div>
+        )}
+      </SmoothCollapse>
 
-        {syncStatus.isLoggedIn ? (
-          /* ACTIVE SYNC CHAIN VIEW */
-          <div className="space-y-6">
-            {/* Active Sync Code Banner */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold text-lg flex items-center justify-center">
-                  <Link2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Nova Sync Active</h3>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Encrypted Sync
+      {syncStatus.isLoggedIn ? (
+        <div className="space-y-6">
+          {/* Active Sync Status */}
+          <SettingsGroup title="Account & Status">
+            <SettingsRow
+              icon={<Link2 className="w-4 h-4" />}
+              title="Nova Sync Active"
+              badge={
+                <SettingsBadge tone="success">
+                  <ShieldCheck className="w-3 h-3" />
+                  Encrypted Sync
+                </SettingsBadge>
+              }
+              description={
+                <div className="space-y-0.5 mt-0.5">
+                  <div>
+                    Code:{' '}
+                    <span className="font-mono text-neutral-700 dark:text-neutral-200 font-medium">
+                      {syncStatus.syncCode || 'Active Device'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                    Code: <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{syncStatus.syncCode || 'Active Device'}</span>
-                  </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    Status: <span className="text-emerald-500 font-medium">Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString(getLocale(settings.language), { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                  </p>
+                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Status: <span className="text-emerald-600 dark:text-emerald-400 font-medium">Connected</span> · Last synced:{' '}
+                    {syncStatus.lastSyncedAt
+                      ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString(getLocale(settings.language), {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'Just now'}
+                  </div>
                 </div>
-              </div>
+              }
+            >
+              <SettingsButton
+                variant="primary"
+                onClick={handleSyncNow}
+                disabled={syncLoading || syncStatus.isSyncing}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncLoading || syncStatus.isSyncing ? 'animate-spin' : ''}`} />
+                <span>{syncLoading || syncStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+              </SettingsButton>
+              <SettingsButton
+                variant="danger"
+                onClick={() => syncService.logout()}
+              >
+                Leave Chain
+              </SettingsButton>
+            </SettingsRow>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={async () => {
-                    if (syncLoading || syncStatus.isSyncing) return;
-                    setSyncErr(null);
-                    setSyncMsg(null);
-                    setSyncLoading(true);
-                    try {
-                      if (onPerformSync) {
-                        // Delegate directly to onPerformSync() to capture live in-memory React state
-                        // rather than reading stale un-debounced localStorage entries.
-                        await onPerformSync();
-                      } else {
-                        const rawB = localStorage.getItem('bookmarks');
-                        const rawF = localStorage.getItem('folders_session');
-                        const rawH = localStorage.getItem('browsing_history');
-                        const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-                        const rawW = localStorage.getItem('workspaces_session');
-                        const rawS = localStorage.getItem('user_settings');
-
-                        const syncRes = await syncService.syncData({
-                          bookmarks: safeParseArray(rawB),
-                          folders: safeParseArray(rawF),
-                          history: safeParseArray(rawH),
-                          passwords: safeParsePasswords(rawP),
-                          settings: safeParseObject(rawS, {} as any),
-                          workspaces: safeParseArray(rawW)
-                        });
-
-                        if (syncRes && syncRes.mergedData) {
-                          const md = syncRes.mergedData;
-                          if (md.bookmarks) {
-                            localStorage.setItem('bookmarks', JSON.stringify(md.bookmarks));
-                            (window as any).electronAPI?.storeSet?.('bookmarks', JSON.stringify(md.bookmarks));
-                          }
-                          if (md.folders) {
-                            localStorage.setItem('folders_session', JSON.stringify(md.folders));
-                            (window as any).electronAPI?.storeSet?.('folders_session', JSON.stringify(md.folders));
-                          }
-                          if (md.history) {
-                            localStorage.setItem('browsing_history', JSON.stringify(md.history));
-                          }
-                          if (md.workspaces) {
-                            localStorage.setItem('workspaces_session', JSON.stringify(md.workspaces));
-                            (window as any).electronAPI?.storeSet?.('workspaces_session', JSON.stringify(md.workspaces));
-                          }
-                          if (md.settings) {
-                            localStorage.setItem('user_settings', JSON.stringify(md.settings));
-                            (window as any).electronAPI?.storeSet?.('user_settings', JSON.stringify(md.settings));
-                          }
-                          if (md.passwords && (window as any).electronAPI?.secureStoreSet) {
-                            await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(md.passwords));
-                          }
-                        }
-                      }
-
-                      setSyncMsg('Sync completed successfully!');
-                      setSafeTimeout(() => setSyncMsg(null), 3000);
-                    } catch (e: any) {
-                      setSyncErr(e.message || 'Sync failed');
-                    } finally {
-                      setSyncLoading(false);
-                    }
-                  }}
-                  disabled={syncLoading || syncStatus.isSyncing}
-                  className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${syncLoading || syncStatus.isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{syncLoading || syncStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
-                </button>
-
-                <button
-                  onClick={() => syncService.logout()}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-700/50 dark:hover:bg-red-500/10 dark:text-slate-300 dark:hover:text-red-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Leave Chain
-                </button>
-              </div>
-            </div>
-
-            {/* Pair Another Device Card - hidden until the pairing join flow exists */}
+            {/* Pair Another Device - hidden until the pairing join flow exists */}
             {NovaSyncService.PAIRING_AVAILABLE && (
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-3 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                    <Laptop className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Pair Another Computer</h4>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Use your unique sync code to link other laptops or desktops.</p>
-                  </div>
-                </div>
-
-                <button
+              <SettingsRow
+                icon={<Laptop className="w-4 h-4" />}
+                title="Pair Another Computer"
+                description="Use your unique sync code to link other laptops or desktops."
+              >
+                <SettingsButton
+                  variant="secondary"
                   onClick={async () => {
                     try {
                       const rawB = localStorage.getItem('bookmarks');
@@ -220,7 +221,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                         history: safeParseArray(rawH),
                         passwords: safeParsePasswords(rawP),
                         settings: safeParseObject(rawS, {} as any),
-                        workspaces: safeParseArray(rawW)
+                        workspaces: safeParseArray(rawW),
                       });
 
                       const copied = await copyTextToClipboard(code);
@@ -235,90 +236,74 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       setSyncErr(err.message || 'Failed to generate code');
                     }
                   }}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-700/60 hover:bg-cyan-500 hover:text-white dark:hover:bg-cyan-500 dark:hover:text-white text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                   <span>{copiedSyncCode ? 'Code Copied!' : 'Copy Device Code'}</span>
-                </button>
-              </div>
-            </div>
+                </SettingsButton>
+              </SettingsRow>
             )}
+          </SettingsGroup>
 
-            {/* Synced Categories List */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-4 shadow-xs">
-              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Synchronized Data Categories
-              </h4>
-
-              <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {[
-                  { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark, desc: 'Your saved bookmarks and toolbar folders' },
-                  { key: 'syncPasswords', label: 'Saved Passwords (Encrypted)', icon: Key, desc: 'Encrypted before upload with AES-256; the authentication provider remains trusted' },
-                  { key: 'syncHistory', label: 'Browsing History', icon: Cloud, desc: 'Your visited page history across devices' },
-                  { key: 'syncSettings', label: 'Settings & Appearance', icon: Settings, desc: 'Themes, search engine, shortcuts' },
-                  { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree, desc: 'Custom tab workspaces and icons' },
-                ].map(item => {
-                  const isChecked = syncStatus.user?.syncPreferences[item.key as keyof SyncPreferences] ?? true;
-                  const Icon = item.icon;
-
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      role="switch"
-                      aria-checked={isChecked}
-                      aria-label={item.label}
-                      onClick={() => {
-                        if (syncStatus.user) {
-                          syncService.updatePreferences({ [item.key]: !isChecked });
-                        }
-                      }}
-                      className="w-full flex items-center justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:opacity-80 transition-opacity text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">{item.label}</span>
-                          <span className="text-[11px] text-slate-400 dark:text-slate-500">{item.desc}</span>
-                        </div>
-                      </div>
-
-                      <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isChecked ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isChecked ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : NovaSyncService.PAIRING_AVAILABLE ? (
-          /* PAIRING SETUP (NO EMAIL / NO PASSWORD) */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Option 1: Enter Code */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-xs">
-              <div className="space-y-3">
-                <div className="p-3 w-fit rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <Laptop className="w-6 h-6" />
+          {/* Synchronized Data Categories */}
+          <SettingsGroup
+            title="Synchronized Data Categories"
+            description="Choose which local data categories sync with your Nova Cloud account."
+          >
+            {[
+              { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark, desc: 'Your saved bookmarks and toolbar folders' },
+              { key: 'syncPasswords', label: 'Saved Passwords (Encrypted)', icon: Key, desc: 'Encrypted before upload with AES-256; the authentication provider remains trusted' },
+              { key: 'syncHistory', label: 'Browsing History', icon: Cloud, desc: 'Your visited page history across devices' },
+              { key: 'syncSettings', label: 'Settings & Appearance', icon: Settings, desc: 'Themes, search engine, shortcuts' },
+              { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree, desc: 'Custom tab workspaces and icons' },
+            ].map((item) => {
+              const isChecked = syncStatus.user?.syncPreferences[item.key as keyof SyncPreferences] ?? true;
+              const Icon = item.icon;
+              return (
+                <SettingsRow
+                  key={item.key}
+                  icon={<Icon className="w-4 h-4" />}
+                  title={item.label}
+                  description={item.desc}
+                >
+                  <ToggleSwitch
+                    checked={isChecked}
+                    ariaLabel={item.label}
+                    onToggle={() => {
+                      if (syncStatus.user) {
+                        syncService.updatePreferences({ [item.key]: !isChecked });
+                      }
+                    }}
+                  />
+                </SettingsRow>
+              );
+            })}
+          </SettingsGroup>
+        </div>
+      ) : NovaSyncService.PAIRING_AVAILABLE ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SettingsGroup noDivide>
+            <div className="p-5 flex flex-col justify-between gap-4 h-full">
+              <div className="space-y-2">
+                <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] flex items-center justify-center text-neutral-700 dark:text-neutral-200">
+                  <Laptop className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                <h3 className="text-[13px] font-semibold text-neutral-950 dark:text-neutral-100">
                   I have a Sync Code
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
                   Enter the pairing code generated from your other computer to sync all bookmarks, passwords, and history instantly.
                 </p>
               </div>
-
-              <div className="space-y-3 pt-2">
+              <div className="space-y-2.5">
                 <input
                   type="text"
                   placeholder="nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx"
                   id="quick-pair-input"
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
+                  className={`${SETTINGS_INPUT_CLS} font-mono`}
                 />
-                <button
+                <SettingsButton
+                  variant="primary"
+                  className="w-full"
                   onClick={async () => {
                     const input = document.getElementById('quick-pair-input') as HTMLInputElement;
                     if (!input || !input.value.trim()) return;
@@ -332,85 +317,85 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       setSyncLoading(false);
                     }
                   }}
-                  className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-2"
                 >
-                  <Link2 className="w-4 h-4" />
+                  <Link2 className="w-3.5 h-3.5" />
                   <span>Connect & Sync</span>
-                </button>
+                </SettingsButton>
               </div>
             </div>
+          </SettingsGroup>
 
-            {/* Option 2: Generate Code on This Computer */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-xs">
-              <div className="space-y-3">
-                <div className="p-3 w-fit rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <Key className="w-6 h-6" />
+          <SettingsGroup noDivide>
+            <div className="p-5 flex flex-col justify-between gap-4 h-full">
+              <div className="space-y-2">
+                <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] flex items-center justify-center text-neutral-700 dark:text-neutral-200">
+                  <Key className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                <h3 className="text-[13px] font-semibold text-neutral-950 dark:text-neutral-100">
                   Start New Encrypted Sync
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
                   Generate a secure pairing code on this computer to link your other laptops or desktops.
                 </p>
               </div>
+              <SettingsButton
+                variant="primary"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    const rawB = localStorage.getItem('bookmarks');
+                    const rawF = localStorage.getItem('folders_session');
+                    const rawH = localStorage.getItem('browsing_history');
+                    const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                    const rawW = localStorage.getItem('workspaces_session');
+                    const rawS = localStorage.getItem('user_settings');
 
-              <div className="space-y-3 pt-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      const rawB = localStorage.getItem('bookmarks');
-                      const rawF = localStorage.getItem('folders_session');
-                      const rawH = localStorage.getItem('browsing_history');
-                      const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-                      const rawW = localStorage.getItem('workspaces_session');
-                      const rawS = localStorage.getItem('user_settings');
+                    const code = await syncService.generateSyncChainCode({
+                      bookmarks: safeParseArray(rawB),
+                      folders: safeParseArray(rawF),
+                      history: safeParseArray(rawH),
+                      passwords: safeParsePasswords(rawP),
+                      settings: safeParseObject(rawS, {} as any),
+                      workspaces: safeParseArray(rawW),
+                    });
 
-                      const code = await syncService.generateSyncChainCode({
-                        bookmarks: safeParseArray(rawB),
-                        folders: safeParseArray(rawF),
-                        history: safeParseArray(rawH),
-                        passwords: safeParsePasswords(rawP),
-                        settings: safeParseObject(rawS, {} as any),
-                        workspaces: safeParseArray(rawW)
-                      });
-
-                      const copied = await copyTextToClipboard(code);
-                      if (copied) {
-                        setCopiedSyncCode(true);
-                        setSyncMsg(`Sync Code: ${code} (Copied to clipboard!)`);
-                        setSafeTimeout(() => setCopiedSyncCode(false), 4000);
-                      } else {
-                        setSyncMsg(`Sync Code: ${code} (copy manually)`);
-                      }
-                    } catch (err: any) {
-                      setSyncErr(err.message || 'Failed to generate code');
+                    const copied = await copyTextToClipboard(code);
+                    if (copied) {
+                      setCopiedSyncCode(true);
+                      setSyncMsg(`Sync Code: ${code} (Copied to clipboard!)`);
+                      setSafeTimeout(() => setCopiedSyncCode(false), 4000);
+                    } else {
+                      setSyncMsg(`Sync Code: ${code} (copy manually)`);
                     }
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <Key className="w-4 h-4 text-cyan-400 dark:text-cyan-600" />
-                  <span>{copiedSyncCode ? 'Sync Code Copied!' : 'Generate Sync Code'}</span>
-                </button>
-              </div>
+                  } catch (err: any) {
+                    setSyncErr(err.message || 'Failed to generate code');
+                  }
+                }}
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>{copiedSyncCode ? 'Sync Code Copied!' : 'Generate Sync Code'}</span>
+              </SettingsButton>
             </div>
-          </div>
-        ) : (
-          /* Pairing is not built yet: offering a code that can never be redeemed
-             is worse than saying so, so this states the one route that works. */
-          <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-8 flex flex-col items-center text-center gap-3 shadow-xs">
-            <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-              <Laptop className="w-6 h-6" />
+          </SettingsGroup>
+        </div>
+      ) : (
+        /* Pairing is not built yet: offering a code that can never be redeemed
+           is worse than saying so, so this states the one route that works. */
+        <SettingsGroup noDivide>
+          <div className="px-6 py-10 flex flex-col items-center text-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.08] flex items-center justify-center text-neutral-500 dark:text-neutral-400">
+              <Laptop className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+            <h3 className="text-[14px] font-semibold text-neutral-950 dark:text-neutral-100">
               Sign in to sync this browser
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-sm">
               Your bookmarks, history, tabs and workspaces sync through your Nova Cloud
               account. Pairing a second device with a sync code is not available yet.
             </p>
           </div>
-        )}
-      </section>
+        </SettingsGroup>
+      )}
     </div>
   );
 };

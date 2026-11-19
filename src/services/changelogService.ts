@@ -1,7 +1,7 @@
 import { CHANGELOG_DATA, ReleaseVersion, ChangelogItem, ReleaseMedia, ReleaseSection } from '../data/changelog';
 import { getElectronAPI } from '../utils/electronBridge';
 
-const LOCAL_STORAGE_CACHE_KEY = 'nova_dynamic_changelog_cache_v2';
+const LOCAL_STORAGE_CACHE_KEY = 'nova_dynamic_changelog_cache_v3';
 
 /**
  * How old the cache must be before a background refresh is worth an API call.
@@ -56,6 +56,34 @@ let inflightRefresh: Promise<ChangelogResult> | null = null;
  */
 let backgroundTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshSubscribers = 0;
+let ipcPushUnsubscribe: (() => void) | null = null;
+
+function attachIpcPushListener(): void {
+  if (ipcPushUnsubscribe || typeof window === 'undefined') return;
+  const api = getElectronAPI();
+  if (!api?.onChangelogReleasesUpdated) return;
+
+  ipcPushUnsubscribe = api.onChangelogReleasesUpdated((_event, pushedReleases) => {
+    if (!Array.isArray(pushedReleases) || pushedReleases.length === 0) return;
+    const releases = sanitizeReleases(mergeReleases(pushedReleases, CHANGELOG_DATA));
+    if (releases.length === 0) return;
+    try {
+      localStorage.setItem(
+        LOCAL_STORAGE_CACHE_KEY,
+        JSON.stringify({ releases, fetchedAt: Date.now(), isLive: true } satisfies CachedChangelog)
+      );
+    } catch (_) {}
+    emitRefresh({ releases, isLive: true });
+  });
+}
+
+function detachIpcPushListener(): void {
+  if (!ipcPushUnsubscribe) return;
+  try {
+    ipcPushUnsubscribe();
+  } catch (_) {}
+  ipcPushUnsubscribe = null;
+}
 
 export async function fetchAutomatedChangelog(forceRefresh = false): Promise<ChangelogResult> {
   // 1. Check local storage cache first if not forcing refresh
@@ -98,6 +126,7 @@ export function subscribeToRefresh(listener: (result: ChangelogResult) => void):
   window.addEventListener(CHANGELOG_REFRESH_EVENT, handler);
 
   refreshSubscribers += 1;
+  attachIpcPushListener();
   let released = false;
   return () => {
     window.removeEventListener(CHANGELOG_REFRESH_EVENT, handler);
@@ -106,7 +135,10 @@ export function subscribeToRefresh(listener: (result: ChangelogResult) => void):
     if (released) return;
     released = true;
     refreshSubscribers -= 1;
-    if (refreshSubscribers === 0) cancelPendingRefresh();
+    if (refreshSubscribers === 0) {
+      cancelPendingRefresh();
+      detachIpcPushListener();
+    }
   };
 }
 
@@ -234,7 +266,7 @@ function readCachedChangelog(): CachedChangelog | null {
  * and `section.points` — so a single malformed cached release threw on every
  * keystroke in the search box, with no way to recover short of clearing it.
  */
-function sanitizeReleases(input: unknown[]): ReleaseVersion[] {
+export function sanitizeReleases(input: unknown[]): ReleaseVersion[] {
   const out: ReleaseVersion[] = [];
   for (const entry of input) {
     const release = sanitizeRelease(entry);
@@ -312,17 +344,33 @@ function isKnownCategory(value: unknown): value is ChangelogItem['category'] {
   );
 }
 
+function isSafeMediaSrc(rawSrc: string): boolean {
+  const trimmed = rawSrc.trim();
+  if (!trimmed || /[\u0000-\u001F\s]/.test(trimmed)) return false;
+  if (trimmed.startsWith('./')) {
+    return !trimmed.includes('..') && !trimmed.includes('\\');
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'github.com' || host.endsWith('.githubusercontent.com');
+  } catch {
+    return false;
+  }
+}
+
 function sanitizeMedia(value: unknown): ReleaseMedia | undefined {
-  if (!isPlainObject(value) || typeof value.src !== 'string' || value.src === '') return undefined;
+  if (!isPlainObject(value) || typeof value.src !== 'string' || !isSafeMediaSrc(value.src)) return undefined;
   const media: ReleaseMedia = {
-    src: value.src,
+    src: value.src.trim(),
     alt: typeof value.alt === 'string' ? value.alt : '',
   };
   if (typeof value.caption === 'string') media.caption = value.caption;
   if (value.kind === 'image' || value.kind === 'video') media.kind = value.kind;
   if (typeof value.title === 'string') media.title = value.title;
-  if (typeof value.poster === 'string') media.poster = value.poster;
-  if (typeof value.captions === 'string') media.captions = value.captions;
+  if (typeof value.poster === 'string' && isSafeMediaSrc(value.poster)) media.poster = value.poster.trim();
+  if (typeof value.captions === 'string' && isSafeMediaSrc(value.captions)) media.captions = value.captions.trim();
   return media;
 }
 
@@ -361,7 +409,7 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(v => typeof v === 'string');
 }
 
-function mergeReleases(remote: any[], bundled: ReleaseVersion[]): ReleaseVersion[] {
+export function mergeReleases(remote: any[], bundled: ReleaseVersion[]): ReleaseVersion[] {
   const map = new Map<string, ReleaseVersion>();
 
   // Add bundled first (has curated highlights and verified descriptions)
@@ -371,26 +419,30 @@ function mergeReleases(remote: any[], bundled: ReleaseVersion[]): ReleaseVersion
 
   // Merge or prepend remote releases from GitHub
   for (const r of remote) {
+    if (!isPlainObject(r)) continue;
     const ver = String(r.version || '').replace(/^v/, '');
     if (!ver) continue;
 
     const existing = map.get(ver);
     if (existing) {
-      // Curated release: the bundled entry is the reviewed, user-facing copy.
-      // Raw commit subjects from GitHub are not merged in — they would bury
-      // the curated notes under noisy `[website] ...` lines. GitHub is only
-      // used to surface versions that have not been curated yet.
+      // Curated release: keep verified bundled copy, only enriching missing media/sections from remote if absent
+      const remoteHero = existing.hero ? undefined : sanitizeMedia(r.hero);
+      const remoteGallery =
+        existing.mediaGallery && existing.mediaGallery.length > 0
+          ? undefined
+          : Array.isArray(r.mediaGallery)
+            ? r.mediaGallery.map(sanitizeMedia).filter((m): m is ReleaseMedia => Boolean(m))
+            : undefined;
       map.set(ver, {
         ...existing,
-        date: existing.date || r.date || 'Recent',
+        date: existing.date || (typeof r.date === 'string' && r.date ? r.date : 'Recent'),
+        ...(remoteHero ? { hero: remoteHero } : {}),
+        ...(remoteGallery && remoteGallery.length > 0 ? { mediaGallery: remoteGallery } : {}),
       });
     } else {
       // New version from GitHub that is not yet in bundled data.
-      // Type-checked instead of defaulted with `||`: `||` only rejects falsy
-      // values, so a number, an object or `[]` in `category`/`text` survives
-      // into a field the renderer treats as a string (`item.text.toLowerCase()`,
-      // `highlights.slice(1)` as a React child). Unknown categories fall back to
-      // 'improvement' because that is a bounded, known value — not a coercion.
+      // Preserves parsed lede, screenshots/videos (hero + mediaGallery), editorial chapters (sections),
+      // categorized changes, and highlights after validating every field cleanly.
       const changes: ChangelogItem[] =
         Array.isArray(r.changes) && r.changes.length > 0
           ? r.changes
@@ -404,22 +456,32 @@ function mergeReleases(remote: any[], bundled: ReleaseVersion[]): ReleaseVersion
               { category: 'improvement', text: 'Performance, stability, and security enhancements.' }
             ];
 
-      // Every change was dropped as malformed: an entry with no renderable
-      // note would show up as an empty chapter, so the release is skipped.
       if (changes.length === 0) continue;
 
       const highlights: string[] = isStringArray(r.highlights) && r.highlights.length > 0
         ? r.highlights
-        : changes.slice(0, 3).map(c => c.text);
+        : changes.slice(0, 4).map(c => c.text);
 
-      map.set(ver, {
+      const mediaGallery = Array.isArray(r.mediaGallery)
+        ? r.mediaGallery.map(sanitizeMedia).filter((m): m is ReleaseMedia => Boolean(m))
+        : [];
+      const hero = sanitizeMedia(r.hero) || mediaGallery[0];
+      const sections = sanitizeSections(r.sections);
+
+      const mergedRelease: ReleaseVersion = {
         version: ver,
-        date: r.date || 'Recent',
-        title: r.title || `Nova Browser v${ver}`,
-        badge: 'New Release',
+        date: typeof r.date === 'string' && r.date ? r.date : 'Recent',
+        title: typeof r.title === 'string' && r.title ? r.title : `Nova Browser v${ver}`,
+        badge: typeof r.badge === 'string' && r.badge ? r.badge : 'New Release',
         highlights,
-        changes
-      });
+        changes,
+      };
+      if (typeof r.lede === 'string' && r.lede.trim()) mergedRelease.lede = r.lede.trim();
+      if (hero) mergedRelease.hero = hero;
+      if (mediaGallery.length > 0) mergedRelease.mediaGallery = mediaGallery;
+      if (sections && sections.length > 0) mergedRelease.sections = sections;
+
+      map.set(ver, mergedRelease);
     }
   }
 

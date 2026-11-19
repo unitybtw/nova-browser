@@ -121,7 +121,6 @@ const AICursorOverlay = lazyWithRetry(() => import('./components/AICursorOverlay
 const FindInPage = lazyWithRetry(() => import('./components/FindInPage').then(m => ({ default: m.FindInPage })));
 const DownloadToast = lazyWithRetry(() => import('./components/DownloadToast').then(m => ({ default: m.DownloadToast })));
 const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(m => ({ default: m.UpdateToast })));
-const CustomizeTopBanner = lazyWithRetry(() => import('./components/customization/CustomizeTopBanner').then(m => ({ default: m.CustomizeTopBanner })));
 const DesignStudioDrawer = lazyWithRetry(() => import('./components/customization/DesignStudioDrawer').then(m => ({ default: m.DesignStudioDrawer })));
 
 // Idle prefetch SidePanel chunk so opening the AI assistant is instantaneous without chunk-fetch pause
@@ -1484,6 +1483,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     handleUpdateSettings({ privacyShield: !settingsRef.current.privacyShield });
   }, [handleUpdateSettings, settingsRef]);
 
+  useEffect(() => {
+    // Safety net: never leave the split-screen drop overlay stuck after any drag ends.
+    const reset = () => {
+      setIsDraggingTab(false);
+      setIsDragOverMain(false);
+    };
+    window.addEventListener('dragend', reset);
+    window.addEventListener('drop', reset);
+    return () => {
+      window.removeEventListener('dragend', reset);
+      window.removeEventListener('drop', reset);
+    };
+  }, []);
+
   const handleTabDragStart = useCallback(() => setIsDraggingTab(true), []);
   const handleTabDragEnd = useCallback(() => {
     setIsDraggingTab(false);
@@ -1979,7 +1992,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   if (showOnboarding) {
     return (
       <MotionConfig reducedMotion={motionReducedMode} transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
-        <React.Suspense fallback={<div className="h-screen w-screen bg-[#07050d]" />}>
+        <React.Suspense fallback={<div className="h-screen w-screen bg-[#0b0c0e]" />}>
           <Onboarding
             onComplete={handleOnboardingComplete}
           />
@@ -2337,7 +2350,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         className="flex-1 min-h-0 relative w-full bg-white dark:bg-slate-900 flex overflow-hidden"
         onDragOver={(e) => {
           const types = Array.from(e.dataTransfer?.types || []);
-          if (types.includes('text/plain')) {
+          // Only react to real tab drags; toolbar/widget drags in Customize Mode also carry text/plain.
+          if (isDraggingTab && !isCustomizeMode && types.includes('text/plain')) {
             e.preventDefault();
             const rect = e.currentTarget.getBoundingClientRect();
             const isLeft = (e.clientX - rect.left) < rect.width / 2;
@@ -2364,7 +2378,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       >
         {/* Split Screen Drop Overlay (Left or Right) */}
         <AnimatePresence>
-          {isDragOverMain && (
+          {isDragOverMain && isDraggingTab && !isCustomizeMode && (
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -2840,10 +2854,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         <AICursorOverlay />
       </React.Suspense>
 
-      {/* Live Customize Banner & Design Studio Drawer */}
+      {/* Docked Live Design Studio Inspector */}
       {isCustomizeMode && !isWebsiteDemo && (
         <React.Suspense fallback={null}>
-          <CustomizeTopBanner />
           <DesignStudioDrawer />
         </React.Suspense>
       )}

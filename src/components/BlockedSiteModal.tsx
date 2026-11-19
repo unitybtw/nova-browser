@@ -50,44 +50,45 @@ export const BlockedSiteModal: React.FC<BlockedSiteModalProps> = ({ alert, onClo
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-lg bg-zinc-900 border border-red-500/40 rounded-xl shadow-2xl overflow-hidden text-zinc-100 p-6"
+          className="relative w-full max-w-lg bg-[#141518] border border-red-500/30 rounded-xl shadow-2xl overflow-hidden text-neutral-100 p-5"
         >
           {/* Header */}
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 shrink-0">
-              <ShieldAlert className="w-8 h-8" />
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 shrink-0">
+              <ShieldAlert className="w-6 h-6" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-red-500/20 text-red-300 rounded border border-red-500/30">
+                <span className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-red-500/15 text-red-300 rounded-md border border-red-500/25">
                   {alert.reason === 'phishing'
                     ? (isTr ? 'Kimlik Avı Koruması' : 'Phishing Protection')
                     : (isTr ? 'Zararlı Bağlantı Engellendi' : 'Malicious Link Blocked')}
                 </span>
               </div>
-              <h2 id="blocked-site-title" className="text-xl font-bold text-white mt-1">
+              <h2 id="blocked-site-title" className="text-base font-semibold text-white mt-1">
                 {isTr ? 'Zararlı Web Sitesi Engellendi' : 'Malicious Website Blocked'}
               </h2>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
+              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer"
               aria-label={isTr ? 'Kapat' : 'Close'}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Description */}
           <div className="mt-4 space-y-3">
-            <p id="blocked-site-desc" className="text-sm text-zinc-300 leading-relaxed">
+            <p id="blocked-site-desc" className="text-xs text-neutral-300 leading-relaxed">
               {isTr
                 ? 'Nova Browser Güvenlik Kalkanı, kişisel verilerinizi ve şifrelerinizi korumak amacıyla bu web sitesine erişimi durdurdu.'
                 : 'Nova Browser Security Shield blocked access to this website to protect your personal data and credentials.'}
             </p>
 
-            <div className="p-3 bg-zinc-950/70 border border-zinc-800 rounded-lg space-y-1">
-              <div className="text-xs text-zinc-400 flex items-center gap-1.5">
+            <div className="p-3 bg-[#0e0f12] border border-white/[0.08] rounded-lg space-y-1">
+              <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
                 <span>{isTr ? 'Engellenen Bağlantı:' : 'Blocked Link:'}</span>
               </div>
@@ -98,10 +99,11 @@ export const BlockedSiteModal: React.FC<BlockedSiteModalProps> = ({ alert, onClo
           </div>
 
           {/* Footer actions */}
-          <div className="mt-6 flex items-center justify-end gap-3">
+          <div className="mt-5 flex items-center justify-end gap-2">
             <button
+              type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-lg transition-colors shadow-lg shadow-red-950/40"
+              className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors cursor-pointer"
             >
               {isTr ? 'Güvenli Sayfaya Dön' : 'Return to Safety'}
             </button>

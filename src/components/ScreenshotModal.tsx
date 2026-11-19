@@ -136,71 +136,82 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4"
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+            exit={{ opacity: 0, scale: 0.98, y: 10 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
             ref={containerRef}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden outline-none max-h-[85vh]"
+            className="bg-white dark:bg-[#141518] border border-neutral-200/90 dark:border-white/[0.1] rounded-xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden outline-none max-h-[85vh]"
             tabIndex={-1}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-md">
-              <div className="flex items-center gap-2.5 text-slate-800 dark:text-slate-100">
-                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <Camera className="w-4 h-4" />
-                </div>
-                <h2 className="font-semibold text-sm">Screenshot Preview</h2>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200/80 dark:border-white/[0.08]">
+              <div className="flex items-center gap-2 text-neutral-900 dark:text-neutral-100">
+                <Camera className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+                <h2 className="font-semibold text-xs">Screenshot Preview</h2>
               </div>
 
               {/* Mode Toggle */}
               {onCaptureFullPage && (
-                <div className="flex items-center p-1 bg-slate-200/50 dark:bg-slate-800 rounded-xl">
+                <div className="flex items-center p-0.5 bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200/80 dark:border-white/[0.07] rounded-lg">
                   <button
+                    type="button"
                     onClick={() => handleToggleMode('visible')}
                     disabled={isCapturingFull}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${captureMode === 'visible' ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      captureMode === 'visible'
+                        ? 'bg-white dark:bg-white/[0.14] shadow-xs text-neutral-950 dark:text-white'
+                        : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                    }`}
                   >
                     <LayoutTemplate className="w-3.5 h-3.5" />
                     Visible Area
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleToggleMode('full')}
                     disabled={isCapturingFull}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${captureMode === 'full' ? 'bg-white dark:bg-slate-700 shadow-xs text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      captureMode === 'full'
+                        ? 'bg-white dark:bg-white/[0.14] shadow-xs text-neutral-950 dark:text-white'
+                        : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                    }`}
                   >
-                    {isCapturingFull ? <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" /> : <Expand className="w-3.5 h-3.5" />}
+                    {isCapturingFull ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Expand className="w-3.5 h-3.5" />}
                     Full Page
                   </button>
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
+                  type="button"
                   onClick={handleCopy}
                   disabled={isCapturingFull || !currentImage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-100 hover:bg-neutral-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-neutral-200/80 dark:border-white/[0.08] text-neutral-800 dark:text-neutral-200 transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-neutral-400" />}
                   <span>{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleDownload}
                   disabled={isCapturingFull || !currentImage}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-600 text-white transition-colors shadow-xs disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Save PNG</span>
                 </button>
                 <button
+                  type="button"
                   onClick={onClose}
-                  className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-1"
+                  className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/[0.07] transition-colors ml-0.5 cursor-pointer"
                   title="Close"
                 >
                   <X className="w-4 h-4" />
@@ -209,30 +220,30 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
             </div>
 
             {/* Image Preview Container */}
-            <div className="flex-1 overflow-y-auto bg-slate-100/50 dark:bg-slate-950/50 p-6 flex flex-col items-center min-h-[300px]">
+            <div className="flex-1 overflow-y-auto bg-[#fbfbfc] dark:bg-[#0e0f12] p-5 flex flex-col items-center min-h-[300px]">
               {actionError && (
-                <p role="alert" className="w-full max-w-2xl mb-3 text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1.5">
+                <p role="alert" className="w-full max-w-2xl mb-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   {actionError}
                 </p>
               )}
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-4 bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-full shadow-xs border border-slate-200/60 dark:border-white/10 truncate max-w-full">
+              <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 mb-3 bg-white dark:bg-[#141518] px-3 py-1 rounded-md border border-neutral-200/80 dark:border-white/[0.08] truncate max-w-full">
                 {pageTitle}
               </p>
 
-              <div className="rounded-xl overflow-hidden border border-slate-200/80 dark:border-white/10 shadow-md bg-white dark:bg-slate-900 w-full flex justify-center p-2">
+              <div className="rounded-xl overflow-hidden border border-neutral-200/90 dark:border-white/[0.08] bg-white dark:bg-[#141518] w-full flex justify-center p-2">
                 {isCapturingFull ? (
-                  <div className="h-[50vh] flex flex-col items-center justify-center text-slate-400 gap-3 w-full">
-                    <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                    <span className="text-sm font-medium">Capturing full page...</span>
+                  <div className="h-[50vh] flex flex-col items-center justify-center text-neutral-400 gap-2.5 w-full">
+                    <Loader2 className="w-6 h-6 animate-spin text-neutral-500 dark:text-neutral-400" />
+                    <span className="text-xs font-medium">Capturing full page...</span>
                   </div>
                 ) : (
-                  currentImage && <img src={currentImage} alt="Screenshot" className="max-w-full object-contain block max-h-[60vh] rounded-lg shadow-sm" />
+                  currentImage && <img src={currentImage} alt="Screenshot" className="max-w-full object-contain block max-h-[60vh] rounded-lg" />
                 )}
               </div>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

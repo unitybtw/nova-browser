@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Edit2, Check, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, Folder, GraduationCap, DollarSign, ShoppingCart } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Check, LayoutGrid, Briefcase, User, Code, Star, Gamepad2, Folder, GraduationCap, DollarSign, ShoppingCart } from 'lucide-react';
 import { Workspace } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
@@ -30,7 +30,7 @@ const ICONS = [
   { id: 'Briefcase', component: Briefcase },
   { id: 'User', component: User },
   { id: 'Code', component: Code },
-  { id: 'Sparkles', component: Sparkles },
+  { id: 'Sparkles', component: Star },
   { id: 'Gamepad2', component: Gamepad2 },
   { id: 'GraduationCap', component: GraduationCap },
   { id: 'DollarSign', component: DollarSign },
@@ -126,50 +126,62 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md" onClick={onClose}>
-          <motion.div 
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={onClose}>
+          <motion.div
             ref={containerRef}
             role="dialog"
             aria-modal="true"
             aria-label="Workspaces"
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            initial={{ opacity: 0, scale: 0.98, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className={`relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] outline-none backdrop-blur-2xl ${
-              isIncognito 
-                ? 'bg-slate-900/95 border border-slate-700 text-slate-100' 
-                : 'bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-slate-100'
+            exit={{ opacity: 0, scale: 0.98, y: 6 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className={`relative w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] outline-none ${
+              isIncognito
+                ? 'bg-[#141518] border border-white/[0.1] text-neutral-100'
+                : 'bg-white dark:bg-[#141518] border border-neutral-200/90 dark:border-white/[0.1] text-neutral-900 dark:text-neutral-100'
             }`}
           >
-            <div className={`flex items-center justify-between px-5 py-4 border-b ${isIncognito ? 'border-slate-800' : 'border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-md'}`}>
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <LayoutGrid className="w-4 h-4" />
-                </div>
-                <h2 className="text-base font-semibold">Manage Workspaces</h2>
+            <div className={`flex items-center justify-between px-4 py-3.5 border-b ${isIncognito ? 'border-white/[0.08]' : 'border-neutral-200/80 dark:border-white/[0.08]'}`}>
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+                <h2 className="text-sm font-semibold tracking-[-0.01em]">Manage Workspaces</h2>
               </div>
-              <button aria-label="Close workspaces" onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <button
+                type="button"
+                aria-label="Close workspaces"
+                onClick={onClose}
+                className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/[0.07] transition-colors cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-              {(draftWorkspace ? [...workspaces, draftWorkspace] : workspaces).map(workspace => {
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-2">
+              {(draftWorkspace ? [...workspaces, draftWorkspace] : workspaces).map((workspace) => {
                 const isEditing = editingId === workspace.id;
-                
+
                 if (isEditing) {
                   return (
-                    <div key={workspace.id} className={`p-4 rounded-xl border ${isIncognito ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50/80 border-slate-200 dark:bg-slate-800/50 dark:border-white/10'}`}>
+                    <div
+                      key={workspace.id}
+                      className={`p-3.5 rounded-xl border ${
+                        isIncognito
+                          ? 'bg-white/[0.03] border-white/[0.08]'
+                          : 'bg-neutral-50/80 border-neutral-200/80 dark:bg-white/[0.03] dark:border-white/[0.08]'
+                      }`}
+                    >
                       <input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className={`w-full px-3 py-2 rounded-lg text-xs font-semibold mb-3 outline-none focus:ring-2 focus:ring-cyan-500/50 ${
-                          isIncognito ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-700 dark:text-white'
-                        } border`}
+                        className={`w-full px-3 py-1.5 rounded-lg text-xs font-medium mb-3 outline-none transition-colors border ${
+                          isIncognito
+                            ? 'bg-white/[0.06] border-white/[0.1] text-white focus:border-white/30'
+                            : 'bg-white border-neutral-200/90 dark:bg-white/[0.06] dark:border-white/[0.1] dark:text-white focus:border-neutral-400 dark:focus:border-white/30'
+                        }`}
                         placeholder="Workspace Name"
                         aria-label="Workspace name"
                         maxLength={100}
@@ -177,23 +189,25 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(workspace.id)}
                       />
                       <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar">
-                        {COLORS.map(c => (
+                        {COLORS.map((c) => (
                           <button
                             key={c.id}
                             aria-label={`${c.id} workspace color`}
                             aria-pressed={editColor === c.id}
                             type="button"
                             onClick={() => setEditColor(c.id)}
-                            className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 shrink-0 ${editColor === c.id ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 ring-current' : ''}`}
-                            style={{ backgroundColor: c.hex, color: c.hex }}
+                            className={`w-5 h-5 rounded-full flex items-center justify-center transition-transform hover:scale-110 shrink-0 cursor-pointer ${
+                              editColor === c.id ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#141518] ring-neutral-900 dark:ring-white' : ''
+                            }`}
+                            style={{ backgroundColor: c.hex }}
                           >
-                            {editColor === c.id && <Check className="w-3.5 h-3.5 text-white" />}
+                            {editColor === c.id && <Check className="w-3 h-3 text-white" />}
                           </button>
                         ))}
                       </div>
 
-                      <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1 no-scrollbar">
-                        {ICONS.map(iconObj => {
+                      <div className="flex items-center gap-1.5 mb-3.5 overflow-x-auto pb-1 no-scrollbar">
+                        {ICONS.map((iconObj) => {
                           const IconComp = iconObj.component;
                           const isSelected = editIcon === iconObj.id;
                           return (
@@ -203,30 +217,32 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                               aria-pressed={isSelected}
                               type="button"
                               onClick={() => setEditIcon(iconObj.id)}
-                              className={`p-1.5 rounded-lg border transition-all shrink-0 ${
+                              className={`p-1.5 rounded-lg border transition-colors shrink-0 cursor-pointer ${
                                 isSelected
-                                  ? 'bg-cyan-500 text-white border-cyan-500 shadow-xs'
+                                  ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-950 border-transparent'
                                   : isIncognito
-                                    ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:text-slate-900 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-400'
+                                    ? 'bg-white/[0.04] border-white/[0.08] text-neutral-400 hover:text-white'
+                                    : 'bg-white border-neutral-200/80 text-neutral-500 hover:text-neutral-900 dark:bg-white/[0.04] dark:border-white/[0.08] dark:text-neutral-400 dark:hover:text-white'
                               }`}
                             >
-                              <IconComp className="w-4 h-4" />
+                              <IconComp className="w-3.5 h-3.5" />
                             </button>
                           );
                         })}
                       </div>
 
                       <div className="flex justify-end gap-2">
-                        <button 
+                        <button
+                          type="button"
                           onClick={cancelEdit}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-white/[0.07] transition-colors cursor-pointer"
                         >
                           Cancel
                         </button>
-                        <button 
+                        <button
+                          type="button"
                           onClick={() => handleSaveEdit(workspace.id)}
-                          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white hover:bg-cyan-600 shadow-xs transition-colors"
+                          className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 transition-colors cursor-pointer"
                         >
                           Save
                         </button>
@@ -235,24 +251,41 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                   );
                 }
 
-                const IconComp = ICONS.find(i => i.id === workspace.icon)?.component || LayoutGrid;
+                const IconComp = ICONS.find((i) => i.id === workspace.icon)?.component || LayoutGrid;
+                const isActive = activeWorkspaceId === workspace.id;
 
                 return (
-                  <div key={workspace.id} className={`group flex items-center justify-between p-3 rounded-xl border transition-all ${activeWorkspaceId === workspace.id ? 'border-cyan-500/80 bg-cyan-500/10 dark:bg-cyan-500/15' : isIncognito ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]'}`}>
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-xs"
-                        style={{ backgroundColor: COLORS.find(c => c.id === workspace.color)?.hex || '#64748b' }}
+                  <div
+                    key={workspace.id}
+                    className={`group flex items-center justify-between p-2.5 px-3 rounded-xl border transition-colors ${
+                      isActive
+                        ? 'border-neutral-900 dark:border-white bg-neutral-100/70 dark:bg-white/[0.06]'
+                        : isIncognito
+                          ? 'border-white/[0.08] hover:bg-white/[0.04]'
+                          : 'border-neutral-200/80 hover:bg-neutral-50 dark:border-white/[0.08] dark:hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+                        style={{ backgroundColor: COLORS.find((c) => c.id === workspace.color)?.hex || '#64748b' }}
                       >
-                        <IconComp className="w-4 h-4 text-white" />
+                        <IconComp className="w-3.5 h-3.5 text-white" />
                       </div>
-                      <div>
-                        <div className="font-medium text-xs text-slate-800 dark:text-slate-200">{workspace.name}</div>
-                        {activeWorkspaceId === workspace.id && <div className="text-[9px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">Active</div>}
+                      <div className="min-w-0">
+                        <div className="font-medium text-xs text-neutral-900 dark:text-neutral-100 truncate">
+                          {workspace.name}
+                        </div>
+                        {isActive && (
+                          <div className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium">
+                            Active
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity">
-                      <button 
+                      <button
+                        type="button"
                         aria-label={`Edit ${workspace.name} workspace`}
                         onClick={() => {
                           setDraftWorkspace(null);
@@ -261,15 +294,16 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                           setEditColor(workspace.color);
                           setEditIcon(workspace.icon || 'LayoutGrid');
                         }}
-                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        className="p-1.5 rounded-md hover:bg-neutral-200/80 dark:hover:bg-white/[0.08] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       {workspaces.length > 1 && (
-                        <button 
+                        <button
+                          type="button"
                           aria-label={`Delete ${workspace.name} workspace`}
                           onClick={() => handleDelete(workspace.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 transition-colors"
+                          className="p-1.5 rounded-md text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -279,18 +313,19 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                 );
               })}
             </div>
-            
-            <div className={`p-4 border-t ${isIncognito ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-900/30'}`}>
-              <button 
+
+            <div className={`p-3.5 border-t ${isIncognito ? 'border-white/[0.08]' : 'border-neutral-200/80 dark:border-white/[0.08]'}`}>
+              <button
+                type="button"
                 onClick={handleAddWorkspace}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-cyan-500 hover:text-cyan-500 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 transition-all font-medium text-xs text-slate-500 dark:text-slate-400"
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-neutral-200/80 dark:border-white/[0.08] transition-colors font-medium text-xs text-neutral-800 dark:text-neutral-200 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Create New Workspace
               </button>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

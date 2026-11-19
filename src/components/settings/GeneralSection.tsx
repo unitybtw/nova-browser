@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { UpdateWidget } from './UpdateWidget';
 import { ToggleSwitch } from './ToggleSwitch';
+import {
+  SETTINGS_SELECT_CLS,
+  SettingsBadge,
+  SettingsButton,
+  SettingsGroup,
+  SettingsPageHeader,
+  SettingsRow,
+  SettingsSegment,
+} from './SettingsPrimitives';
 
 export interface GeneralSectionProps {
   settings: UserSettings;
@@ -12,13 +21,22 @@ export interface GeneralSectionProps {
   onClearHistory?: () => void;
 }
 
+const SEARCH_ENGINES = [
+  { id: 'google', name: 'Google', desc: 'Fast and accurate' },
+  { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privacy focused' },
+  { id: 'brave', name: 'Brave Search', desc: 'Independent index' },
+  { id: 'bing', name: 'Bing', desc: 'Microsoft search' },
+  { id: 'ecosia', name: 'Ecosia', desc: 'Reforestation search' },
+  { id: 'yahoo', name: 'Yahoo', desc: 'Classic web search' },
+] as const;
+
 export const GeneralSection: React.FC<GeneralSectionProps> = ({
   settings,
   onUpdateSettings,
   onClearHistory,
 }) => {
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.0';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.2';
   });
   const [systemVersions, setSystemVersions] = useState<{
     app: string;
@@ -32,225 +50,222 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
 
   useEffect(() => {
     if (getElectronAPI()?.getAppVersion) {
-      getElectronAPI()?.getAppVersion().then(ver => {
-        if (ver) setAppVersion(ver);
-      }).catch(() => {});
+      getElectronAPI()
+        ?.getAppVersion()
+        .then((ver) => {
+          if (ver) setAppVersion(ver);
+        })
+        .catch(() => {});
     }
     if (getElectronAPI()?.getSystemVersions) {
-      getElectronAPI()?.getSystemVersions().then(ver => {
-        if (ver) setSystemVersions(ver);
-      }).catch(() => {});
+      getElectronAPI()
+        ?.getSystemVersions()
+        .then((ver) => {
+          if (ver) setSystemVersions(ver);
+        })
+        .catch(() => {});
     }
   }, []);
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in duration-200">
+      <SettingsPageHeader
+        title="General"
+        description="Default search engine, startup behavior, translation, media playback, and application updates."
+      />
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">About Nova</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nova Browser</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version {appVersion} (Open Source Edition)</p>
-          </div>
+      {/* Updates & About */}
+      <SettingsGroup title="Application & Updates">
+        <SettingsRow
+          title="Nova Browser"
+          description={`Version ${appVersion} · Open Source Edition`}
+        >
           <UpdateWidget />
-        </div>
+        </SettingsRow>
 
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4 mb-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Automatic Update Checks</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Periodically check for new releases in the background and notify when ready.</p>
-            </div>
-            <ToggleSwitch
-              ariaLabel="Toggle automatic update checks"
-              checked={settings.autoCheckUpdates ?? true}
-              onToggle={() => onUpdateSettings({ autoCheckUpdates: !(settings.autoCheckUpdates ?? true) })}
-              activeColorClass="bg-blue-600"
-            />
-          </div>
+        <SettingsRow
+          title="Automatic Update Checks"
+          description="Periodically check GitHub Releases in the background and notify when a new build is available."
+        >
+          <ToggleSwitch
+            ariaLabel="Toggle automatic update checks"
+            checked={settings.autoCheckUpdates ?? true}
+            onToggle={() =>
+              onUpdateSettings({ autoCheckUpdates: !(settings.autoCheckUpdates ?? true) })
+            }
+          />
+        </SettingsRow>
 
-          <div className="border-t border-slate-200/60 dark:border-slate-700/60 pt-3 flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Auto-Download Updates</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">When disabled, Nova will never download update packages without your explicit approval.</p>
-            </div>
-            <ToggleSwitch
-              ariaLabel="Toggle automatic update downloads"
-              checked={settings.autoDownloadUpdates ?? false}
-              onToggle={() => onUpdateSettings({ autoDownloadUpdates: !(settings.autoDownloadUpdates ?? false) })}
-              activeColorClass="bg-blue-600"
-            />
-          </div>
-        </div>
+        <SettingsRow
+          title="Auto-Download Updates"
+          description="When disabled, Nova will never download installer packages without your explicit confirmation."
+        >
+          <ToggleSwitch
+            ariaLabel="Toggle automatic update downloads"
+            checked={settings.autoDownloadUpdates ?? false}
+            onToggle={() =>
+              onUpdateSettings({ autoDownloadUpdates: !(settings.autoDownloadUpdates ?? false) })
+            }
+          />
+        </SettingsRow>
 
         {systemVersions && (
-          <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
-            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-              <span>Engine & Security Patch Transparency</span>
+          <div className="px-4 sm:px-5 py-4 space-y-2.5">
+            <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block">
+              Runtime &amp; Engine Versions
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              {[
+                { label: 'Chromium', val: systemVersions.chrome || '134.0.6998' },
+                { label: 'Electron', val: systemVersions.electron },
+                { label: 'V8 Engine', val: systemVersions.v8 },
+                { label: 'Platform', val: `${systemVersions.platform} (${systemVersions.arch})` },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="px-3 py-2 rounded-lg bg-neutral-50 dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/[0.06]"
+                >
+                  <div className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                    {item.label}
+                  </div>
+                  <div className="font-mono text-xs text-neutral-900 dark:text-neutral-200 mt-0.5 truncate">
+                    {item.val}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Chromium</div>
-                <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.chrome || '134.0.6998'}</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Electron</div>
-                <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.electron}</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">V8 Engine</div>
-                <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.v8}</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Architecture</div>
-                <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.platform} ({systemVersions.arch})</div>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 leading-relaxed">
-              Patch gap tracking active: Automated CI/CD builds release Chromium security patches with verified platform binaries.
-            </p>
           </div>
         )}
-      </section>
+      </SettingsGroup>
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">On Startup</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex flex-col sm:flex-row gap-2">
-          {[
-            { id: 'newTab', label: 'Open New Tab Page' },
-            { id: 'continue', label: 'Continue where you left off' },
-            { id: 'specificPages', label: 'Open a specific page' }
-          ].map(opt => (
-            <button
-              key={opt.id}
-              onClick={() => onUpdateSettings({ startupBehavior: opt.id as any })}
-              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-                settings.startupBehavior === opt.id || (!settings.startupBehavior && opt.id === 'newTab')
-                  ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Startup & Typography */}
+      <SettingsGroup title="Startup & Reading">
+        <SettingsRow
+          title="On Startup"
+          description="Choose what Nova opens when launching a new window session."
+          vertical
+        >
+          <SettingsSegment
+            fullWidth
+            value={(settings.startupBehavior || 'newTab') as 'newTab' | 'continue' | 'specificPages'}
+            onChange={(val) => onUpdateSettings({ startupBehavior: val })}
+            options={[
+              { id: 'newTab', label: 'Open New Tab Page' },
+              { id: 'continue', label: 'Continue where you left off' },
+              { id: 'specificPages', label: 'Open a specific page' },
+            ]}
+          />
+        </SettingsRow>
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Search Engine</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1">
-            {[
-              { id: 'google', name: 'Google', desc: 'Fast & Accurate' },
-              { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privacy focused' },
-              { id: 'brave', name: 'Brave Search', desc: 'Independent index' },
-              { id: 'bing', name: 'Bing', desc: 'AI powered' },
-              { id: 'ecosia', name: 'Ecosia', desc: 'Plant trees' },
-              { id: 'yahoo', name: 'Yahoo', desc: 'Classic search' }
-            ].map(engine => (
+        <SettingsRow
+          title="Web Page Font Size"
+          description="Default baseline font scale across pages and internal views."
+        >
+          <SettingsSegment
+            value={(settings.fontSize || 'medium') as 'small' | 'medium' | 'large'}
+            onChange={(val) => onUpdateSettings({ fontSize: val })}
+            options={[
+              { id: 'small', label: 'Small' },
+              { id: 'medium', label: 'Medium' },
+              { id: 'large', label: 'Large' },
+            ]}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+
+      {/* Search Engine */}
+      <SettingsGroup
+        title="Default Search Engine"
+        description="Used when typing queries directly into the address bar or New Tab search box."
+      >
+        <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+          {SEARCH_ENGINES.map((engine) => {
+            const isSelected = settings.searchEngine === engine.id;
+            return (
               <button
                 key={engine.id}
-                onClick={() => onUpdateSettings({ searchEngine: engine.id as any })}
-                className={`p-4 rounded-xl text-left transition-all ${
-                  settings.searchEngine === engine.id
-                    ? 'bg-blue-50 dark:bg-blue-500/10 ring-1 ring-blue-500 text-blue-900 dark:text-blue-100'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                type="button"
+                onClick={() => onUpdateSettings({ searchEngine: engine.id })}
+                className={`px-3.5 py-3 rounded-lg border text-left transition-colors cursor-pointer flex items-start justify-between gap-2 ${
+                  isSelected
+                    ? 'border-neutral-900 dark:border-white/75 bg-neutral-50 dark:bg-white/[0.05]'
+                    : 'border-neutral-200/80 dark:border-white/[0.07] hover:border-neutral-300 dark:hover:border-white/[0.16] hover:bg-neutral-50/70 dark:hover:bg-white/[0.03]'
                 }`}
               >
-                <p className="font-semibold">{engine.name}</p>
-                <p className={`text-xs mt-1 ${settings.searchEngine === engine.id ? 'text-blue-700/70 dark:text-blue-400/70' : 'text-slate-500 dark:text-slate-400'}`}>{engine.desc}</p>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-neutral-900 dark:text-neutral-100">
+                    {engine.name}
+                  </div>
+                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    {engine.desc}
+                  </div>
+                </div>
+                {isSelected && (
+                  <Check className="w-3.5 h-3.5 text-neutral-900 dark:text-white shrink-0 mt-0.5" />
+                )}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      </section>
+      </SettingsGroup>
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Media & Browsing Experience</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Automatic Picture-in-Picture (Auto-PiP)</span>
-              <span className="px-2 py-0.5 text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md border border-blue-500/20">Video</span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md">
-              Automatically pops out playing videos into a floating Picture-in-Picture window when switching away from a tab, and restores them when returning.
-            </p>
-          </div>
+      {/* Media & Translation */}
+      <SettingsGroup title="Browsing & Language">
+        <SettingsRow
+          title="Automatic Picture-in-Picture"
+          badge={<SettingsBadge>Video</SettingsBadge>}
+          description="Pop playing videos into a floating window when switching away from a tab and restore on return."
+        >
           <ToggleSwitch
             ariaLabel="Toggle automatic picture-in-picture"
             checked={settings.autoPictureInPicture ?? true}
-            onToggle={() => onUpdateSettings({ autoPictureInPicture: !(settings.autoPictureInPicture ?? true) })}
-            activeColorClass="bg-blue-600"
+            onToggle={() =>
+              onUpdateSettings({
+                autoPictureInPicture: !(settings.autoPictureInPicture ?? true),
+              })
+            }
           />
-        </div>
-      </section>
+        </SettingsRow>
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Page Translation</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p id="setting-target-language" className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Default Target Language</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Foreign web pages will be translated to this language in 1-click.</p>
-            </div>
-            <select
-              aria-labelledby="setting-target-language"
-              value={settings.defaultTranslationLanguage || 'en'}
-              onChange={(e) => onUpdateSettings({ defaultTranslationLanguage: e.target.value })}
-              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="en">English</option>
-              <option value="tr">Turkish (Türkçe)</option>
-              <option value="de">German (Deutsch)</option>
-              <option value="fr">French (Français)</option>
-              <option value="es">Spanish (Español)</option>
-              <option value="it">Italian (Italiano)</option>
-              <option value="ru">Russian (Русский)</option>
-              <option value="ar">Arabic (العربية)</option>
-              <option value="ja">Japanese (日本語)</option>
-              <option value="zh">Chinese (中文)</option>
-              <option value="az">Azərbaycan (Azerbaycan)</option>
-            </select>
-          </div>
-        </div>
-      </section>
+        <SettingsRow
+          title={<span id="setting-target-language">Default Translation Language</span>}
+          description="Target language when translating foreign web pages with one click."
+        >
+          <select
+            aria-labelledby="setting-target-language"
+            value={settings.defaultTranslationLanguage || 'en'}
+            onChange={(e) => onUpdateSettings({ defaultTranslationLanguage: e.target.value })}
+            className={SETTINGS_SELECT_CLS}
+          >
+            <option value="en">English</option>
+            <option value="tr">Turkish (Türkçe)</option>
+            <option value="de">German (Deutsch)</option>
+            <option value="fr">French (Français)</option>
+            <option value="es">Spanish (Español)</option>
+            <option value="it">Italian (Italiano)</option>
+            <option value="ru">Russian (Русский)</option>
+            <option value="ar">Arabic (العربية)</option>
+            <option value="ja">Japanese (日本語)</option>
+            <option value="zh">Chinese (中文)</option>
+            <option value="az">Azərbaycan (Azerbaycan)</option>
+          </select>
+        </SettingsRow>
+      </SettingsGroup>
 
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Font Size</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
-          {(['small', 'medium', 'large'] as const).map(size => (
-            <button
-              key={size}
-              onClick={() => onUpdateSettings({ fontSize: size })}
-              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium capitalize transition-all ${
-                settings.fontSize === size
-                  ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Clear Browsing Data</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Clear History & Cache</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Clear your browsing history, cookies, cache, and more.</p>
-          </div>
-          <button
+      {/* Browsing Data */}
+      <SettingsGroup title="Browsing Data">
+        <SettingsRow
+          title="Clear History & Cache"
+          description="Permanently remove saved browsing history, cookies, and temporary cached data."
+        >
+          <SettingsButton
+            variant="danger"
             onClick={async () => {
               const confirmed = await showConfirm({
                 title: 'Clear Browsing History',
                 message: 'Are you sure you want to clear your browsing history?',
                 confirmLabel: 'Clear History',
-                cancelLabel: 'Cancel'
+                cancelLabel: 'Cancel',
               });
               if (confirmed) {
                 if (onClearHistory) {
@@ -260,12 +275,11 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
                 }
               }
             }}
-            className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 rounded-xl font-medium transition-colors text-sm"
           >
             Clear Data
-          </button>
-        </div>
-      </section>
+          </SettingsButton>
+        </SettingsRow>
+      </SettingsGroup>
     </div>
   );
 };

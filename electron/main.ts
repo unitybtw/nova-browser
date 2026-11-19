@@ -11,6 +11,7 @@ import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
 import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback, getMemoizedScryptKey, computeFileSha256Stream, SecureStoreKeyedRWLock } from './main/proxySecurity';
+import { parseGitHubRelease, isTrustedReleaseMediaUrl, type ParsedReleaseVersion, type ReleaseManifestLike, type GitHubCommitLike } from './main/releaseChangelogParser';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, SecureStoreKeyedRWLock };
 
 console.log('Main process starting...');
@@ -796,8 +797,8 @@ function createWindow() {
       const isDev = isDevLocalhost || !app.isPackaged;
       responseHeaders['Content-Security-Policy'] = [
         isDev
-          ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http://localhost:*; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com https://www.bing.com https://openrouter.ai https://api.groq.com https://api.openai.com https://api.deepseek.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
-          : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com https://www.bing.com https://openrouter.ai https://api.groq.com https://api.openai.com https://api.deepseek.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
+          ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http://localhost:*; media-src 'self' blob: http://localhost:* https://github.com https://*.githubusercontent.com; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com https://www.bing.com https://openrouter.ai https://api.groq.com https://api.openai.com https://api.deepseek.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+          : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: https://github.com https://*.githubusercontent.com; connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://raw.githubusercontent.com https://fonts.googleapis.com https://www.bing.com https://openrouter.ai https://api.groq.com https://api.openai.com https://api.deepseek.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
       ];
       responseHeaders['X-Content-Type-Options'] = ['nosniff'];
     }
@@ -2797,6 +2798,140 @@ fi
     return { success: false, error: 'Automatic installation not supported for this package type; opened containing folder.' };
   }
 
+  const CHANGELOG_CACHE_SCHEMA_VERSION = 2;
+  const CHANGELOG_CACHE_TTL_MS = 60 * 60 * 1000;
+  let changelogSyncInFlight: Promise<ParsedReleaseVersion[] | null> | null = null;
+
+  function getChangelogCachePath(): string {
+    return path.join(app.getPath('userData'), 'changelog_cache.json');
+  }
+
+  async function fetchJsonBounded<T>(url: string, timeoutMs: number, maxBytes = 256 * 1024): Promise<T | null> {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': getStandardUserAgent() },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!res.ok) return null;
+      const contentLen = Number(res.headers?.get?.('content-length') || 0);
+      if (contentLen > maxBytes) return null;
+      const text = await res.text();
+      if (!text || Buffer.byteLength(text, 'utf8') > maxBytes) return null;
+      return JSON.parse(text) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  async function buildAndCacheChangelogReleases(rawReleases: any[]): Promise<ParsedReleaseVersion[]> {
+    const nonDrafts = rawReleases.filter((r) => r && !r.draft && r.tag_name).slice(0, 10);
+    const parsedReleases: ParsedReleaseVersion[] = [];
+
+    for (let i = 0; i < nonDrafts.length; i++) {
+      const r = nonDrafts[i];
+      const prev = nonDrafts.slice(i + 1).find((x: any) => !x.draft && x.tag_name);
+      const tag = String(r.tag_name || '').trim();
+
+      // 1. Prefer attached changelog-media.json / release-manifest.json asset when present
+      let manifest: ReleaseManifestLike | null = null;
+      if (Array.isArray(r.assets)) {
+        const manifestAsset = r.assets.find(
+          (a: any) =>
+            typeof a?.name === 'string' &&
+            /^(?:changelog-media|release-manifest)\.json$/i.test(a.name) &&
+            (!a.size || a.size <= 131072) &&
+            isTrustedReleaseMediaUrl(String(a.browser_download_url || ''))
+        );
+        if (manifestAsset?.browser_download_url) {
+          manifest = await fetchJsonBounded<ReleaseManifestLike>(manifestAsset.browser_download_url, 4000, 131072);
+        }
+      }
+
+      // 2. Fallback to tag-level manifest in repo for recent releases if still missing manifest
+      const safeTag = /^[a-zA-Z0-9._-]+$/.test(tag) ? tag : '';
+      let parsed = parseGitHubRelease(r, { manifest });
+
+      // 3. Query GitHub Compare commits if release body yielded <= 1 synthesized/fallback item
+      const bodyHasBullets = typeof r.body === 'string' && /(?:^|\n)\s*[-*]\s+\S/.test(r.body);
+      let commits: GitHubCommitLike[] | undefined;
+      if (!bodyHasBullets && prev?.tag_name && safeTag) {
+        const safePrev = String(prev.tag_name).trim();
+        if (/^[a-zA-Z0-9._-]+$/.test(safePrev)) {
+          const compData = await fetchJsonBounded<{ commits?: GitHubCommitLike[] }>(
+            `https://api.github.com/repos/unitybtw/nova-browser/compare/${encodeURIComponent(safePrev)}...${encodeURIComponent(safeTag)}`,
+            5000,
+            512 * 1024
+          );
+          if (Array.isArray(compData?.commits)) {
+            commits = compData.commits;
+          }
+        }
+      }
+
+      // 4. For the top 3 newest releases with no inline/asset media, check repo release-manifest.json
+      if (!manifest && i < 3 && safeTag && (!parsed?.hero && (!parsed?.mediaGallery || parsed.mediaGallery.length === 0))) {
+        manifest = await fetchJsonBounded<ReleaseManifestLike>(
+          `https://raw.githubusercontent.com/unitybtw/nova-browser/${encodeURIComponent(safeTag)}/public/changelog/release-manifest.json`,
+          3000,
+          131072
+        );
+      }
+
+      if (commits || manifest) {
+        parsed = parseGitHubRelease(r, { commits, manifest });
+      }
+      if (parsed) {
+        parsedReleases.push(parsed);
+      }
+    }
+
+    if (parsedReleases.length > 0) {
+      try {
+        await fs.promises.writeFile(
+          getChangelogCachePath(),
+          JSON.stringify({ schemaVersion: CHANGELOG_CACHE_SCHEMA_VERSION, timestamp: Date.now(), releases: parsedReleases }, null, 2),
+          'utf8'
+        );
+      } catch (_) {}
+    }
+
+    return parsedReleases;
+  }
+
+  function fetchAndCacheChangelogReleases(): Promise<ParsedReleaseVersion[] | null> {
+    if (changelogSyncInFlight) return changelogSyncInFlight;
+    const run = (async (): Promise<ParsedReleaseVersion[] | null> => {
+      try {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases?per_page=10', {
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) return null;
+        const raw = await res.json();
+        if (!Array.isArray(raw)) return null;
+        return await buildAndCacheChangelogReleases(raw);
+      } catch {
+        return null;
+      }
+    })().finally(() => {
+      if (changelogSyncInFlight === run) changelogSyncInFlight = null;
+    });
+    changelogSyncInFlight = run;
+    return run;
+  }
+
+  async function syncAndBroadcastChangelog(prefetchedRawReleases?: any[]): Promise<void> {
+    try {
+      const parsed =
+        Array.isArray(prefetchedRawReleases) && prefetchedRawReleases.length > 0
+          ? await buildAndCacheChangelogReleases(prefetchedRawReleases)
+          : await fetchAndCacheChangelogReleases();
+      if (parsed && parsed.length > 0) {
+        sendToMainWindow('changelog-releases-updated', parsed);
+      }
+    } catch (_) {}
+  }
+
   type UpdateCheckResult = { success: boolean; version?: string; isAvailable?: boolean; error?: string };
   // In-flight update check, mirroring the isDownloadingUpdate lock lifecycle
   // above: the slot is claimed synchronously before the first await and released
@@ -2867,6 +3002,7 @@ fi
                 releaseNotes: latestRelease.body || '',
                 releaseName: latestRelease.name || `v${latestTag}`
               });
+              void syncAndBroadcastChangelog(releases);
               return { success: true, version: latestTag, isAvailable: true };
             }
           }
@@ -2915,6 +3051,7 @@ fi
                 releaseNotes: latestRelease.body || '',
                 releaseName: latestRelease.name || `v${latestTag}`
               });
+              void syncAndBroadcastChangelog(releases);
               return { success: true, version: latestTag, isAvailable: true };
             }
           }
@@ -2946,6 +3083,7 @@ fi
       releaseNotes: (info as any)?.releaseNotes || '',
       releaseName: (info as any)?.releaseName || `v${info.version}`
     });
+    void syncAndBroadcastChangelog();
   });
 
   autoUpdater.on('update-not-available', (info) => {
@@ -3538,158 +3676,34 @@ fi
   ipcMain.handle('get-changelog-releases', async (event, forceRefresh?: boolean) => {
     if (!isTrustedSender(event)) return null;
 
-    const cachePath = path.join(app.getPath('userData'), 'changelog_cache.json');
-    const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+    const cachePath = getChangelogCachePath();
 
-    // 1. Read cached releases if valid and not forcing refresh (non-blocking async)
+    // 1. Read v2 cached releases if fresh and not forcing refresh
     if (!forceRefresh) {
       try {
         const cachedRaw = await fs.promises.readFile(cachePath, 'utf8');
         const cached = JSON.parse(cachedRaw);
-        if (cached && Array.isArray(cached.releases) && (Date.now() - (cached.timestamp || 0) < CACHE_TTL_MS)) {
+        if (
+          cached &&
+          cached.schemaVersion === CHANGELOG_CACHE_SCHEMA_VERSION &&
+          Array.isArray(cached.releases) &&
+          Date.now() - (cached.timestamp || 0) < CHANGELOG_CACHE_TTL_MS
+        ) {
           return cached.releases;
         }
       } catch (_) {}
     }
 
-    // 2. Fetch fresh releases from GitHub API
+    // 2. Fetch, parse (descriptions + markdown/asset media + chapters), and cache live GitHub releases
+    const parsed = await fetchAndCacheChangelogReleases();
+    if (parsed && parsed.length > 0) return parsed;
+
+    // 3. Offline fallback to stale disk cache if available
     try {
-      const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases?per_page=10', {
-        headers: { 'User-Agent': getStandardUserAgent() },
-        signal: AbortSignal.timeout(8000)
-      });
-
-      if (!res.ok) {
-        try {
-          const cached = JSON.parse(await fs.promises.readFile(cachePath, 'utf8'));
-          if (cached && Array.isArray(cached.releases)) return cached.releases;
-        } catch (_) {}
-        return null;
-      }
-
-      const releases = await res.json();
-      if (!Array.isArray(releases)) return null;
-
-      const parsedReleases = [];
-
-      for (let i = 0; i < releases.length; i++) {
-        const r = releases[i];
-        if (r.draft) continue;
-
-        const prev = releases.slice(i + 1).find((x: any) => !x.draft && x.tag_name);
-        const tag = r.tag_name || '';
-        const version = tag.replace(/^v/, '');
-        const title = r.name || `Nova Browser v${version}`;
-
-        let dateStr = '';
-        if (r.published_at) {
-          try {
-            const d = new Date(r.published_at);
-            dateStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          } catch (_) {
-            dateStr = r.published_at;
-          }
-        }
-
-        const changes: Array<{ category: 'feature' | 'fix' | 'security' | 'performance' | 'improvement'; text: string }> = [];
-
-        // Check if release body has markdown bullets
-        const lines = (r.body || '').split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-            const rawText = trimmed.replace(/^[-*]\s+/, '').trim();
-            if (!rawText.toLowerCase().includes('full changelog') && !rawText.includes('sha256') && rawText.length > 5) {
-              const match = rawText.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
-              if (match) {
-                const type = match[1].toLowerCase();
-                const scope = match[2] ? `[${match[2]}] ` : '';
-                const desc = match[3];
-                let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
-                if (type === 'feat') cat = 'feature';
-                else if (type === 'fix') cat = 'fix';
-                else if (type === 'perf') cat = 'performance';
-                else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
-                changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
-              } else {
-                changes.push({ category: 'improvement', text: rawText.charAt(0).toUpperCase() + rawText.slice(1) });
-              }
-            }
-          }
-        }
-
-        // If body has no bullets and there is a previous tag, query compare API to get commits
-        if (changes.length === 0 && prev?.tag_name) {
-          try {
-            const safePrev = String(prev.tag_name).trim();
-            const safeCurr = String(tag).trim();
-            if (/^[a-zA-Z0-9._-]+$/.test(safePrev) && /^[a-zA-Z0-9._-]+$/.test(safeCurr)) {
-              const compRes = await fetch(`https://api.github.com/repos/unitybtw/nova-browser/compare/${encodeURIComponent(safePrev)}...${encodeURIComponent(safeCurr)}`, {
-                headers: { 'User-Agent': getStandardUserAgent() },
-                signal: AbortSignal.timeout(5000)
-              });
-              if (compRes.ok) {
-                const compData = await compRes.json();
-                if (Array.isArray(compData.commits)) {
-                  for (const c of compData.commits) {
-                    const msg = (c.commit?.message || '').split('\n')[0].trim();
-                    if (!msg || msg.startsWith('Merge') || msg.startsWith('release:')) continue;
-                    const match = msg.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
-                    if (match) {
-                      const type = match[1].toLowerCase();
-                      const scope = match[2] ? `[${match[2]}] ` : '';
-                      const desc = match[3];
-                      let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
-                      if (type === 'feat') cat = 'feature';
-                      else if (type === 'fix') cat = 'fix';
-                      else if (type === 'perf') cat = 'performance';
-                      else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
-                      changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
-                    } else {
-                      changes.push({ category: 'improvement', text: msg.charAt(0).toUpperCase() + msg.slice(1) });
-                    }
-                  }
-                }
-              }
-            }
-          } catch (_) {}
-        }
-
-        const highlights: string[] = [];
-        for (const ch of changes) {
-          if (highlights.length < 4 && (ch.category === 'feature' || ch.category === 'security' || ch.category === 'fix')) {
-            highlights.push(ch.text);
-          }
-        }
-        if (highlights.length === 0) {
-          for (const ch of changes.slice(0, 3)) {
-            highlights.push(ch.text);
-          }
-        }
-
-        parsedReleases.push({
-          version,
-          date: dateStr || 'Recent',
-          title,
-          highlights,
-          changes
-        });
-      }
-
-      // Cache the parsed releases asynchronously
-      try {
-        await fs.promises.writeFile(cachePath, JSON.stringify({ timestamp: Date.now(), releases: parsedReleases }, null, 2), 'utf8');
-      } catch (_) {}
-
-      return parsedReleases;
-    } catch (err) {
-      console.warn('[Changelog] Failed to fetch live releases from GitHub:', err);
-      try {
-        const cached = JSON.parse(await fs.promises.readFile(cachePath, 'utf8'));
-        if (cached && Array.isArray(cached.releases)) return cached.releases;
-      } catch (_) {}
-      return null;
-    }
+      const cached = JSON.parse(await fs.promises.readFile(cachePath, 'utf8'));
+      if (cached && Array.isArray(cached.releases)) return cached.releases;
+    } catch (_) {}
+    return null;
   });
 
   // Wait 15 seconds before background update check on startup to not slow down initialization

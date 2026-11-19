@@ -272,29 +272,29 @@ export const BackgroundPreviewCard: React.FC<{
       onClick={onSelect}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group relative h-36 rounded-2xl overflow-hidden border-2 text-left transition-all duration-300 cursor-pointer ${
+      className={`group relative h-28 rounded-xl overflow-hidden border text-left transition-colors cursor-pointer ${
         isSelected
-          ? 'border-cyan-500 ring-2 ring-cyan-500/30 shadow-xl shadow-cyan-500/15 scale-[1.02] z-10'
-          : 'border-slate-200 dark:border-slate-800 hover:border-cyan-400/60 dark:hover:border-cyan-500/40 hover:shadow-lg'
+          ? 'border-neutral-900 dark:border-white ring-1 ring-neutral-900 dark:ring-white z-10'
+          : 'border-neutral-200/80 dark:border-white/[0.08] hover:border-neutral-400 dark:hover:border-white/30'
       }`}
     >
       {/* Background Live Preview Layer */}
       {renderBackgroundAnimation(bg.id, isHovered, isSelected)}
 
       {/* Overlay & Content */}
-      <div className="absolute inset-0 flex flex-col justify-between p-3 z-20 pointer-events-none">
+      <div className="absolute inset-0 flex flex-col justify-between p-2.5 z-20 pointer-events-none">
         {/* Selection Checkmark */}
         <div className="flex justify-end w-full">
           {isSelected && (
-            <div className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center shadow-md font-bold">
-              <Check size={12} strokeWidth={3} />
+            <div className="w-5 h-5 rounded-full bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 flex items-center justify-center shadow-xs">
+              <Check size={11} strokeWidth={3} />
             </div>
           )}
         </div>
 
         {/* Bottom Title */}
-        <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent -mx-3 -mb-3 p-3 pt-5 rounded-b-2xl">
-          <p className="text-white font-medium text-sm drop-shadow-sm truncate">
+        <div className="bg-gradient-to-t from-black/85 via-black/40 to-transparent -mx-2.5 -mb-2.5 px-2.5 pb-2.5 pt-4">
+          <p className="text-white font-medium text-xs drop-shadow-sm truncate">
             {bg.name}
           </p>
         </div>

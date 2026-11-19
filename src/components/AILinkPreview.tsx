@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Loader2, Globe, Clock, ExternalLink } from 'lucide-react';
+import { FileText, Loader2, Globe, Clock, ExternalLink } from 'lucide-react';
 import { Readability } from '@mozilla/readability';
 import DOMPurify from 'dompurify';
 import { aiAgent } from '../services/aiAgent';
@@ -237,43 +237,43 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
           exit={{ opacity: 0, scale: 0.96, y: 6 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
           style={{ top: topPos, left: leftPos, position: 'fixed', zIndex: 999999 }}
-          className="w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xl pointer-events-none"
+          className="w-80 bg-white/95 dark:bg-[#141518]/95 backdrop-blur-xl border border-neutral-200/90 dark:border-white/[0.09] rounded-xl p-3.5 shadow-2xl pointer-events-none"
         >
-          <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-neutral-200/80 dark:border-white/[0.07]">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+              <Globe className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
+              <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300 truncate">
                 {domainName}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
               {data && (
-                <span className="flex items-center gap-1 text-[10.5px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                  <Clock className="w-3 h-3" />
+                <span className="flex items-center gap-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded-md border border-neutral-200/80 dark:border-white/[0.08]">
+                  <Clock className="w-2.5 h-2.5" />
                   ~{data.readingTimeMinutes} min
                 </span>
               )}
-              <span className="p-1 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-lg">
-                <Sparkles className="w-3 h-3" />
+              <span className="p-1 bg-neutral-100 dark:bg-white/[0.06] text-neutral-500 dark:text-neutral-400 rounded-md">
+                <FileText className="w-3 h-3" />
               </span>
             </div>
           </div>
 
           {data?.title && (
-            <h4 className="text-[13px] font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2 mb-2">
+            <h4 className="text-[13px] font-semibold text-neutral-950 dark:text-neutral-100 leading-snug line-clamp-2 mb-1.5">
               {data.title}
             </h4>
           )}
 
-          <div className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed min-h-[46px]">
+          <div className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed min-h-[44px]">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-4 text-slate-500 dark:text-slate-400 gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
+              <div className="flex flex-col items-center justify-center py-4 text-neutral-500 dark:text-neutral-400 gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-neutral-500 dark:text-neutral-400" />
                 <span className="text-[11px] font-medium">{loadingText}</span>
               </div>
             ) : error ? (
-              <div className="text-red-500 text-xs text-center py-3 font-medium bg-red-500/5 rounded-xl border border-red-500/10">
+              <div className="text-red-600 dark:text-red-400 text-xs text-center py-3 font-medium bg-red-500/10 rounded-lg border border-red-500/20">
                 {error}
               </div>
             ) : (
@@ -282,12 +282,12 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
           </div>
 
           {data && !isLoading && (
-            <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10.5px] text-slate-400 dark:text-slate-500">
-              <span className="flex items-center gap-1 font-medium text-cyan-600 dark:text-cyan-400">
-                <Sparkles className="w-2.5 h-2.5" />
-                {data.isAiGenerated ? 'AI Summary' : 'Smart Page Preview'}
+            <div className="mt-2.5 pt-2 border-t border-neutral-200/80 dark:border-white/[0.07] flex items-center justify-between text-[10.5px] text-neutral-400 dark:text-neutral-500">
+              <span className="flex items-center gap-1 font-medium text-neutral-600 dark:text-neutral-300">
+                <FileText className="w-2.5 h-2.5" />
+                {data.isAiGenerated ? 'AI Summary' : 'Page Preview'}
               </span>
-              <span className="flex items-center gap-1 opacity-80">
+              <span className="flex items-center gap-1">
                 Click to open <ExternalLink className="w-2.5 h-2.5" />
               </span>
             </div>

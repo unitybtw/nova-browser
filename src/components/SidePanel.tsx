@@ -197,10 +197,10 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
             className="flex w-full items-center justify-between px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer select-none"
           >
             <div className="flex items-center gap-2">
-              <Brain className="w-3.5 h-3.5 text-purple-500" />
+              <Brain className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
               <span className="font-medium text-[11.5px]">Reasoning Process</span>
               {msg.reasoning.durationMs && (
-                <span className="text-[9.5px] font-mono text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                <span className="text-[9.5px] font-mono text-neutral-500 dark:text-neutral-400 bg-neutral-200/70 dark:bg-white/[0.08] px-1.5 py-0.5 rounded-md">
                   {(msg.reasoning.durationMs / 1000).toFixed(1)}s
                 </span>
               )}
