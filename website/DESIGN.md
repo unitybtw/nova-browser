@@ -1,13 +1,20 @@
-# A little more space
+# Nova Browser Website — Monumental Editorial Redesign
 
-User delegated visual direction. Persuasive product-led design: warm white, ink, electric blue, Manrope; cinematic alpine panorama and actual Nova screenshots. Large quiet typography and editorial split sections, no testimonial or metrics grid. Navigation is compact, product tour is the center of the story, the footer is a large typographic brand signature.
+Direction: `name-as-monument` (`design-taste-frontend` seed `819112766`) with hybrid high-contrast Obsidian (`#0b0c0e`), Cool Stone (`#eef0f3`), and Electric Cobalt (`#1f2de6`) full-bleed color fields.
 
-Implementation: standalone React/TypeScript/Vite site, local assets, semantic HTML, bilingual copy, native video dialog, accessible tabs, FAQ disclosures, platform downloads. CSS tokens define color, typography, spacing, corners, and motion. Support reduced motion, keyboard focus, and narrow screens.
+## Visual & Structural System
+- **Idea:** Nova's customizable browser viewport becomes the `O` aperture inside the monumental `N [O] V A` opening wordmark and expands into an interactive Live Browser Studio directly below.
+- **Typography:** Local `@fontsource/red-hat-display` (700, 900) and `@fontsource/red-hat-text` (400, 500) supporting both `latin` and `latin-ext` (Turkish). Strictly 5 page type sizes (`14 / 17 / 24 / 68 / 277 px` on desktop).
+- **House Rules:** Zero hairline dividers, zero resting box-shadows, zero gradients, zero glass blur, zero icon-topped card grids, zero `01/02/03` numbering. Cropped real product UI fragments carry `data-ui` on their root.
+- **Interactive Moments:**
+  - Hero `O` looping dark Nova browser preview (`/images/hero-loop.webm`) with shutter `clip-path` entrance, reduced-motion sync, and visible WCAG 2.2.2 Pause/Play control.
+  - Interactive Live Browser Studio (`src/components/LiveStudio.tsx`): live switching across 4 tab geometries (`Vertical`, `Top bar`, `Compact`, `Below bar`), 3 workspaces (`Personal`, `Work`, `Research`), Dark/Light surfaces, and 3 accessible ARIA experience tabs.
+  - Native `<dialog closedby="any">` 36-second product film player with pointer-position light-dismiss fallback, CSS `overscroll-behavior: contain` scroll containment, EN/TR WebVTT captions, and error retry.
+  - Non-exclusive native `<details>` FAQ with `::details-content` intrinsic-height transition.
+  - Live official `v1.5.2` 3-platform, 6-installer picker (`src/components/DownloadPicker.tsx`).
 
-Verification: production build; desktop and mobile rendered review; 320/375/414/768 widths; language, tour, navigation, dialog and FAQ interaction; valid download links; no missing images or console errors.
-
-## Motion — 2026-10-06
-
-Focal moment: the two-line opening makes room for the actual Nova interface, with a restrained camera entrance over the landscape. Continuity: the product settles toward a flatter angle as it leaves the viewport; tour tabs use one traveling indicator and a bounded image reveal. Feedback: links, platform files, mobile navigation, FAQ and video dialog respond in short, calm transitions. Section headings enter once to establish the next chapter.
-
-Budget: CSS and Web Animations only; no new dependencies or perpetual loops. Pointer depth is limited to fine pointers on desktop. Scroll work is coalesced with requestAnimationFrame; listeners, observers and animations clean up. Content is visible without reveal scripts. System reduced motion disables spatial movement and runtime changes cancel active reveals.
+## Verification
+- `npm --prefix website test` (JSDOM regression suite)
+- `npm --prefix website run build` (`tsc -b && vite build`)
+- `design-taste-frontend/scripts/lint.mjs`: `0 FAIL, 0 WARN`
+- `design-taste-frontend/scripts/inspect.mjs`: `0 FAIL, 0 WARN` across 1440px, 768px, and 390px viewports

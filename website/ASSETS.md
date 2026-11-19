@@ -1,21 +1,15 @@
 # Assets
 
-All assets are served locally; the site does not request external image or font hosts.
+All assets are served locally from `website/public/` or bundled via Vite; the site makes zero requests to external image or font hosts.
 
-- `public/images/nova-icon.svg`, `nova-mark.svg`: original Nova logo assets from the repository.
-- `newtab.png`, `assistant.png`, `sync.png`: original repository screenshots. The assistant image is displayed as a CSS crop of the actual sidebar; no UI was invented or redrawn.
-- `tour.webm`, `tour-poster.jpg`: existing Nova product walkthrough from `website/public/demo/`. The walkthrough is silent and has a descriptive text label.
-- Manrope: installed through `@fontsource-variable/manrope`, served by Vite. Lucide icons: `lucide-react`.
-- `alpine.webp`: generated for this website with the built-in image generation tool, then converted to WebP at quality 86 (approximately 135 KB).
-
-## Landscape generation prompt
-
-Use case: photorealistic-natural. Create a premium panoramic landscape asset for a sophisticated desktop browser website. Wide 16:9 composition. A dreamlike but photographic aerial landscape of pale ice-blue alpine mountain ridges with a calm turquoise lake and soft luminous clouds, morning light, powder blue and periwinkle shadows, extremely elegant quiet atmosphere. The top half is very pale almost white blue open sky and soft haze, the lower half has sweeping diagonal mountain ridges and the lake. Restrained editorial travel photography, medium format camera, realistic fine details, no grain, no people, no buildings. This is a website background behind a separate actual product screenshot. No text, no logos, no browser, no UI, no devices, no typography. Avoid oversaturated fantasy colors. Edge to edge image.
-
-## New website product film
-
-`nova-tour.mp4` and `nova-tour.poster.jpg` replace the original walkthrough in the video dialog. The 27-second, 1080p/30fps film was authored and rendered in Remotion using real Nova screenshots, the existing generated alpine landscape, and the site’s Manrope font. Its instrumental score was synthesized for this project without third-party music. English and Turkish WebVTT captions are provided. Editable source and render instructions: `video/src/NovaWebsiteTour.tsx` and `video/WEBSITE-TOUR.md`.
-
-## Updated tour screenshots — 2026-10-06
-
-`newtab-current.jpg` and `assistant-current.jpg` are unaltered 1280 × 720 captures of Nova's current React renderer in the local web preview, using the light theme. They show the simplified shortcuts and assistant controls. The wallpaper credit remains visible in each screenshot. The tour contains the entire window rather than enlarging it beyond the panel. The sync screenshot remains the existing product capture; its CSS frame preserves the complete dialog.
+- **Typography:** `@fontsource/red-hat-display` (weights 700, 900) and `@fontsource/red-hat-text` (weights 400, 500) with both `latin` and `latin-ext` subsets bundled by Vite.
+- **Brand marks:** `public/images/nova-icon.svg` and `public/images/nova-mark.svg` (high-contrast light/cobalt mark for the Obsidian footer).
+- **Hero looping preview:** `public/images/hero-loop.webm` (~207 KB, silent VP9 clip trimmed from the clean dark segment of `tour.webm`) and `public/images/hero-loop.jpg` (~58 KB matching poster frame).
+- **Real Nova Browser screenshots:**
+  - `public/images/studio-layout.png`: real Live Design Studio shell layout controls capture (Classic Top, Compact Row, Vertical Left, Vertical Right).
+  - `public/images/studio-dark.png`: real Live Design Studio dark mode and Advanced Surface Inspector capture.
+  - `public/images/newtab-clean-light.jpg`: real light-theme New Tab capture.
+  - `public/images/assistant-clean-light.jpg`: real Local WebGPU AI sidebar capture.
+  - `public/images/tour-poster.jpg`: real dark-theme Split View capture.
+  - `public/images/sync-clean-light.jpg`: real Nova Sync sign-in dialog capture.
+- **Narrated product film:** `public/images/nova-tour.mp4`, `public/images/nova-tour.poster.jpg`, `public/images/nova-tour.en.vtt`, and `public/images/nova-tour.tr.vtt` played inside the native `<dialog>` overlay.
