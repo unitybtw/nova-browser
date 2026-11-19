@@ -1,5 +1,5 @@
-import { type KeyboardEvent, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, Layers3, LockKeyhole, Play, RotateCw, ShieldCheck, Sparkles } from 'lucide-react'
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { ArrowDown, ArrowLeft, ArrowRight, Layers3, LockKeyhole, Pause, Play, RotateCw, ShieldCheck, Sparkles } from 'lucide-react'
 import type { SiteCopy, StudioLayoutId, StudioSurface, StudioWorkspaceId } from '../content'
 
 interface LiveStudioProps {
@@ -44,9 +44,35 @@ export function LiveStudio({ t, activeTab, onSelectTab, onWatchFilm, onMoveTab }
   const [workspace, setWorkspace] = useState<StudioWorkspaceId>('personal')
   const [surface, setSurface] = useState<StudioSurface>('dark')
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(0)
+  const [previewPaused, setPreviewPaused] = useState(false)
+  const previewVideoRef = useRef<HTMLVideoElement>(null)
 
   const ws = t.studioWorkspaces[workspace]
   const media = resolveViewportMedia(activeTab, workspace, surface)
+  const showLiveVideo = activeTab === 0 && workspace === 'personal' && surface === 'dark'
+
+  useEffect(() => {
+    const video = previewVideoRef.current
+    if (!video || !showLiveVideo) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+    const syncPlayback = () => {
+      if (reduced.matches || previewPaused) {
+        video.pause()
+      } else {
+        const playResult = video.play?.()
+        if (playResult && typeof playResult.catch === 'function') {
+          playResult.catch(() => {})
+        }
+      }
+    }
+
+    syncPlayback()
+    reduced.addEventListener('change', syncPlayback)
+    return () => {
+      reduced.removeEventListener('change', syncPlayback)
+    }
+  }, [previewPaused, showLiveVideo])
 
   const renderTabStrip = (orientation: 'row' | 'column') => (
     <div className={`ui-tabs ui-tabs--${orientation}`}>
@@ -166,11 +192,39 @@ export function LiveStudio({ t, activeTab, onSelectTab, onWatchFilm, onMoveTab }
                     loading="lazy"
                     decoding="async"
                   />
+                  {showLiveVideo && (
+                    <video
+                      ref={previewVideoRef}
+                      className={`ui-canvas-video ${previewPaused ? 'is-paused' : ''}`}
+                      src="/images/hero-loop.webm"
+                      poster="/images/hero-loop.jpg"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      width="1280"
+                      height="800"
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
               </div>
             </div>
           </div>
-          <p className="studio-caption">{t.studioCaption}</p>
+          <div className="studio-caption-row">
+            <p className="studio-caption">{t.studioCaption}</p>
+            {showLiveVideo && (
+              <button
+                type="button"
+                className="studio-preview-toggle"
+                onClick={() => setPreviewPaused((prev) => !prev)}
+              >
+                {previewPaused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
+                <span>{previewPaused ? t.heroVideoPlay : t.heroVideoPause}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="studio-editorial">

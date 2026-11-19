@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpRight, Globe2, Menu, Pause, Play, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpRight, Globe2, Menu, X } from 'lucide-react'
 import { copy, PLATFORMS, REPO_URL, type Lang } from './content'
 import { LiveStudio } from './components/LiveStudio'
 import { FeatureProofs } from './components/FeatureProofs'
@@ -22,11 +22,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [platform, setPlatform] = useState(0)
-  const [heroPaused, setHeroPaused] = useState(false)
 
   const headerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const heroVideoRef = useRef<HTMLVideoElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const lastDialogTriggerRef = useRef<HTMLElement | null>(null)
 
@@ -41,30 +39,6 @@ export default function App() {
       /* Storage may be disabled in private contexts. */
     }
   }, [lang, t.docTitle])
-
-  // Sync hero preview loop with reduced motion and pause toggle (WCAG 2.2.2)
-  useEffect(() => {
-    const video = heroVideoRef.current
-    if (!video) return
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
-
-    const syncPlayback = () => {
-      if (reduced.matches || heroPaused) {
-        video.pause()
-      } else {
-        const playResult = video.play?.()
-        if (playResult && typeof playResult.catch === 'function') {
-          playResult.catch(() => {})
-        }
-      }
-    }
-
-    syncPlayback()
-    reduced.addEventListener('change', syncPlayback)
-    return () => {
-      reduced.removeEventListener('change', syncPlayback)
-    }
-  }, [heroPaused])
 
   // Accessible mobile drawer dismiss behavior
   useEffect(() => {
@@ -191,35 +165,21 @@ export default function App() {
       </header>
 
       <main id="main" tabIndex={-1}>
-        {/* Hero: Photograph for a letter (Obsidian dark opening) */}
+        {/* Hero: Monumental NOVA with the Orbital Eclipse Ring logo as the letter O */}
         <section className="band band--dark hero-section" aria-labelledby="hero-title">
           <div className="container hero-inner">
             <div className="hero-monument-wrap">
               <h1 id="hero-title" className="hero-monument" data-rise style={{ '--i': 0 } as CSSProperties}>
                 <span className="sr-only">Nova</span>
                 <span className="monument-glyph" aria-hidden="true">N</span>
-                <span className="hero-aperture shutter" aria-hidden="true">
+                <span className="hero-logo-glyph shutter" aria-hidden="true">
                   <img
-                    className="aperture-poster"
-                    src="/images/hero-loop.jpg"
-                    alt={t.heroVideoAlt}
-                    width="1280"
-                    height="800"
+                    className="hero-logo-img"
+                    src="/images/nova-mark.svg"
+                    alt=""
+                    width="256"
+                    height="256"
                     fetchPriority="high"
-                  />
-                  <video
-                    ref={heroVideoRef}
-                    className={`aperture-video ${heroPaused ? 'is-paused' : ''}`}
-                    src="/images/hero-loop.webm"
-                    poster="/images/hero-loop.jpg"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                    width="1280"
-                    height="800"
-                    aria-hidden="true"
                   />
                 </span>
                 <span className="monument-glyph" aria-hidden="true">VA</span>
@@ -227,17 +187,9 @@ export default function App() {
             </div>
 
             <div className="hero-bottom">
-              <div className="hero-meta-col" data-rise style={{ '--i': 1 } as CSSProperties}>
-                <p className="hero-meta">{t.heroMeta}</p>
-                <button
-                  type="button"
-                  className="preview-toggle"
-                  onClick={() => setHeroPaused((prev) => !prev)}
-                >
-                  {heroPaused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
-                  <span>{heroPaused ? t.heroVideoPlay : t.heroVideoPause}</span>
-                </button>
-              </div>
+              <p className="hero-meta" data-rise style={{ '--i': 1 } as CSSProperties}>
+                {t.heroMeta}
+              </p>
 
               <p className="hero-intro" data-rise style={{ '--i': 2 } as CSSProperties}>
                 {t.heroIntro}

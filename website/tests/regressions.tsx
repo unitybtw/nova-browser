@@ -82,14 +82,20 @@ async function run() {
   await click(document.querySelector('.brand'))
   assert.equal(lastScroll?.behavior, 'smooth', 'Normal motion keeps smooth scroll')
 
-  // 2. Hero preview pause/play control (WCAG 2.2.2)
+  // 2. Hero monumental NOVA renders the new Nova brand mark as the letter O
+  assert.ok(
+    document.querySelector('#hero-title .hero-logo-glyph img[src="/images/nova-mark.svg"]'),
+    'Hero monumental NOVA heading must render the Nova logo mark as the letter O'
+  )
+
+  // 3. Live Browser Studio preview pause/play control (WCAG 2.2.2)
   const pauseBtn = buttonByText('Pause preview')
-  assert.ok(pauseBtn, 'Hero looping video must expose a Pause control')
+  assert.ok(pauseBtn, 'Live Studio looping preview video must expose a Pause control')
   assert.equal(pauseBtn.getAttribute('aria-pressed'), null, 'Pause/Play button whose label changes must not set aria-pressed')
   const pausesBefore = pauses
   await click(pauseBtn)
   assert.equal(pauseBtn.textContent?.trim(), 'Play preview')
-  assert.ok(pauses > pausesBefore, 'Clicking Pause preview must pause the hero video')
+  assert.ok(pauses > pausesBefore, 'Clicking Pause preview must pause the live preview video')
 
   // 3. Live Browser Studio: layout, workspace, surface & keyboard ARIA tablist
   const browserUi = document.querySelector('[data-ui].studio-browser')!

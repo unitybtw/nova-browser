@@ -1,7 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="128 128 768 768" width="768" height="768" fill="none">
-  <path d="M512 140C512 360 360 512 140 512C360 512 512 664 512 884C512 664 664 512 884 512C664 512 512 360 512 140Z" fill="#eef0f3"/>
-  <path d="M512 320L704 512L512 704L320 512Z" fill="#9fa8b7" fill-opacity=".35"/>
-  <circle cx="512" cy="512" r="46" fill="#0b0c0e"/>
-  <circle cx="512" cy="512" r="28" fill="#1f2de6"/>
-  <circle cx="512" cy="512" r="9" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" fill="none">
+  <defs>
+    <mask id="nova-eclipse-mark">
+      <rect width="256" height="256" fill="#ffffff"/>
+      <circle cx="136" cy="120" r="62" fill="#000000"/>
+      <path d="M188 14 C188 50 170 68 134 68 C170 68 188 86 188 122 C188 86 206 68 242 68 C206 68 188 50 188 14 Z" fill="#000000" stroke="#000000" stroke-width="18" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <circle cx="124" cy="132" r="104" fill="#eef0f3" mask="url(#nova-eclipse-mark)"/>
+  <path d="M188 22 C188 52 173 68 142 68 C173 68 188 84 188 114 C188 84 203 68 234 68 C203 68 188 52 188 22 Z" fill="#1f2de6"/>
 </svg>
