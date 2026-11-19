@@ -9,6 +9,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -47,7 +48,7 @@ function rewriteMediaForTag(tag, media) {
 function loadCuratedRelease(version) {
   try {
     const esbuild = require('esbuild');
-    const outFile = path.join('/tmp', `nova-changelog-data-${process.pid}.cjs`);
+    const outFile = path.join(os.tmpdir(), `nova-changelog-data-${process.pid}.cjs`);
     esbuild.buildSync({
       entryPoints: [path.resolve('src/data/changelog.ts')],
       bundle: true,

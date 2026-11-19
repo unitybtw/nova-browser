@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -193,7 +194,7 @@ const htmlContent = `<!DOCTYPE html>
 </html>
 `;
 
-const tempHtmlPath = path.join('/tmp', 'dmg-template.html');
+const tempHtmlPath = path.join(os.tmpdir(), 'dmg-template.html');
 const out2xPath = path.join(rootDir, 'build', 'dmg-background@2x.png');
 const out1xPath = path.join(rootDir, 'build', 'dmg-background.png');
 fs.mkdirSync(path.join(rootDir, 'build'), { recursive: true });

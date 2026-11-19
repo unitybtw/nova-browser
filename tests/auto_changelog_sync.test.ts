@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   isTrustedReleaseMediaUrl,
@@ -316,18 +318,18 @@ console.log('--- Auto Changelog Ingestion & Media Sync Suite ---');
 // 5. Release Manifest Generator CLI Check
 // ---------------------------------------------------------------------------
 {
-  const outPath = `/tmp/test-nova-manifest-${process.pid}.json`;
+  const outPath = path.join(os.tmpdir(), `test-nova-manifest-${process.pid}.json`);
   try {
     execFileSync(
-      'node',
-      ['scripts/generate-release-manifest.mjs', '--tag', 'v1.5.2', '--out', outPath],
+      process.execPath,
+      [path.resolve('scripts/generate-release-manifest.mjs'), '--tag', 'v1.5.3', '--out', outPath],
       { stdio: 'pipe' }
     );
     const manifest = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-    assert.equal(manifest.version, '1.5.2');
+    assert.equal(manifest.version, '1.5.3');
     assert.ok(manifest.lede && manifest.lede.length > 20, 'Generated manifest includes curated lede');
     assert.ok(
-      manifest.hero?.src?.startsWith('https://raw.githubusercontent.com/unitybtw/nova-browser/v1.5.2/public/'),
+      manifest.hero?.src?.startsWith('https://raw.githubusercontent.com/unitybtw/nova-browser/v1.5.3/public/'),
       'Rewrites relative ./screenshots path to raw.githubusercontent.com tag URL'
     );
     assert.ok(Array.isArray(manifest.mediaGallery) && manifest.mediaGallery.length >= 2);
