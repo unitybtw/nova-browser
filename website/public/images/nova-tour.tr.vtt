@@ -1,19 +1,19 @@
 WEBVTT
 
-00:00.400 --> 00:05.720
-Meet Nova. A browser designed around focus, speed, and your own space.
+00:00.450 --> 00:04.480
+Nova ile tanış. Canlı olarak şekillendirdiğin açık kaynak masaüstü tarayıcı.
 
-00:05.850 --> 00:11.609
-Organize your day with vertical tabs, isolated workspaces, and an instant command bar.
+00:06.350 --> 00:15.501
+Live Design Studio'yu aç ve her çubuğu gerçek zamanlı şekillendir. Dört sekme geometrisi arasında geç, araç çubuğunu sırala ve her çalışma alanını kendi tarzına göre kur.
 
-00:12.050 --> 00:18.106
-Work side by side in Split View, while inactive tabs quietly hibernate to save memory.
+00:16.300 --> 00:22.358
+Dikey sekmelerle çalışma alanlarını ayır, Bölünmüş Ekran'da iki sayfayı yan yana aç ve boşta kalan sekmeler otomatik uyusun.
 
-00:18.450 --> 00:24.914
-Ask Nova Assistant anything. Powered by WebGPU, local models run right on your device.
+00:23.300 --> 00:29.786
+Herhangi bir sayfanın yanında Nova Asistan'a sor. Yerel WebGPU modelleri ve Whisper ses motoru doğrudan kendi donanımında çalışır.
 
-00:25.250 --> 00:31.085
-Built-in protection blocks trackers automatically, and end-to-end encryption keeps your sync private.
+00:30.250 --> 00:35.510
+Chrome eklentilerini kur, ajanları yerel MCP ile bağla ve eşitlemeni şifreli tut.
 
-00:31.000 --> 00:36.000
-Free and open source for Mac, Windows, and Linux. Make room for Nova.
+00:36.450 --> 00:41.534
+macOS, Windows ve Linux için ücretsiz ve açık kaynak. Nova ile web senin kalsın.

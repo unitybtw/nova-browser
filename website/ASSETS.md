@@ -11,4 +11,4 @@ All assets are served locally from `website/public/` or bundled via Vite; the si
   - `public/images/shot-split.jpg`: Dual Split View displaying a GitHub repository and New Tab side by side.
   - `public/images/shot-extensions.jpg`: Extensions modal with direct Chrome Web Store URL and 32-character extension ID installer bar.
   - `public/images/shot-sync.jpg`: Nova Sync sign-in dialog in dark mode.
-- **Narrated product film:** `public/images/nova-tour.mp4`, `public/images/nova-tour.poster.jpg`, `public/images/nova-tour.en.vtt`, and `public/images/nova-tour.tr.vtt` played inside the native `<dialog>` overlay.
+- **Narrated launch film (42s, 1080p 60fps):** `public/images/nova-tour.mp4`, `public/images/nova-tour.poster.jpg`, `public/images/nova-tour.en.vtt`, and `public/images/nova-tour.tr.vtt` rendered from `video/src/NovaLaunchFilm.tsx` with real 2× Retina Nova v1.5.2 captures and played inside the native `<dialog>` overlay.

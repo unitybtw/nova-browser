@@ -1,5 +1,6 @@
 import React from 'react';
 import { Composition } from 'remotion';
+import { NovaLaunchFilm } from './NovaLaunchFilm';
 import { NovaPromo } from './NovaPromo';
 import { NovaShorts } from './NovaShorts';
 import { NovaBrowserAd, NovaBrowserAdShorts } from './NovaBrowserAd';
@@ -9,6 +10,15 @@ import { NovaUpdateGuide } from './NovaUpdateGuide';
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* 16:9 Monumental Editorial Launch Film (1920x1080, 60fps, 42s = 2520 frames) */}
+      <Composition
+        id="NovaLaunchFilm"
+        component={NovaLaunchFilm}
+        durationInFrames={2520}
+        fps={60}
+        width={1920}
+        height={1080}
+      />
       <Composition id="NovaUpdateGuide" component={NovaUpdateGuide} durationInFrames={540} fps={30} width={1920} height={1080} />
       <Composition id="NovaWebsiteTour" component={NovaWebsiteTour} durationInFrames={1080} fps={30} width={1920} height={1080} />
       {/* 16:9 Apple-Style Product Launch Film (1920x1080, 30fps, 36s = 1080 frames, English Ava Voiceover) */}

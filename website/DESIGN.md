@@ -10,7 +10,7 @@ Direction: `name-as-monument` (`design-taste-frontend` seed `819112766`) with hy
   - Monumental `N [Orbital Eclipse Ring] V A` hero with `shutter` clip-path reveal.
   - Real Embedded Interactive Nova Browser Demo (`src/components/LiveStudio.tsx`): loads the actual compiled Nova v1.5.2 React application (`/browser-demo/index.html`) inside a full-width interactive iframe with 4 live scenarios (`Live Design Studio`, `Vertical Tabs`, `Local AI`, `Split View`), instant Dark/Light theme syncing via `postMessage` (`NOVA_THEME_CHANGE`), fullscreen link, and accessible ARIA tablist keyboard navigation.
   - Five uniform dark-theme 1440×900 interface proofs captured fresh from Nova v1.5.2 (`shot-studio.jpg`, `shot-ai.jpg`, `shot-split.jpg`, `shot-extensions.jpg`, `shot-sync.jpg`).
-  - Native `<dialog closedby="any">` 36-second product film player with pointer-position light-dismiss fallback, CSS `overscroll-behavior: contain` scroll containment, EN/TR WebVTT captions, and error retry.
+  - Native `<dialog closedby="any">` 42-second Monumental Editorial launch film player with pointer-position light-dismiss fallback, CSS `overscroll-behavior: contain` scroll containment, EN/TR WebVTT captions, and error retry.
   - Non-exclusive native `<details>` FAQ with `::details-content` intrinsic-height transition.
   - Live official `v1.5.2` 3-platform, 6-installer picker (`src/components/DownloadPicker.tsx`).
 

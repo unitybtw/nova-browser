@@ -1,0 +1,56 @@
+[
+  {
+    "index": 0,
+    "start": 0.45,
+    "end": 4.48,
+    "duration": 4.03,
+    "wav": "/Users/siracsimsek/Desktop/novabrowser/video/out/launch-audio/seg-0.wav",
+    "en": "Meet Nova. The open-source desktop browser you reshape live.",
+    "tr": "Nova ile tanış. Canlı olarak şekillendirdiğin açık kaynak masaüstü tarayıcı."
+  },
+  {
+    "index": 1,
+    "start": 6.35,
+    "end": 15.501,
+    "duration": 9.151,
+    "wav": "/Users/siracsimsek/Desktop/novabrowser/video/out/launch-audio/seg-1.wav",
+    "en": "Open Live Design Studio and reshape every bar in real time. Switch between four tab geometries, reorder your toolbar, and style each workspace your way.",
+    "tr": "Live Design Studio'yu aç ve her çubuğu gerçek zamanlı şekillendir. Dört sekme geometrisi arasında geç, araç çubuğunu sırala ve her çalışma alanını kendi tarzına göre kur."
+  },
+  {
+    "index": 2,
+    "start": 16.3,
+    "end": 22.358,
+    "duration": 6.058,
+    "wav": "/Users/siracsimsek/Desktop/novabrowser/video/out/launch-audio/seg-2.wav",
+    "en": "Isolate workspaces with vertical tabs, open two pages in Split View, and let idle tabs sleep.",
+    "tr": "Dikey sekmelerle çalışma alanlarını ayır, Bölünmüş Ekran'da iki sayfayı yan yana aç ve boşta kalan sekmeler otomatik uyusun."
+  },
+  {
+    "index": 3,
+    "start": 23.3,
+    "end": 29.786,
+    "duration": 6.486,
+    "wav": "/Users/siracsimsek/Desktop/novabrowser/video/out/launch-audio/seg-3.wav",
+    "en": "Ask Nova Assistant beside any page. Local WebGPU models and Whisper voice run right on your hardware.",
+    "tr": "Herhangi bir sayfanın yanında Nova Asistan'a sor. Yerel WebGPU modelleri ve Whisper ses motoru doğrudan kendi donanımında çalışır."
+  },
+  {
+    "index": 4,
+    "start": 30.25,
+    "end": 35.51,
+    "duration": 5.26,
+    "wav": "/Users/siracsimsek/Desktop/novabrowser/video/out/launch-audio/seg-4.wav",
+    "en": "Install Chrome extensions, connect agents via local MCP, and keep your sync encrypted.",
+    "tr": "Chrome eklentilerini kur, ajanları yerel MCP ile bağla ve eşitlemeni şifreli tut."
+  },
+  {
+    "index": 5,
+    "start": 36.45,
+    "end": 41.534,
+    "duration": 5.084,
+    "wav": "/Users/siracsimsek/Desktop/novabrowser/video/out/launch-audio/seg-5.wav",
+    "en": "Free and open source for macOS, Windows, and Linux. Make the web yours with Nova.",
+    "tr": "macOS, Windows ve Linux için ücretsiz ve açık kaynak. Nova ile web senin kalsın."
+  }
+]

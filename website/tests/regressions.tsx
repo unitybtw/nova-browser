@@ -179,7 +179,7 @@ async function run() {
   assert.equal(dialog.getAttribute('aria-modal'), null, 'Native modal <dialog> must not set redundant aria-modal')
   assert.equal(dialog.getAttribute('closedby'), 'any')
   document.body.style.overflow = 'clip'
-  await click(buttonByText('Watch 36s film'))
+  await click(buttonByText('Watch 42s film'))
   assert.equal(dialog.open, true)
   assert.equal(document.body.style.overflow, 'clip', 'Native modal <dialog> must not mutate body overflow')
   const video = dialog.querySelector('video')!
