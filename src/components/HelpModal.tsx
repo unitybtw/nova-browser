@@ -151,7 +151,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
   const [webGpuStatus, setWebGpuStatus] = useState<'checking' | 'supported' | 'unsupported'>('checking');
   
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.2';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.3';
   });
 
   const [systemVersions, setSystemVersions] = useState<{

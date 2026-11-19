@@ -47,10 +47,99 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.5.3',
+    date: 'November 2026',
+    title: 'Native macOS & Linear UI Overhaul, Swiss Release Ledger & Choreographed Onboarding',
+    badge: 'Latest Release',
+    lede: 'A comprehensive native macOS and Linear-inspired architectural redesign across 30+ browser components, featuring a Swiss typographic release ledger with automatic GitHub media ingestion, a choreographed zero-shift onboarding flow with live theme morphing, smooth drag ghost tokens in Live Design Studio, and an Obsidian Studio DMG installer.',
+    hero: {
+      src: './screenshots/horizontal-newtab.png',
+      alt: 'Nova Browser v1.5.3 interface with native macOS and Linear-inspired precision chrome.',
+      caption: 'Nova v1.5.3: Precision 1px hairline architecture, Swiss release ledger, and choreographed motion across every surface.',
+    },
+    mediaGallery: [
+      {
+        src: './screenshots/horizontal-newtab.png',
+        kind: 'image',
+        title: 'Native macOS & Linear Design Language',
+        alt: 'Nova Browser v1.5.3 horizontal layout and redesigned precision surfaces',
+        caption: 'Unified neutral surfaces (#fcfcfd / #111214), 1px hairlines, and crisp tabular typography across 30+ components.',
+      },
+      {
+        src: './screenshots/vertical-clean-light.jpg',
+        kind: 'image',
+        title: 'Swiss Release Ledger & Auto Media Ingestion',
+        alt: 'Clean editorial layout and vertical sidebar integration',
+        caption: 'Unboxed Swiss release notes with automated GitHub release Markdown/HTML/Asset media extraction and live IPC push.',
+      },
+      {
+        src: './screenshots/horizontal-clean-light.jpg',
+        kind: 'image',
+        title: 'Choreographed Onboarding & Smooth Motion Layer',
+        alt: 'Precision browser frame with spring-driven transitions',
+        caption: 'Fixed-chrome onboarding with live reactive canvas theme morphing, custom toolbar drag ghosts, and spring physics.',
+      },
+    ],
+    highlights: [
+      'Redesigned 30+ browser surfaces (Settings, Live Design Studio, Omnibox, SidePanel, Popovers, Modals, History, Downloads, Reader Mode) in a native macOS and Linear precision aesthetic.',
+      'Rebuilt nova://changelog as an unboxed Swiss / Linear editorial release ledger with a 1px reading progress hairline, sliding version rail, full-bleed filmstrip lightbox, and underline-tabbed change ledger.',
+      'Added automated GitHub Release description and media ingestion (releaseChangelogParser) with trusted URL validation, commit-compare chapter synthesis, and live auto-updater IPC push.',
+      'Crafted a choreographed Apple/Linear onboarding experience with fixed top/bottom chrome, live full-canvas theme morphing, interactive mini browser preview, and directional blur-to-crisp stage transitions.',
+      'Fixed Customize Mode toolbar drag-and-drop snapshot glitches with a compact high-DPI ghost pill and isolated Split View drop zones during toolbar customization.',
+      'Designed a new Obsidian Studio macOS DMG installer canvas with dual-ring vector drop targets, subtle 1px architectural grid lines, and crisp Retina typography.',
+    ],
+    sections: [
+      {
+        eyebrow: 'Design Architecture',
+        title: 'Native macOS & Linear precision across 30+ surfaces',
+        body: 'Replaced heavy decorative gradients, neon glows, and boxed cards with disciplined neutral surfaces, 1px hairline borders, and shared spring physics tokens.',
+        points: [
+          'Unified Settings (all 10 sections), Live Design Studio, Spotlight Omnibox, AI SidePanel, and all popovers/modals around #fcfcfd light and #111214 dark surfaces.',
+          'Shared spring curves (SPRING_SNAPPY, SPRING_SMOOTH,POPOVER_TRANSITION) and animated modal backdrop exits provide cohesive 120fps spatial continuity.',
+          'Custom high-DPI drag ghost pills in Live Design Studio eliminate oversized browser drag snapshots and prevent accidental Split View drop overlays.',
+        ],
+        media: {
+          src: './screenshots/horizontal-newtab.png',
+          alt: 'Nova Browser v1.5.3 redesigned chrome and workspace layout.',
+          caption: 'Hairline geometry and spring-driven micro-interactions across the entire browser shell.',
+        },
+        stats: [
+          { value: '30+', label: 'Components Redesigned' },
+          { value: '1px', label: 'Hairline Geometry' },
+          { value: '120fps', label: 'Spring Motion Layer' },
+        ],
+      },
+      {
+        eyebrow: 'Release Engineering',
+        title: 'Swiss Release Ledger & Automatic Media Ingestion',
+        body: 'Every new version detected by the auto-updater automatically parses release notes, extracts screenshots and videos from GitHub Releases, and pushes live updates to the changelog ledger.',
+        points: [
+          'Extracts Markdown images, HTML <img>/<video> tags, GitHub user-attachments, and uploaded release asset media with strict domain and badge filtering.',
+          'Synthesizes structured editorial chapters and categorized change ledgers from GitHub compare commit history whenever release notes are brief.',
+          'Unboxed Swiss typography with keyboard navigation (j/k, arrows, /, Esc) and cross-release search.',
+        ],
+        media: {
+          src: './screenshots/vertical-clean-light.jpg',
+          alt: 'Swiss editorial layout and clean sidebar navigation.',
+          caption: 'Automatic GitHub Release media parsing paired with a distraction-free Swiss editorial ledger.',
+        },
+      },
+    ],
+    changes: [
+      { category: 'feature', text: 'Swiss / Linear editorial ChangelogPage (nova://changelog) with unboxed typography, 1px scroll progress hairline, sliding version indicator, lightbox filmstrip, and cross-release search.' },
+      { category: 'feature', text: 'Automatic GitHub Release description and media ingestion engine (releaseChangelogParser.ts) supporting Markdown/HTML media, user-attachments, release assets, and live IPC push on auto-updater detection.' },
+      { category: 'feature', text: 'Choreographed Apple/Linear Onboarding flow with fixed top/bottom chrome, live reactive full-canvas theme morphing (Light/Dark/System), and interactive LiveBrowserThemePreview.' },
+      { category: 'feature', text: 'Obsidian Studio macOS DMG installer window background (660x440 & 1320x880 Retina) with architectural grid hairlines, glowing connector track, and dual-ring drop target.' },
+      { category: 'improvement', text: 'Complete native macOS / Linear visual overhaul across SettingsPage (all 10 sections), Live Design Studio, SpotlightOmnibox, SidePanel, Popovers, Modals, HistoryPage, DownloadsPage, and ReaderMode.' },
+      { category: 'improvement', text: 'Shared motion token library (src/utils/motion.ts) with spring-driven layoutId active pills, tab content crossfades, and smooth popover scale/opacity transitions.' },
+      { category: 'fix', text: 'Replaced oversized default browser drag snapshot in Customize Mode with a compact custom ghost pill and prevented Split View drop overlay from triggering during toolbar icon drags.' },
+      { category: 'fix', text: 'Preserved corrupt legacy AI memory vault backups in safeStorage while maintaining sensitive credential key filtering.' },
+    ],
+  },
+  {
     version: '1.5.2',
     date: 'November 2026',
     title: 'Startup Performance Optimization, Memory Hardening & Render Fluidity',
-    badge: 'Latest Release',
     lede: 'Zero-latency instant startup with asynchronous extension loading, pre-bundled core dependencies, cooperative reader micro-yielding, 300ms throttled adblock badge batching, fine-grained secure store RWLock concurrency, and layout thrashing elimination.',
     hero: {
       src: './screenshots/vertical-clean-light.jpg',

@@ -83,7 +83,7 @@ function isVersionNewer(candidate: string, current: string): boolean {
 }
 
 /** Swiss / Linear Editorial Release Ledger for nova://changelog. */
-export function ChangelogPage({ currentVersion = '1.5.2', onNavigate }: ChangelogPageProps) {
+export function ChangelogPage({ currentVersion = '1.5.3', onNavigate }: ChangelogPageProps) {
   const { t } = useTranslation();
   const [releases, setReleases] = useState<ReleaseVersion[]>(CHANGELOG_DATA);
   const [selected, setSelected] = useState(CHANGELOG_DATA[0]?.version || currentVersion);

@@ -7,8 +7,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const htmlContent = `
-<!DOCTYPE html>
+/**
+ * Generates the macOS DMG installer background (`build/dmg-background@2x.png` at 1320x880
+ * and `build/dmg-background.png` at 660x440).
+ *
+ * Coordinate alignment with `package.json -> build.dmg`:
+ *   - Window: 660x440 (1x) -> 1320x880 (2x)
+ *   - Icon size: 128pt (1x) -> 256px (2x)
+ *   - App icon center: (180, 220) in 1x -> (360, 440) in 2x (spans x: 232..488, y: 312..568)
+ *   - Applications link center: (480, 220) in 1x -> (960, 440) in 2x (spans x: 832..1088, y: 312..568)
+ *   - Finder icon labels occupy y: ~576..618 in 2x
+ *   - Visible Finder content height (440pt minus ~28pt titlebar) is ~412pt (824px in 2x)
+ */
+const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -19,308 +30,164 @@ const htmlContent = `
       padding: 0;
       -webkit-font-smoothing: antialiased;
     }
+
     body {
       width: 1320px;
       height: 880px;
-      background-color: #080a11;
-      background-image: 
-        radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.22) 0%, rgba(14, 165, 233, 0.08) 35%, transparent 65%),
-        radial-gradient(circle at 18% 50%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
-        radial-gradient(circle at 82% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
-        linear-gradient(180deg, #090c15 0%, #06080e 100%);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
-      color: #ffffff;
+      background-color: #0b0c0e;
+      background-image:
+        radial-gradient(ellipse 68% 42% at 50% 0%, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 48%, transparent 78%),
+        linear-gradient(180deg, #0d0e11 0%, #0b0c0e 55%, #090a0c 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", Helvetica, Arial, sans-serif;
+      color: #fafafa;
       position: relative;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      padding: 58px 60px 42px;
     }
 
-    /* Perimeter inner border */
-    .frame-border {
+    /* Subtle top specular hairline */
+    .top-hairline {
       position: absolute;
-      inset: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 26px;
-      pointer-events: none;
-      box-shadow: 
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        inset 0 0 40px rgba(0, 0, 0, 0.6);
-    }
-
-    /* Top ambient light line */
-    .top-glow-line {
-      position: absolute;
-      top: 14px;
-      left: 20%;
-      right: 20%;
+      top: 0;
+      left: 15%;
+      right: 15%;
       height: 1px;
-      background: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.6) 50%, transparent 100%);
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.8);
+      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.14) 50%, transparent 100%);
     }
 
-    /* Header Section */
+    /* Header Section (y: 74..205 in 2x, well clear of icons at y: 312) */
     .header {
-      text-align: center;
-      z-index: 10;
+      position: absolute;
+      top: 76px;
+      left: 0;
+      right: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      text-align: center;
+      gap: 16px;
+      z-index: 10;
     }
 
-    .badge {
+    .brand-row {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 5px 14px;
-      border-radius: 9999px;
-      background: rgba(6, 182, 212, 0.12);
-      border: 1px solid rgba(6, 182, 212, 0.3);
-      color: #38bdf8;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      box-shadow: 0 2px 10px rgba(6, 182, 212, 0.15);
+      gap: 12px;
     }
 
-    .badge-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #38bdf8;
-      box-shadow: 0 0 8px #38bdf8;
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      display: block;
+    }
+
+    .brand-name {
+      font-size: 24px;
+      font-weight: 500;
+      letter-spacing: -0.015em;
+      color: #a1a1aa;
     }
 
     .title {
-      font-size: 36px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      color: #ffffff;
-      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+      font-size: 46px;
+      font-weight: 600;
+      letter-spacing: -0.032em;
+      line-height: 1.12;
+      color: #fafafa;
     }
 
-    .subtitle {
-      font-size: 16px;
-      color: #94a3b8;
-      font-weight: 400;
-      letter-spacing: -0.01em;
-    }
-
-    /* Platform Drop Targets */
-    .targets-container {
+    /* Frameless Sculptural Arrow (centered at x: 660, y: 440 between icons at 360 and 960) */
+    .connector {
       position: absolute;
-      top: 440px; /* y: 220 in 1x -> 440 in 2x */
-      left: 0;
-      width: 1320px;
-      transform: translateY(-50%);
-      pointer-events: none;
+      left: 660px;
+      top: 440px;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       z-index: 5;
     }
 
-    /* Left Target (x: 180 -> 360 in 2x) */
-    .target-left {
-      position: absolute;
-      left: 360px;
-      top: 0;
-      transform: translate(-50%, -50%);
-      width: 250px;
-      height: 250px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(6, 182, 212, 0.16) 0%, rgba(6, 182, 212, 0.04) 55%, transparent 75%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .target-platform {
-      width: 190px;
-      height: 190px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(6, 182, 212, 0.35);
-      background: rgba(6, 182, 212, 0.04);
-      box-shadow: 
-        inset 0 0 20px rgba(6, 182, 212, 0.15),
-        0 0 24px rgba(6, 182, 212, 0.1);
-    }
-
-    /* Right Target (x: 480 -> 960 in 2x) */
-    .target-right {
-      position: absolute;
-      left: 960px;
-      top: 0;
-      transform: translate(-50%, -50%);
-      width: 250px;
-      height: 250px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.16) 0%, rgba(59, 130, 246, 0.04) 55%, transparent 75%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .target-platform-right {
-      width: 190px;
-      height: 190px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(59, 130, 246, 0.35);
-      background: rgba(59, 130, 246, 0.04);
-      box-shadow: 
-        inset 0 0 20px rgba(59, 130, 246, 0.15),
-        0 0 24px rgba(59, 130, 246, 0.1);
-    }
-
-    /* Directional Connector Arrow */
-    .connector-arrow {
-      position: absolute;
-      left: 485px;
-      top: 0;
-      width: 350px;
-      transform: translateY(-50%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .arrow-track {
-      position: relative;
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, 
-        rgba(6, 182, 212, 0.2) 0%, 
-        rgba(56, 189, 248, 0.8) 40%, 
-        rgba(59, 130, 246, 0.8) 85%, 
-        transparent 100%
-      );
-      border-radius: 2px;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
-    }
-
-    /* Pulse dots on arrow track */
-    .pulse-dot-1 {
-      position: absolute;
-      top: -3px;
-      left: 20%;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #38bdf8;
-      box-shadow: 0 0 10px #38bdf8;
-    }
-
-    .pulse-dot-2 {
-      position: absolute;
-      top: -4px;
-      left: 55%;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #ffffff;
-      box-shadow: 0 0 14px #38bdf8;
-    }
-
-    .pulse-dot-3 {
-      position: absolute;
-      top: -3px;
-      left: 82%;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #60a5fa;
-      box-shadow: 0 0 10px #60a5fa;
-    }
-
-    .arrow-head {
-      position: absolute;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 0;
-      height: 0;
-      border-top: 10px solid transparent;
-      border-bottom: 10px solid transparent;
-      border-left: 15px solid #60a5fa;
-      filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.9));
-    }
-
-    /* Footer Section */
+    /* Quiet Signature Footer (placed at y: 726 in 2x so it sits cleanly inside the 824px visible Finder area) */
     .footer {
+      position: absolute;
+      top: 724px;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
       z-index: 10;
-      display: flex;
-      align-items: center;
-      gap: 26px;
-      padding: 9px 24px;
-      border-radius: 9999px;
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
 
-    .footer-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #94a3b8;
+    .footer-rule {
+      width: 96px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .footer-text {
+      font-size: 22px;
       font-weight: 500;
-      letter-spacing: -0.01em;
-    }
-
-    .footer-dot {
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: #334155;
+      letter-spacing: 0.01em;
+      color: #71717a;
     }
   </style>
 </head>
 <body>
-  <div class="frame-border"></div>
-  <div class="top-glow-line"></div>
+  <div class="top-hairline"></div>
 
-  <!-- Header -->
+  <!-- Editorial Header -->
   <div class="header">
-    <div class="badge">
-      <span class="badge-dot"></span>
-      Nova Browser
+    <div class="brand-row">
+      <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+        <defs>
+          <linearGradient id="nova-sq-bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#171b24"/>
+            <stop offset="45%" stop-color="#0d0f14"/>
+            <stop offset="100%" stop-color="#07080b"/>
+          </linearGradient>
+          <linearGradient id="nova-sq-rim" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(238,240,243,0.26)"/>
+            <stop offset="50%" stop-color="rgba(238,240,243,0.1)"/>
+            <stop offset="100%" stop-color="rgba(238,240,243,0.04)"/>
+          </linearGradient>
+          <mask id="nova-eclipse-app">
+            <rect width="1024" height="1024" fill="#ffffff"/>
+            <circle cx="536" cy="488" r="176" fill="#000000"/>
+            <path d="M684 186 C684 288 632 340 530 340 C632 340 684 392 684 494 C684 392 736 340 838 340 C736 340 684 288 684 186 Z" fill="#000000" stroke="#000000" stroke-width="48" stroke-linejoin="round"/>
+          </mask>
+        </defs>
+        <rect x="80" y="80" width="864" height="864" rx="200" fill="url(#nova-sq-bg)" stroke="url(#nova-sq-rim)" stroke-width="16"/>
+        <circle cx="502" cy="522" r="296" fill="#eef0f3" mask="url(#nova-eclipse-app)"/>
+        <path d="M684 208 C684 294 640 340 554 340 C640 340 684 386 684 472 C684 386 728 340 814 340 C728 340 684 294 684 208 Z" fill="#1f2de6"/>
+      </svg>
+      <span class="brand-name">Nova Browser</span>
     </div>
-    <h1 class="title">Drag to Applications to Install</h1>
-    <p class="subtitle">Drag the Nova icon to the Applications folder to complete installation</p>
+    <h1 class="title">Drag Nova Browser to Applications</h1>
   </div>
 
-  <!-- Targets & Connector -->
-  <div class="targets-container">
-    <div class="target-left">
-      <div class="target-platform"></div>
-    </div>
-
-    <div class="connector-arrow">
-      <div class="arrow-track">
-        <div class="pulse-dot-1"></div>
-        <div class="pulse-dot-2"></div>
-        <div class="pulse-dot-3"></div>
-      </div>
-      <div class="arrow-head"></div>
-    </div>
-
-    <div class="target-right">
-      <div class="target-platform-right"></div>
-    </div>
+  <!-- Minimal Frameless Connector Arrow -->
+  <div class="connector">
+    <svg width="200" height="48" viewBox="0 0 200 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="arrow-shaft" x1="16" y1="24" x2="178" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08"/>
+          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.32"/>
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.82"/>
+        </linearGradient>
+      </defs>
+      <line x1="16" y1="24" x2="176" y2="24" stroke="url(#arrow-shaft)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M162 11L177 24L162 37" stroke="#f4f4f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
   </div>
 
-  <!-- Footer -->
+  <!-- Quiet Signature Footer -->
   <div class="footer">
-    <div class="footer-item">On-Device WebGPU AI</div>
-    <span class="footer-dot"></span>
-    <div class="footer-item">Rust Ad-Blocker</div>
-    <span class="footer-dot"></span>
-    <div class="footer-item">Zero-Knowledge Cloud Sync</div>
-    <span class="footer-dot"></span>
-    <div class="footer-item">MIT Open Source</div>
+    <div class="footer-rule"></div>
+    <div class="footer-text">Nova Browser for macOS</div>
   </div>
 </body>
 </html>
@@ -346,9 +213,10 @@ if (!fs.existsSync(chromeBin)) {
 
 console.log('Rendering Retina 2x DMG Background (1320x880)...');
 execSync(
-  `"${chromeBin}" --headless --disable-gpu --screenshot="${out2xPath}" --window-size=1320,880 --default-background-color=00000000 "file://${tempHtmlPath}"`,
+  `"${chromeBin}" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --screenshot="${out2xPath}" --window-size=1320,880 --default-background-color=00000000 "file://${tempHtmlPath}"`,
   { stdio: 'inherit' }
 );
+fs.rmSync(tempHtmlPath, { force: true });
 
 console.log('Rendering 1x DMG Background (660x440)...');
 try {

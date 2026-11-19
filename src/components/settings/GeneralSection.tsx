@@ -36,7 +36,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
   onClearHistory,
 }) => {
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.2';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.3';
   });
   const [systemVersions, setSystemVersions] = useState<{
     app: string;

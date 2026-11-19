@@ -184,7 +184,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               Settings
             </h1>
             <span className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500">
-              v1.5.2
+              v1.5.3
             </span>
           </div>
 

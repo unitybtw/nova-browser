@@ -780,7 +780,7 @@ async function main() {
 
   {
     check('changelog data has at least 10 releases', CHANGELOG_DATA.length >= 10);
-    check('latest release in changelog is 1.5.2', CHANGELOG_DATA[0]?.version === '1.5.2');
+    check('latest release in changelog is 1.5.3', CHANGELOG_DATA[0]?.version === '1.5.3');
 
     const publicDir = path.resolve(__dirname, '../public');
     const checkedAssets = new Set<string>();
