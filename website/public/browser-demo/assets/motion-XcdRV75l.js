@@ -1,0 +1,1 @@
+const i=[.16,1,.3,1],a=[.4,0,.2,1],t=.14,e={hidden:{opacity:0},visible:{opacity:1,transition:{duration:t,ease:i}},exit:{opacity:0,transition:{duration:t,ease:a}}},s={hidden:{opacity:0,scale:.97,y:8},visible:{opacity:1,scale:1,y:0,transition:{duration:.2,ease:i}},exit:{opacity:0,scale:.98,y:4,transition:{duration:t,ease:a}}};export{i as E,e as b,s as m};

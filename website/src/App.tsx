@@ -305,7 +305,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Section 5: First Step Already Open — Official v1.5.2 Download (Electric Cobalt block) */}
+        {/* Section 5: First Step Already Open — Official v1.5.3 Download (Electric Cobalt block) */}
         <DownloadPicker
           t={t}
           platform={platform}

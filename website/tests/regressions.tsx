@@ -130,7 +130,7 @@ async function run() {
   assert.ok(iframe.getAttribute('src')?.includes('feature=vertical_tabs&tabs=vertical'))
   assertAriaControls()
 
-  // 4. All 5 Feature Proof screenshots point to fresh v1.5.2 captures
+  // 4. All 5 Feature Proof screenshots point to fresh v1.5.3 captures
   const proofImgs = [...document.querySelectorAll('.proof-panel img')].map((img) => img.getAttribute('src'))
   assert.deepEqual(proofImgs, [
     '/images/shot-studio.jpg',
@@ -140,11 +140,11 @@ async function run() {
     '/images/shot-sync.jpg',
   ])
 
-  // 5. Platform download picker: keyboard + official v1.5.2 release assets
+  // 5. Platform download picker: keyboard + official v1.5.3 release assets
   await click(document.getElementById('platform-tab-1'))
   const winLinks = [...document.querySelectorAll('.download-file')]
-  assert.equal(winLinks.length, 2, 'Windows tab must show both Installer and Portable v1.5.2 downloads')
-  assert.ok(winLinks[0].getAttribute('href')?.includes('/releases/download/v1.5.2/'))
+  assert.equal(winLinks.length, 2, 'Windows tab must show both Installer and Portable v1.5.3 downloads')
+  assert.ok(winLinks[0].getAttribute('href')?.includes('/releases/download/v1.5.3/'))
   await click(document.getElementById('platform-tab-2'))
   const linuxLinks = [...document.querySelectorAll('.download-file')]
   assert.equal(linuxLinks.length, 2, 'Linux tab must show both AppImage and Debian downloads')
@@ -202,7 +202,7 @@ async function run() {
   }
 
   await act(async () => root.unmount())
-  console.log('[PASS] Website regression suite passed: Embedded live Nova demo, fresh v1.5.2 screenshots, ARIA tabs, bilingual switch, native dialog, FAQ, and mobile menu.')
+  console.log('[PASS] Website regression suite passed: Embedded live Nova demo, fresh v1.5.3 screenshots, ARIA tabs, bilingual switch, native dialog, FAQ, and mobile menu.')
   dom.window.close()
 }
 
