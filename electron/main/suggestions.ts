@@ -60,6 +60,27 @@ export function isSuggestionScriptCompatible(query: string, suggestion: string):
   return true;
 }
 
+/**
+ * Strips HTML tags and residual angle brackets in a single linear pass so
+ * nested or malformed payloads (e.g. `<scr<script>ipt>`) cannot survive
+ * single-pass regex sanitization.
+ */
+function stripHtmlTags(input: string): string {
+  let out = '';
+  let tagDepth = 0;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '<') {
+      tagDepth++;
+    } else if (ch === '>') {
+      if (tagDepth > 0) tagDepth--;
+    } else if (tagDepth === 0) {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 export function sanitizeSuggestions(query: string, rawList: unknown): string[] {
   if (!Array.isArray(rawList)) return [];
   const seen = new Set<string>();
@@ -67,7 +88,7 @@ export function sanitizeSuggestions(query: string, rawList: unknown): string[] {
 
   for (const item of rawList) {
     if (typeof item !== 'string') continue;
-    const stripped = item.replace(/<[^>]*>/g, '').trim();
+    const stripped = stripHtmlTags(item).trim();
     if (!stripped) continue;
 
     if (!isSuggestionScriptCompatible(query, stripped)) continue;

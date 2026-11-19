@@ -1,0 +1,6 @@
+name: "Nova Browser CodeQL Config"
+paths-ignore:
+  - website/public/browser-demo
+  - dist
+  - dist-electron
+  - dist-test

@@ -134,4 +134,21 @@ assert.equal(sanitized[0], 'hava durumu', 'Must strip HTML tags');
 assert.ok(!sanitized.some(s => /скачать/.test(s)), 'Must not contain foreign script');
 assert.equal(new Set(sanitized.map(s => s.toLowerCase())).size, sanitized.length, 'Must have zero duplicates');
 
-console.log('[PASS] [Search Localization & Anti-Bot] 20 search localization, script filtering, backward compatibility, and system detection tests passed.');
+// Nested, malformed, and unclosed HTML payloads must never leave angle brackets behind
+const maliciousSuggestions = sanitizeSuggestions('hava', [
+  '<scr<script>ipt>hava</script>',
+  '<img src=x onerror=alert(1)',
+  '<<script>script>hava durumu</script>',
+  'hava > rüzgar',
+]);
+assert.deepEqual(
+  maliciousSuggestions,
+  ['hava', 'hava durumu', 'hava  rüzgar'],
+  'sanitizeSuggestions must strip nested, unclosed, and stray angle-bracket payloads completely'
+);
+assert.ok(
+  maliciousSuggestions.every(s => !s.includes('<') && !s.includes('>')),
+  'Sanitized suggestions must never contain < or > characters'
+);
+
+console.log('[PASS] [Search Localization & Anti-Bot] 22 search localization, script filtering, HTML sanitization, backward compatibility, and system detection tests passed.');

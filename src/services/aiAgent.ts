@@ -30,15 +30,16 @@ function sanitizeAgentInput(raw: string): string {
   text = text.replace(/\u0000/g, '');
   text = text.replace(/[\u2028\u2029\u200B-\u200D\uFEFF\uE0000-\uE007F]/g, '');
 
-  // 2. Neutralize boundary delimiter breakouts
-  text = text.replace(/<\/?untrusted_page_content>/gi, '[REDACTED_TAG]');
-  text = text.replace(/<\/?user_vault_data>/gi, '[REDACTED_TAG]');
-  text = text.replace(/<\/?page_form_inputs>/gi, '[REDACTED_TAG]');
-
-  // 3. Normalize Unicode to catch homoglyph and zero-width evasion attacks
+  // 2. Normalize Unicode before boundary delimiter neutralization so fullwidth
+  //    homoglyphs (e.g. ＜/untrusted_page_content＞) cannot bypass delimiter checks.
   try {
     text = text.normalize('NFKC');
   } catch {}
+
+  // 3. Neutralize boundary delimiter breakouts
+  text = text.replace(/<\/?untrusted_page_content>/gi, '[REDACTED_TAG]');
+  text = text.replace(/<\/?user_vault_data>/gi, '[REDACTED_TAG]');
+  text = text.replace(/<\/?page_form_inputs>/gi, '[REDACTED_TAG]');
 
   // 4. Remove well-known system-override trigger phrases in English & Turkish.
   const injectionPatterns: RegExp[] = [
