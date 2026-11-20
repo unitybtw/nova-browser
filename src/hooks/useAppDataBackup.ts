@@ -230,6 +230,8 @@ export function sanitizeImportedSettings(raw: any): Partial<UserSettings> {
   if (typeof raw.smoothScrollingEnabled === 'boolean') safeSettings.smoothScrollingEnabled = raw.smoothScrollingEnabled;
   if (typeof raw.newTabBackground === 'string' && ['default', 'gradient', 'mesh', 'glass', 'unsplash', 'custom_url', 'aurora_waves', 'cyber_grid', 'hyper_space', 'fireflies', 'nebula', 'matrix'].includes(raw.newTabBackground)) safeSettings.newTabBackground = raw.newTabBackground;
   if (typeof raw.backgroundCustomUrl === 'string' && isSafeNavigationUrl(raw.backgroundCustomUrl)) safeSettings.backgroundCustomUrl = raw.backgroundCustomUrl;
+  if (typeof raw.startupBehavior === 'string' && ['newTab', 'continue', 'specificPages'].includes(raw.startupBehavior)) safeSettings.startupBehavior = raw.startupBehavior;
+  if (typeof raw.startupPageUrl === 'string' && isSafeNavigationUrl(raw.startupPageUrl)) safeSettings.startupPageUrl = raw.startupPageUrl;
   if (typeof raw.accentColor === 'string' && ['blue', 'emerald', 'purple', 'rose', 'amber', 'custom'].includes(raw.accentColor)) safeSettings.accentColor = raw.accentColor;
   if (typeof raw.customAccentColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(raw.customAccentColor)) safeSettings.customAccentColor = raw.customAccentColor;
   if (typeof raw.browserColor === 'string' && ['default', 'midnight', 'cyberpunk', 'forest', 'crimson', 'warm', 'ocean', 'sunset', 'custom'].includes(raw.browserColor)) safeSettings.browserColor = raw.browserColor as any;

@@ -44,8 +44,6 @@ const PermissionReviewDialog: React.FC<PermissionReviewDialogProps> = ({
   permissions,
   onConfirm,
 }) => {
-  const [rememberDecision, setRememberDecision] = useState(false);
-
   const handleConfirm = useCallback((allowed: boolean) => {
     onConfirm(allowed);
   }, [onConfirm]);
@@ -128,17 +126,6 @@ const PermissionReviewDialog: React.FC<PermissionReviewDialogProps> = ({
       </div>
 
       <div className="p-3.5 border-t border-neutral-200/80 dark:border-white/[0.08] bg-neutral-50/70 dark:bg-white/[0.02] flex flex-col gap-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={rememberDecision}
-            onChange={(e) => setRememberDecision(e.target.checked)}
-            className="w-3.5 h-3.5 rounded accent-neutral-900 dark:accent-white"
-          />
-          <span className="text-xs text-neutral-600 dark:text-neutral-400">
-            Remember this decision for future installations
-          </span>
-        </label>
         <div className="flex gap-2">
           <button
             type="button"

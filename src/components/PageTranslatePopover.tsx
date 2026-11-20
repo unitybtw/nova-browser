@@ -46,8 +46,6 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === selectedTargetLang) || SUPPORTED_LANGUAGES[0];
   const sourceLangObj = SUPPORTED_LANGUAGES.find(l => l.code === currentSourceLang);
 

@@ -160,15 +160,36 @@ export function getProviderPreset(id: string): AIProviderPreset {
 export function normalizeOpenAIEndpoint(endpoint: string): string {
   let clean = (endpoint || '').trim().replace(/\/+$/, '');
   if (!clean) {
-    clean = 'http://localhost:4000/v1';
+    return 'http://localhost:4000/v1';
   }
-  if (!/^https?:\/\//i.test(clean)) {
-    clean = `http://${clean}`;
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(clean)) {
+    const hostPort = clean.split(/[/?#]/)[0].toLowerCase();
+    const hostOnly = hostPort.startsWith('[')
+      ? hostPort.slice(0, hostPort.indexOf(']') + 1)
+      : hostPort.split(':')[0];
+    const isLoopback =
+      hostOnly === 'localhost' ||
+      hostOnly === '127.0.0.1' ||
+      hostOnly === '[::1]' ||
+      hostOnly === '::1' ||
+      hostOnly === '0.0.0.0';
+    clean = `${isLoopback ? 'http' : 'https'}://${clean}`;
   }
-  if (!clean.endsWith('/v1')) {
-    clean = `${clean}/v1`;
+  try {
+    const parsed = new URL(clean);
+    const trimmedPath = parsed.pathname.replace(/\/+$/, '');
+    if (!trimmedPath) {
+      parsed.pathname = '/v1';
+      return parsed.toString().replace(/\/+$/, '');
+    }
+    parsed.pathname = trimmedPath;
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    if (!clean.endsWith('/v1')) {
+      clean = `${clean}/v1`;
+    }
+    return clean;
   }
-  return clean;
 }
 
 /**
@@ -321,6 +342,7 @@ export class OpenAICompatibleEngine {
 
     // Handle Streaming Path
     if (wantsStream && typeof params.onChunk === 'function') {
+      let emittedAnyChunk = false;
       try {
         const streamHeaders = {
           ...headers,
@@ -343,7 +365,19 @@ export class OpenAICompatibleEngine {
           signal: params.signal
         });
 
-        if (res.ok && res.body && typeof (res.body as any).getReader === 'function') {
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          let msg = `API Error ${res.status}`;
+          try {
+            const errJson = JSON.parse(errText);
+            if (errJson.error?.message) msg = errJson.error.message;
+          } catch {
+            if (errText) msg += `: ${errText.slice(0, 200)}`;
+          }
+          throw Object.assign(new Error(msg), { httpStatus: res.status });
+        }
+
+        if (res.body && typeof (res.body as any).getReader === 'function') {
           const reader = (res.body as ReadableStream<Uint8Array>).getReader();
           const decoder = new TextDecoder('utf-8');
           let fullText = '';
@@ -365,6 +399,7 @@ export class OpenAICompatibleEngine {
                   const parsed = JSON.parse(trimmed.slice(6));
                   const delta = parsed.choices?.[0]?.delta?.content || '';
                   if (delta) {
+                    emittedAnyChunk = true;
                     fullText += delta;
                     params.onChunk(delta);
                   }
@@ -387,8 +422,16 @@ export class OpenAICompatibleEngine {
             };
           }
         }
-      } catch (streamErr) {
-        // Fall back to standard non-streaming fetch if streaming fails or is unhandled
+      } catch (streamErr: any) {
+        // Never duplicate a request after partial output, explicit abort, or auth/server failure.
+        if (
+          emittedAnyChunk ||
+          streamErr?.name === 'AbortError' ||
+          (typeof streamErr?.httpStatus === 'number' && streamErr.httpStatus >= 400)
+        ) {
+          throw streamErr;
+        }
+        // Only fall back to non-streaming if the stream handshake itself could not start.
       }
     }
 

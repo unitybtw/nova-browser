@@ -66,9 +66,14 @@ export const UpdateWidget = ({ hideChangelogButton = false }: { hideChangelogBut
         if (info?.releaseNotes) setReleaseNotes(info.releaseNotes);
         setIntegrityVerified(info?.integrityVerified !== false);
       }));
-      if (api.onUpdateError) unsubs.push(api.onUpdateError((_: any, err: string) => {
+      if (api.onUpdateError) unsubs.push(api.onUpdateError((_: any, err: unknown) => {
         setStatus('error');
-        setErrorMsg(typeof err === 'string' ? err : 'Unknown error');
+        const msg = typeof err === 'string'
+          ? err
+          : (err && typeof err === 'object' && typeof (err as any).message === 'string')
+            ? (err as any).message
+            : 'Unknown error';
+        setErrorMsg(msg);
       }));
     }
     return () => unsubs.forEach(u => u());

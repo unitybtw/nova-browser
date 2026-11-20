@@ -348,6 +348,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     }
 
+    if (startupBehavior === 'specificPages' && typeof parsedSettings.startupPageUrl === 'string') {
+      const targetUrl = parsedSettings.startupPageUrl.trim();
+      if (targetUrl && isSafeNavigationUrl(targetUrl)) {
+        return [
+          {
+            id: '1',
+            url: targetUrl,
+            title: targetUrl,
+            isLoading: false,
+            canGoBack: false,
+            canGoForward: false,
+            lastAccessed: Date.now()
+          }
+        ];
+      }
+    }
+
     return [
       {
         id: '1',
@@ -552,6 +569,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }, 280);
   }, []);
 
+  useEffect(() => () => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+  }, []);
+
   const {
     vpnEnabled,
     setVpnEnabled,
@@ -716,24 +737,27 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     workspaces,
     onUpdateSettings: handleUpdateSettings,
   });
+  const customizeRef = useRef(customize);
+  customizeRef.current = customize;
   const isCustomizeMode = isWebsiteDemo ? false : customize.isCustomizeMode;
   const setIsCustomizeMode = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const next = typeof val === 'function' ? val(customize.isCustomizeMode) : val;
-    if (next) customize.openCustomizeMode();
-    else customize.discard();
-  }, [customize]);
+    const current = customizeRef.current;
+    const next = typeof val === 'function' ? val(current.isCustomizeMode) : val;
+    if (next) current.openCustomizeMode();
+    else current.discard();
+  }, []);
 
   const demoAutoOpenedRef = useRef(false);
   useEffect(() => {
     if (!demoParams.isDemo || demoAutoOpenedRef.current) return;
     if (demoParams.feature === 'studio') {
       demoAutoOpenedRef.current = true;
-      customize.openCustomizeMode();
+      customizeRef.current.openCustomizeMode();
     } else if (demoParams.feature === 'extensions') {
       demoAutoOpenedRef.current = true;
       setIsExtensionsOpen(true);
     }
-  }, [demoParams.isDemo, demoParams.feature, customize, setIsExtensionsOpen]);
+  }, [demoParams.isDemo, demoParams.feature, setIsExtensionsOpen]);
 
   // Tema + dil yan etkileri useThemeLanguage hookunda (birebir tasindi; ayni committe calisir, flash yok).
   const isActiveTabIncognito = Boolean((tabs.find(t => t.id === activeTabId) || tabs[0])?.isIncognito);
@@ -842,6 +866,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
   const downloads = useMemo(() => getVisibleDownloads(allDownloads, activeTab?.isIncognito ? '*' : undefined), [allDownloads, activeTab?.id, activeTab?.isIncognito]);
   const handleClearVisibleDownloads = useCallback(() => handleClearDownloads(activeTab?.isIncognito ? '*' : undefined), [handleClearDownloads, activeTab?.id, activeTab?.isIncognito]);
+  const publicDownloads = useMemo(() => getVisibleDownloads(allDownloads, undefined), [allDownloads]);
+  const privateDownloads = useMemo(() => getVisibleDownloads(allDownloads, '*'), [allDownloads]);
+  const handleClearPublicDownloads = useCallback(() => handleClearDownloads(undefined), [handleClearDownloads]);
+  const handleClearPrivateDownloads = useCallback(() => handleClearDownloads('*'), [handleClearDownloads]);
   const {
     splitTabId,
     handleCloseSplitView,
@@ -1135,12 +1163,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleToggleCustomizeMode = useCallback(() => {
     if (isWebsiteDemo) return;
-    if (customize.isCustomizeMode) {
-      customize.commit();
+    const current = customizeRef.current;
+    if (current.isCustomizeMode) {
+      current.commit();
     } else {
-      customize.openCustomizeMode();
+      current.openCustomizeMode();
     }
-  }, [isWebsiteDemo, customize]);
+  }, [isWebsiteDemo]);
 
   const handleResetAppearanceDefault = useCallback(async () => {
     if (isResettingAppearanceRef.current) return;
@@ -1154,7 +1183,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         cancelLabel: 'Cancel',
       });
       if (!confirmed) return;
-      if (typeof customize !== 'undefined' && customize?.discard) {
+      if (typeof customizeRef !== 'undefined' && customizeRef.current?.discard) {
+        customizeRef.current.discard();
+      } else if (typeof customize !== 'undefined' && customize?.discard) {
         customize.discard();
       }
       setSettings(prev => ({
@@ -1169,12 +1200,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } finally {
       isResettingAppearanceRef.current = false;
     }
-  }, [customize, setSettings, setIsSidebarCollapsed, setIsCustomizeMode]);
+  }, [setSettings, setIsSidebarCollapsed, setIsCustomizeMode]);
 
   const persistSidebarWidth = useCallback((width: number) => {
     const clamped = clampSidebarWidth(width);
-    if (customize.isCustomizeMode) {
-      customize.updateDraft(prev => ({
+    const current = customizeRef.current;
+    if (current.isCustomizeMode) {
+      current.updateDraft(prev => ({
         ...prev,
         layout: {
           ...prev.layout,
@@ -1187,15 +1219,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, () => ({
       sidebarWidth: clamped,
     })));
-  }, [customize, setSettings, activeWorkspaceIdRef]);
+  }, [setSettings, activeWorkspaceIdRef]);
 
   const handleResetSidebarWidth = useCallback(() => {
     persistSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
   }, [persistSidebarWidth]);
 
   const handleToggleSidebarSection = useCallback((section: SidebarSectionKey) => {
-    if (customize.isCustomizeMode) {
-      customize.updateDraft(prev => {
+    const current = customizeRef.current;
+    if (current.isCustomizeMode) {
+      current.updateDraft(prev => {
         const sections = resolveSidebarSections(prev.layout.sidebarSections);
         return {
           ...prev,
@@ -1220,12 +1253,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         },
       };
     }));
-  }, [customize, setSettings, activeWorkspaceIdRef]);
+  }, [setSettings, activeWorkspaceIdRef]);
 
   const handleUpdateNewTabLayout = useCallback((nextLayout: NewTabLayoutConfig) => {
     if (isWebsiteDemo) return;
-    if (customize.isCustomizeMode) {
-      customize.updateDraft(prev => ({
+    const current = customizeRef.current;
+    if (current.isCustomizeMode) {
+      current.updateDraft(prev => ({
         ...prev,
         newTabLayout: nextLayout,
       }));
@@ -1233,7 +1267,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
     const activeWsId = activeWorkspaceIdRef.current || 'default';
     setSettings(prev => updateWorkspaceAwareNewTabLayout(prev, activeWsId, nextLayout));
-  }, [isWebsiteDemo, customize, setSettings, activeWorkspaceIdRef]);
+  }, [isWebsiteDemo, setSettings, activeWorkspaceIdRef]);
 
   const handleUpdateSettingsWithDesignSync = useCallback((updates: Partial<UserSettings>) => {
     if ((typeof updates.showTasksWidget === 'boolean' || typeof updates.useVerticalTabs === 'boolean') && !updates.designProfile) {
@@ -1318,8 +1352,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const mutateToolbarItems = useCallback(
     (updater: (items: ToolbarSlotItem[]) => ToolbarSlotItem[]) => {
-      if (customize.isCustomizeMode) {
-        customize.updateDraft(prev => ({
+      const current = customizeRef.current;
+      if (current.isCustomizeMode) {
+        current.updateDraft(prev => ({
           ...prev,
           layout: {
             ...prev.layout,
@@ -1333,7 +1368,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         toolbarItems: updater(layout.toolbarItems || TOOLBAR_ITEM_ORDER_DEFAULT),
       })));
     },
-    [customize, setSettings, activeWorkspaceIdRef]
+    [setSettings, activeWorkspaceIdRef]
   );
 
   const handleReorderToolbarSlot = useCallback(
@@ -1511,28 +1546,32 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const handleDropToSplitScreen = useCallback((droppedTabId: string, side: 'left' | 'right' = 'right') => {
     if (!droppedTabId) return;
 
+    const currentTabs = tabsRef.current;
+    const currentActiveTabId = activeTabIdRef.current;
+    const currentWorkspaceId = activeWorkspaceIdRef.current;
+
     // Disallow splitting if the dropped tab is already in split view
-    const alreadySplit = tabs.find(t => t.id === droppedTabId && t.splitWith);
+    const alreadySplit = currentTabs.find(t => t.id === droppedTabId && t.splitWith);
     if (alreadySplit) return;
 
     let targetTabId = droppedTabId;
-    let partnerTabId = activeTabId;
+    let partnerTabId = currentActiveTabId;
 
-    if (droppedTabId === activeTabId) {
-      const currentActive = tabs.find(t => t.id === activeTabId);
+    if (droppedTabId === currentActiveTabId) {
+      const currentActive = currentTabs.find(t => t.id === currentActiveTabId);
       if (currentActive?.splitWith) return;
 
-      const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
+      const workspaceTabs = currentTabs.filter(t => t.workspaceId === currentWorkspaceId || (!t.workspaceId && currentWorkspaceId === 'default'));
       const candidate = workspaceTabs.find(
-        t => t.id !== activeTabId && !t.splitWith && Boolean(t.isIncognito) === Boolean(currentActive?.isIncognito)
+        t => t.id !== currentActiveTabId && !t.splitWith && Boolean(t.isIncognito) === Boolean(currentActive?.isIncognito)
       );
       if (!candidate) return;
       targetTabId = candidate.id;
-      partnerTabId = activeTabId;
+      partnerTabId = currentActiveTabId;
     }
 
-    const partnerTabSnapshot = tabs.find(t => t.id === partnerTabId);
-    const targetTabSnapshot = tabs.find(t => t.id === targetTabId);
+    const partnerTabSnapshot = currentTabs.find(t => t.id === partnerTabId);
+    const targetTabSnapshot = currentTabs.find(t => t.id === targetTabId);
     if (
       !partnerTabSnapshot ||
       !targetTabSnapshot ||
@@ -1577,7 +1616,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } else {
       activateTab(partnerTabId);
     }
-  }, [activeTabId, tabs, activeWorkspaceId, activateTab]);
+  }, [activateTab, activeTabIdRef, activeWorkspaceIdRef]);
   const handleToggleReaderMode = useCallback(() => {
     // `isActive` inside ReaderMode is now the real signal (its tab is in front),
     // so "open but bound to another tab" is not a showing reader: toggling here
@@ -1803,7 +1842,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
 
       // Toggle Sidebar in Vertical Tabs Mode (⌘B / ⌘S / Ctrl+B / Ctrl+S)
-      if (matches('toggleSidebar') || ((e.metaKey || e.ctrlKey) && !shift && (key === 'b' || key === 's'))) {
+      if (matches('toggleSidebar') || (s?.toggleSidebar === undefined && (e.metaKey || e.ctrlKey) && !shift && (key === 'b' || key === 's'))) {
         e.preventDefault();
         setIsSidebarCollapsed(prev => !prev);
         return;
@@ -2618,15 +2657,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     isIncognito={tab.isIncognito || false}
                     onExitIncognito={handleExitIncognitoTab}
                     history={typeof tab?.url === 'string' && (tab.url.includes('nova://history') || tab.url === 'about:history') ? history : EMPTY_ARRAY}
-                    downloads={typeof tab?.url === 'string' && (tab.url.includes('nova://downloads') || tab.url === 'about:downloads') ? getVisibleDownloads(allDownloads, tab?.isIncognito ? '*' : undefined) : EMPTY_ARRAY}
+                    downloads={typeof tab?.url === 'string' && (tab.url.includes('nova://downloads') || tab.url === 'about:downloads') ? (tab?.isIncognito ? privateDownloads : publicDownloads) : EMPTY_ARRAY}
                     onClearHistory={handleClearHistory}
                     onRemoveHistoryItem={handleRemoveHistoryItem}
-                    onClearDownloads={() => handleClearDownloads(tab?.isIncognito ? '*' : undefined)}
+                    onClearDownloads={tab?.isIncognito ? handleClearPrivateDownloads : handleClearPublicDownloads}
                     onPurgeMemory={handlePurgeMemory}
                     onPerformSync={handlePerformSync}
                     isDemo={demoParams.isDemo}
+                    activeWorkspaceId={activeWorkspaceId}
                     newTabLayout={browserNewTabLayout}
                     isCustomizeMode={isWebsiteDemo ? false : isCustomizeMode}
+                    onOpenCustomizeMode={handleToggleCustomizeMode}
                     onUpdateNewTabLayout={handleUpdateNewTabLayout}
                   />
                 </div>

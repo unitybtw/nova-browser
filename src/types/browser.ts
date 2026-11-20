@@ -273,6 +273,7 @@ export interface UserSettings {
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space' | 'fireflies' | 'nebula' | 'matrix';
   backgroundCustomUrl?: string;
   startupBehavior: 'newTab' | 'continue' | 'specificPages';
+  startupPageUrl?: string;
   tabStyle: 'rounded' | 'square' | 'floating';
   tabAnimation?: 'chrome' | 'smooth' | 'snappy' | 'none';
   doNotTrack: boolean;
@@ -323,6 +324,7 @@ export const defaultSettings: UserSettings = {
   newTabBackground: 'default',
   backgroundCustomUrl: '',
   startupBehavior: 'newTab',
+  startupPageUrl: '',
   tabStyle: 'floating',
   tabAnimation: 'chrome',
   doNotTrack: true,

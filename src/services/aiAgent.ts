@@ -6,6 +6,7 @@ import { orchestrator } from "./agentOrchestrator";
 import { generateId } from "../utils/idGenerator";
 import { logger } from "../utils/logger";
 import { getLocale } from "./i18n";
+import { isSafeNavigationUrl } from "../utils/safeNavigation";
 import {
   captureLegacyCustomAiApiKeySync,
   getCachedCustomAiApiKey,
@@ -736,6 +737,7 @@ class AIAgent {
   // Default: balanced 3B model (see DEFAULT_AI_MODEL_ID / AVAILABLE_AI_MODELS)
   private modelId = DEFAULT_AI_MODEL_ID;
   private customApiKey = '';
+  private persistentUntrustedTaint = false;
 
   public getModel(): string {
     return this.modelId;
@@ -2133,15 +2135,18 @@ CRITICAL RULES:
       let llmTimer: any = null;
       try {
         const sourcesContext = visitedSources.map((s, idx) => {
-          let text = `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\n`;
+          const safeTitle = sanitizeAgentInput(String(s.title || 'Source')).slice(0, 160);
+          const safeUrl = isSafeNavigationUrl(s.url) ? sanitizeAgentInput(String(s.url)).slice(0, 300) : '';
+          let text = `[Source ${idx + 1}: ${safeTitle}]\nURL: ${safeUrl}\n<untrusted_page_content>\n`;
           if (s.headlines && s.headlines.length > 0) {
-            text += `Top Headlines:\n${s.headlines.map(h => `- ${h}`).join('\n')}\n`;
+            text += `Top Headlines:\n${s.headlines.map(h => `- ${sanitizeAgentInput(String(h)).slice(0, 200)}`).join('\n')}\n`;
           }
           if (s.paragraphs && s.paragraphs.length > 0) {
-            text += `Key Excerpts:\n${s.paragraphs.slice(0, 3).join('\n\n')}\n`;
+            text += `Key Excerpts:\n${s.paragraphs.slice(0, 3).map(p => sanitizeAgentInput(String(p)).slice(0, 500)).join('\n\n')}\n`;
           } else if (s.content) {
-            text += `Content:\n${s.content.slice(0, 1000)}\n`;
+            text += `Content:\n${sanitizeAgentInput(String(s.content)).slice(0, 1000)}\n`;
           }
+          text += `</untrusted_page_content>\n`;
           return text;
         }).join('\n\n---\n\n');
 
@@ -2434,12 +2439,14 @@ CRITICAL RULES:
         if (urlMatch) {
           const rawUrl = urlMatch[0];
           const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-          steps.push({
-            action: 'navigate',
-            target: fullUrl,
-            descriptionTr: `${fullUrl} sitesine gidiliyor`,
-            descriptionEn: `Navigating to ${fullUrl}`
-          });
+          if (isSafeNavigationUrl(fullUrl)) {
+            steps.push({
+              action: 'navigate',
+              target: fullUrl,
+              descriptionTr: `${fullUrl} sitesine gidiliyor`,
+              descriptionEn: `Navigating to ${fullUrl}`
+            });
+          }
         } else if (/(?:github|wikipedia|amazon|trendyol|reddit|twitter|x\.com)/i.test(pNorm)) {
           let dest = 'https://www.google.com';
           if (pNorm.includes('github')) dest = 'https://github.com/trending';
@@ -2513,7 +2520,7 @@ CRITICAL RULES:
                 try {
                   const links = Array.from(document.querySelectorAll('ytd-video-renderer a#video-title, ytd-video-renderer a#thumbnail, #contents ytd-video-renderer a[href*="/watch?v="]'));
                   for (const a of links) {
-                    if (a.href && a.href.includes('/watch?v=')) {
+                    if (a.href && /^https?:\/\//i.test(a.href) && a.href.includes('/watch?v=')) {
                       const rect = a.getBoundingClientRect();
                       const title = (a.innerText || a.getAttribute('title') || '').trim();
                       if (rect.width > 0 && rect.height > 0) {
@@ -2554,6 +2561,9 @@ CRITICAL RULES:
             this.triggerVirtualCursor(targetX, targetY, 'click');
 
             // Navigate to the video
+            if (!isSafeNavigationUrl(videoInfo.url)) {
+              throw new Error('Blocked unsafe video navigation URL');
+            }
             if (this.actionContext?.onNavigate) {
               await this.actionContext.onNavigate(videoInfo.url);
             }
@@ -2566,12 +2576,13 @@ CRITICAL RULES:
             await this.interruptibleSleep(150, generation);
             this.triggerVirtualCursor(playerOffset.left + 450, playerOffset.top + 280, 'click');
 
+            const safeVideoTitle = sanitizeAgentInput(String(videoInfo.title || 'YouTube Video')).slice(0, 140);
             executedResults.push({
               stepNumber: i + 1,
               title: isTr ? `YouTube Videosu Baslatildi` : `YouTube Video Launched`,
               detail: isTr
-                ? `"${step.target}" arandi ve ilk video secildi: "${videoInfo.title}". Video oynatiliyor.`
-                : `Searched for "${step.target}" and launched: "${videoInfo.title}". Playback in progress.`,
+                ? `"${step.target}" arandi ve ilk video secildi: "${safeVideoTitle}". Video oynatiliyor.`
+                : `Searched for "${step.target}" and launched: "${safeVideoTitle}". Playback in progress.`,
               link: videoInfo.url
             });
           } else {
@@ -2586,6 +2597,9 @@ CRITICAL RULES:
           }
         }
         else if (step.action === 'navigate') {
+          if (!step.target || !isSafeNavigationUrl(step.target)) {
+            throw new Error('Blocked unsafe navigation URL in autonomous goal');
+          }
           if (this.actionContext?.onNavigate && step.target) {
             await this.actionContext.onNavigate(step.target);
           }
@@ -2635,7 +2649,7 @@ CRITICAL RULES:
                 } catch(_) { return ''; }
               })()
             `);
-            if (typeof raw === 'string') extractedInfo = raw;
+            if (typeof raw === 'string') extractedInfo = sanitizeAgentInput(raw).slice(0, 600);
           } catch (_) {}
 
           executedResults.push({
@@ -2667,7 +2681,7 @@ CRITICAL RULES:
                 return paras.slice(0, 3).join('\\n\\n');
               })()
             `);
-            if (typeof raw === 'string') pageText = raw;
+            if (typeof raw === 'string') pageText = sanitizeAgentInput(raw).slice(0, 1200);
           } catch (_) {}
 
           executedResults.push({
@@ -2710,10 +2724,11 @@ CRITICAL RULES:
 
     executedResults.forEach(res => {
       report += `### ${res.stepNumber}. ${res.title}\n`;
-      if (res.link) {
-        report += `- **Baglanti:** [${res.link}](${res.link})\n`;
+      if (res.link && isSafeNavigationUrl(res.link)) {
+        const safeHref = encodeURI(res.link);
+        report += `- **${isTr ? 'Baglanti' : 'Link'}:** [${sanitizeAgentInput(res.link)}](${safeHref})\n`;
       }
-      report += `- **Detay:** ${res.detail}\n\n`;
+      report += `- **${isTr ? 'Detay' : 'Detail'}:** ${sanitizeAgentInput(res.detail)}\n\n`;
     });
 
     report += isTr
@@ -2876,12 +2891,7 @@ CRITICAL RULES:
         try {
           url = new URL(url).href;
         } catch (e) {
-          // The old code swallowed this by rewriting the address to a Google
-          // search and then falling through to "Sayfa basariyla acildi." — the
-          // model and the user were told the requested page opened when it did
-          // not. Throwing hands it to the catch below, which marks the queued
-          // action 'failed' and returns a visible error to the model.
-          throw new Error(`Gecersiz URL: ${args.url}`);
+          throw new Error(`Invalid URL: ${args.url}`);
         }
 
         await this.actionContext.onNavigate(url);
@@ -2890,7 +2900,7 @@ CRITICAL RULES:
         result = {
           success: true,
           url,
-          message: "Sayfa basariyla acildi."
+          message: "Page loaded successfully."
         };
       }
 
@@ -2901,7 +2911,7 @@ CRITICAL RULES:
           await this.actionContext.onExecuteScript('window.location.reload()');
         }
         await this.waitForPageLoadSettled(generation);
-        result = { success: true, message: "Sayfa yenilendi." };
+        result = { success: true, message: "Page reloaded." };
       }
 
       else if (functionName === "go_back") {
@@ -2911,7 +2921,7 @@ CRITICAL RULES:
           await this.actionContext.onExecuteScript('window.history.back()');
         }
         await this.waitForPageLoadSettled(generation);
-        result = { success: true, message: "Önceki sayfaya gidildi." };
+        result = { success: true, message: "Navigated back." };
       }
 
       else if (functionName === "go_forward") {
@@ -2921,7 +2931,7 @@ CRITICAL RULES:
           await this.actionContext.onExecuteScript('window.history.forward()');
         }
         await this.waitForPageLoadSettled(generation);
-        result = { success: true, message: "İleri sayfaya gidildi." };
+        result = { success: true, message: "Navigated forward." };
       }
 
       else if (functionName === "read_page_content") {
@@ -2932,7 +2942,7 @@ CRITICAL RULES:
           // from hostile web pages embedding system override instructions in page text.
           text = sanitizeAgentInput(typeof raw === 'string' ? raw : JSON.stringify(raw));
         } catch (e) {
-          text = 'Sayfa metni alinamadi.';
+          text = 'Could not extract page content.';
         }
 
         // Revive DOM_SCAN_SCRIPT: tag visible interactive elements with
@@ -2973,7 +2983,9 @@ CRITICAL RULES:
           logger.warn('AIAgent:handleToolCall', 'Failed to parse get_page_url result', e);
           parsed = {};
         }
-        result = { success: true, ...parsed };
+        const safeUrl = typeof parsed?.url === 'string' ? sanitizeAgentInput(parsed.url).slice(0, 500) : '';
+        const safeTitle = typeof parsed?.title === 'string' ? sanitizeAgentInput(parsed.title).slice(0, 200) : '';
+        result = { success: true, url: safeUrl, title: safeTitle };
       }
 
       else if (functionName === "click_element") {
@@ -3119,7 +3131,7 @@ CRITICAL RULES:
           if (!el) return { error: 'Input not found for ID: ' + ${safeAiId} };
 
           // Security: Block typing into password and sensitive payment fields
-          const inputType = ((el as any).type || '').toLowerCase();
+          const inputType = String(el.type || el.getAttribute('type') || '').toLowerCase();
           const autocomplete = (el.getAttribute('autocomplete') || '').toLowerCase();
           if (inputType === 'password' || autocomplete === 'current-password' || autocomplete === 'new-password' || autocomplete.startsWith('cc-')) {
             return { error: 'Security restriction: AI Agent is blocked from typing into password or payment credential fields.' };
@@ -3566,8 +3578,8 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         const MAX_PAGE_LINKS = 40;
         const source = Array.isArray(allLinks) ? allLinks : [];
         const links = source.slice(0, MAX_PAGE_LINKS).map((link: any) => ({
-          text: String(link?.text ?? '').slice(0, 80),
-          href: String(link?.href ?? '').slice(0, 200)
+          text: sanitizeAgentInput(String(link?.text ?? '')).slice(0, 80),
+          href: sanitizeAgentInput(String(link?.href ?? '')).slice(0, 200)
         }));
         result = {
           success: true,
@@ -4011,7 +4023,12 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       const MAX_LOOPS = 4;
       // Honest-failure bookkeeping: never claim success when nothing ran.
       let executedAnyTool = false;
-      let untrustedPageContentIngested = false;
+      // Reset untrusted taint only at the start of a fresh conversation thread;
+      // multi-turn follow-ups inherit prior untrusted page exposure.
+      if (messages.length <= 1) {
+        this.persistentUntrustedTaint = false;
+      }
+      let untrustedPageContentIngested = this.persistentUntrustedTaint;
       const executedToolSignatures: string[] = [];
       const isTr = isTurkishText(userQuery);
       const NO_VALID_OUTPUT_MSG = isTr
@@ -4045,7 +4062,9 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         let turn: { text: string; constrained: boolean };
         try {
-          turn = await this.generateAgentTurn(windowedMessages, generation, onChunk);
+          // Do not pass raw token stream to UI during the JSON/ReAct tool-planning turn:
+          // finalAnswer is streamed cleanly below once extracted, avoiding raw JSON leakage & duplication.
+          turn = await this.generateAgentTurn(windowedMessages, generation);
         } catch (e: any) {
           finalAnswer = 'An error occurred. Please try again.';
           this.emitStatus('error', e?.message || String(e));
@@ -4096,7 +4115,12 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
             'browser_duplicate_tab',
             'search_history',
             'browser_search_history',
-            'browser_search_bookmarks'
+            'browser_search_bookmarks',
+            'click_element',
+            'fill_input',
+            'auto_fill_form',
+            'save_to_memory',
+            'execute_goal'
           ]);
           const requireApproval = untrustedPageContentIngested && SENSITIVE_POST_UNTRUSTED_TOOLS.has(name);
           try {
@@ -4120,6 +4144,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           ]);
           if (UNTRUSTED_CONTENT_SOURCES.has(name)) {
             untrustedPageContentIngested = true;
+            this.persistentUntrustedTaint = true;
           }
 
           internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);

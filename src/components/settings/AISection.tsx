@@ -123,6 +123,7 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
   const [modelSearchQuery, setModelSearchQuery] = useState('');
   const [customApiKeyInput, setCustomApiKeyInput] = useState<string>(() => getCachedCustomAiApiKey());
   const hasEditedApiKeyRef = useRef(false);
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +134,7 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
     });
     return () => {
       cancelled = true;
+      if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     };
   }, []);
 
@@ -188,18 +190,23 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
   };
 
   const handleFieldChange = (field: 'aiCustomEndpoint' | 'aiCustomModel' | 'aiCustomApiKey', val: string) => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     if (field === 'aiCustomApiKey') {
       hasEditedApiKeyRef.current = true;
       setCustomApiKeyInput(val);
-      void saveCustomAiApiKey(val);
-      syncBackend({ apiKey: val });
+      syncDebounceRef.current = setTimeout(() => {
+        void saveCustomAiApiKey(val);
+        syncBackend({ apiKey: val });
+      }, 300);
       return;
     }
     onUpdateSettings({ [field]: val });
-    syncBackend({
-      endpoint: field === 'aiCustomEndpoint' ? val : undefined,
-      model: field === 'aiCustomModel' ? val : undefined,
-    });
+    syncDebounceRef.current = setTimeout(() => {
+      syncBackend({
+        endpoint: field === 'aiCustomEndpoint' ? val : undefined,
+        model: field === 'aiCustomModel' ? val : undefined,
+      });
+    }, 300);
   };
 
   const handleTemperature = (val: number) => {

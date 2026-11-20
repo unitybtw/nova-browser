@@ -659,10 +659,17 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     }
   };
 
+  const pauseSpeech = () => {
+    isPlayingRef.current = false;
+    readerSessionIdRef.current++;
+    tts.stop();
+    setIsPlaying(false);
+    setIsPaused(true);
+  };
+
   const toggleSpeech = () => {
     if (isPlaying) {
-      stopSpeech();
-      setIsPaused(true);
+      pauseSpeech();
     } else {
       tts.stop();
       readerSessionIdRef.current++;

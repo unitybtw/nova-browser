@@ -514,6 +514,16 @@ export function useBrowserAgentBridge({
           return "Error: No active tab to duplicate";
         }
 
+        case 'nova_browser_info': {
+          return {
+            name: 'Nova Browser',
+            activeTabId,
+            activeWorkspaceId: activeWorkspaceIdRef.current,
+            tabCount: tabs.length,
+            activeUrl: tabs.find(t => t.id === activeTabId)?.url || null,
+          };
+        }
+
         default:
           return `Error: Unknown tool ${toolName}`;
       }
@@ -744,6 +754,10 @@ export function useBrowserAgentBridge({
         } else {
           const { id: approvalId, done } = orchestrator.enqueueAction(toolName, args);
           pending.approvalId = approvalId;
+          const queuedAction = (orchestrator as any).getQueue?.()?.find((a: any) => a.id === approvalId);
+          if (queuedAction?.state === 'pending' && typeof CustomEvent === 'function' && typeof window?.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('open-ai-sidepanel'));
+          }
           done.then(approved => {
             if (approved) {
               runAction();

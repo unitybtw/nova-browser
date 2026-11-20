@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, Square, Copy, Check, Users, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Play, Square, Copy, Check, Users, RefreshCw } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
@@ -57,7 +57,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
 }) => {
   const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);
   const [mcpToken, setMcpToken] = useState<string>('');
-  const [mcpTokenVisible, setMcpTokenVisible] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
@@ -166,8 +166,8 @@ export const McpSection: React.FC<McpSectionProps> = ({
 }`;
 
   const handleCopyConfig = async () => {
-    // Main builds the config with the real token — prefer IPC over the
-    // status prefix shown in the UI.
+    // Main builds the config with the real token — never silently copy masked placeholders.
+    setTokenError(null);
     try {
       if ((window as any).electronAPI?.copyMcpConfig) {
         const ok = await (window as any).electronAPI.copyMcpConfig();
@@ -178,11 +178,15 @@ export const McpSection: React.FC<McpSectionProps> = ({
         }
       }
     } catch (_) {}
-    const ok = await copyTextToClipboard(mcpConfigSnippet);
-    if (ok) {
-      setMcpCopied(true);
-      setSafeTimeout(() => setMcpCopied(false), 2000);
+    if (!isMaskedToken(mcpToken)) {
+      const ok = await copyTextToClipboard(mcpConfigSnippet);
+      if (ok) {
+        setMcpCopied(true);
+        setSafeTimeout(() => setMcpCopied(false), 2000);
+        return;
+      }
     }
+    setTokenError('Full MCP config could not be copied. Use Copy or Rotate token to reveal the secret.');
   };
 
   const isRunning = Boolean(mcpStatus?.running);
@@ -255,20 +259,12 @@ export const McpSection: React.FC<McpSectionProps> = ({
         <div className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="relative flex-1 min-w-0">
             <input
-              type={mcpTokenVisible ? 'text' : 'password'}
+              type={!isMaskedToken(mcpToken) ? 'text' : 'password'}
               value={mcpToken}
               readOnly
-              className={`${SETTINGS_INPUT_CLS} font-mono pr-9`}
+              aria-label="MCP API authentication token"
+              className={`${SETTINGS_INPUT_CLS} font-mono`}
             />
-            <button
-              type="button"
-              onClick={() => setMcpTokenVisible(!mcpTokenVisible)}
-              title={mcpTokenVisible ? 'Hide Token' : 'Show Token'}
-              aria-label={mcpTokenVisible ? 'Hide Token' : 'Show Token'}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-            >
-              {mcpTokenVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SettingsButton variant="secondary" onClick={handleCopyToken}>
@@ -285,6 +281,11 @@ export const McpSection: React.FC<McpSectionProps> = ({
             </SettingsButton>
           </div>
         </div>
+        {tokenError && (
+          <p role="alert" className="px-4 sm:px-5 pb-3 text-[11px] text-amber-600 dark:text-amber-400">
+            {tokenError}
+          </p>
+        )}
       </SettingsGroup>
 
       {/* Setup Guide / Config Snippet */}

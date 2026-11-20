@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
+import { isSafeNavigationUrl } from '../../utils/safeNavigation';
 import { UpdateWidget } from './UpdateWidget';
 import { ToggleSwitch } from './ToggleSwitch';
 import {
@@ -47,6 +48,29 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
     platform: string;
     arch: string;
   } | null>(null);
+
+  const [startupPageInput, setStartupPageInput] = useState(settings.startupPageUrl || '');
+  const [startupPageSaved, setStartupPageSaved] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+  }, []);
+
+  const handleSaveStartupPage = () => {
+    const raw = startupPageInput.trim();
+    if (!raw) {
+      onUpdateSettings({ startupPageUrl: '' });
+      return;
+    }
+    const candidate = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw) ? raw : `https://${raw}`;
+    if (!isSafeNavigationUrl(candidate)) return;
+    onUpdateSettings({ startupPageUrl: candidate });
+    setStartupPageInput(candidate);
+    setStartupPageSaved(true);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setStartupPageSaved(false), 2000);
+  };
 
   useEffect(() => {
     if (getElectronAPI()?.getAppVersion) {
@@ -155,6 +179,24 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
               { id: 'specificPages', label: 'Open a specific page' },
             ]}
           />
+          {settings.startupBehavior === 'specificPages' && (
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="url"
+                value={startupPageInput}
+                onChange={(e) => setStartupPageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveStartupPage();
+                }}
+                placeholder="https://example.com"
+                aria-label="Startup page URL"
+                className="flex-1 h-8 px-2.5 rounded-lg bg-white dark:bg-white/[0.04] border border-neutral-200/90 dark:border-white/[0.09] text-xs text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-400 dark:focus:border-white/25"
+              />
+              <SettingsButton variant="secondary" onClick={handleSaveStartupPage}>
+                {startupPageSaved ? 'Saved' : 'Save'}
+              </SettingsButton>
+            </div>
+          )}
         </SettingsRow>
 
         <SettingsRow

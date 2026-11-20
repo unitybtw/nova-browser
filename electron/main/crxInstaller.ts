@@ -616,7 +616,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     return { error: 'Unauthorized: install-from-webstore can only be called from Chrome Web Store or Nova main window.' };
   }
 
-  let crxFilePath = '';
   let stagingPath = '';
 
   try {
@@ -645,12 +644,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
           }
         }
       } catch (_) {}
-      if (!extensionId) {
-        const match = trimmed.match(/(?:^|[\/=])([a-p]{32})(?:[\/?#&]|$)/i);
-        if (match && match[1]) {
-          extensionId = match[1].toLowerCase();
-        }
-      }
     }
     if (!extensionId) return { error: 'Invalid extension URL or ID' };
 
@@ -822,7 +815,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       }
     } catch (extractErr) {
       try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
-      try { fs.unlinkSync(crxFilePath); } catch (_) {}
       throw extractErr;
     }
 
@@ -878,7 +870,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     if (response !== 1) {
       try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
-      try { fs.unlinkSync(crxFilePath); } catch (_) {}
       return { error: 'Installation cancelled by user.' };
     }
 
@@ -921,9 +912,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
         const actualId = extInfo.id;
         try { await extApi.removeExtension(actualId); } catch (_) {}
         try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
-        if (crxFilePath && fs.existsSync(crxFilePath)) {
-          try { fs.unlinkSync(crxFilePath); } catch (_) {}
-        }
         console.warn(`[WebStore] Refused extension ${extensionId}: manifest key resolves to ${actualId}.`);
         return { error: 'The extension\'s manifest key does not match its store ID, so it was not installed.' };
       }
@@ -933,13 +921,9 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       }
     } catch (loadErr: any) {
       console.error('Failed to load extension into session:', loadErr);
-      if (crxFilePath && fs.existsSync(crxFilePath)) {
-        try { fs.unlinkSync(crxFilePath); } catch (_) {}
-      }
+      try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
       return { error: `Failed to load extension: ${loadErr?.message || 'Unsupported or invalid extension'}` };
     }
-
-    try { fs.unlinkSync(crxFilePath); } catch (_) {}
 
     // Notify all frontend windows immediately
     for (const w of BrowserWindow.getAllWindows()) {
@@ -953,9 +937,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     console.error('Web Store Install Error:', err);
     if (stagingPath && fs.existsSync(stagingPath)) {
       try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
-    }
-    if (crxFilePath && fs.existsSync(crxFilePath)) {
-      try { fs.unlinkSync(crxFilePath); } catch (_) {}
     }
     return { error: err.message || 'An unknown error occurred.' };
   }

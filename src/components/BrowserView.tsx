@@ -90,6 +90,8 @@ export interface BrowserViewProps {
   onImportData?: (file: File) => void;
   onPurgeMemory?: () => Promise<void> | void;
   onPerformSync?: (mergedData: any) => Promise<void> | void;
+  activeWorkspaceId?: string;
+  onOpenCustomizeMode?: () => void;
   isDemo?: boolean;
   newTabLayout?: NewTabLayoutConfig;
   isCustomizeMode?: boolean;
@@ -227,6 +229,8 @@ export function browserViewPropsEqual(prev: BrowserViewProps, next: BrowserViewP
   // Page-specific props are compared only where they are rendered, so a change
   // in unrelated app data cannot re-render tabs that do not use it.
   if (isSettingsUrl(next.tab?.url)) {
+    if (prev.activeWorkspaceId !== next.activeWorkspaceId) return false;
+    if (prev.onOpenCustomizeMode !== next.onOpenCustomizeMode) return false;
     for (const key of SETTINGS_PAGE_CALLBACKS) {
       if (prev[key] !== next[key]) return false;
     }
@@ -295,6 +299,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onImportData,
   onPurgeMemory,
   onPerformSync,
+  activeWorkspaceId,
+  onOpenCustomizeMode,
   isDemo = false,
   newTabLayout,
   isCustomizeMode = false,
@@ -1290,6 +1296,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             onClearHistory={onClearHistory}
             onPurgeMemory={onPurgeMemory}
             onPerformSync={onPerformSync}
+            activeWorkspaceId={activeWorkspaceId}
+            onOpenCustomizeMode={onOpenCustomizeMode}
           />
         </Suspense>
       </div>

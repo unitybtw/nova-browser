@@ -24,6 +24,8 @@ const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'history', label: 'Open History' },
   { id: 'downloads', label: 'Open Downloads' },
   { id: 'findInPage', label: 'Find in Page' },
+  { id: 'toggleSidebar', label: 'Toggle Vertical Sidebar' },
+  { id: 'settings', label: 'Open Settings' },
 ];
 
 function buildDefaultShortcuts(): NonNullable<UserSettings['shortcuts']> {
@@ -46,6 +48,8 @@ function buildDefaultShortcuts(): NonNullable<UserSettings['shortcuts']> {
       meta: true,
     },
     findInPage: { key: 'f', shift: false, meta: true },
+    toggleSidebar: { key: 's', shift: false, meta: true },
+    settings: { key: ',', shift: false, meta: true },
   };
 }
 

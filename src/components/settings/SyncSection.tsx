@@ -164,9 +164,9 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
               description={
                 <div className="space-y-0.5 mt-0.5">
                   <div>
-                    Code:{' '}
+                    Account:{' '}
                     <span className="font-mono text-neutral-700 dark:text-neutral-200 font-medium">
-                      {syncStatus.syncCode || 'Active Device'}
+                      {syncStatus.user?.email || 'Nova Cloud'}
                     </span>
                   </div>
                   <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
@@ -193,7 +193,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 variant="danger"
                 onClick={() => syncService.logout()}
               >
-                Leave Chain
+                Sign Out
               </SettingsButton>
             </SettingsRow>
 

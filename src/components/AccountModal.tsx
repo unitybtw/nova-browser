@@ -23,6 +23,7 @@ import { copyTextToClipboard } from '../utils/clipboard';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
 import { getLocale } from '../services/i18n';
+import { showConfirm } from '../utils/confirmDialog';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -140,13 +141,18 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     }
   };
 
-  const handleLeaveChain = () => {
-    // Device pairing is not implemented (syncService throws), so there is no
-    // chain to leave. This used to call logout(), which silently destroyed the
-    // user's real cloud session and every key derived from it.
+  const handleSignOut = async () => {
+    const confirmed = await showConfirm({
+      title: 'Sign out of Nova Cloud Sync?',
+      message: 'Local bookmarks, passwords, and settings will remain on this device, but cloud sync will pause until you sign in again.',
+      confirmLabel: 'Sign Out',
+      cancelLabel: 'Cancel',
+    });
+    if (!confirmed) return;
     setGeneratedCode(null);
     setInputSyncCode('');
     setErrorMessage(null);
+    await syncService.logout();
   };
 
   const handleTogglePreference = (key: keyof SyncPreferences) => {
@@ -298,9 +304,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={handleLeaveChain}
+                        onClick={handleSignOut}
                         className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                        title="Disconnect Sync"
+                        title="Sign Out of Sync"
+                        aria-label="Sign Out of Sync"
                       >
                         <LogOut className="w-4 h-4" />
                       </button>

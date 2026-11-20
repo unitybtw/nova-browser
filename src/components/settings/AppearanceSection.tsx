@@ -248,7 +248,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
       tabStyle: 'floating',
       tabAnimation: 'chrome',
       useVerticalTabs: false,
-      showTasksWidget: true,
+      showTasksWidget: false,
     });
   };
 

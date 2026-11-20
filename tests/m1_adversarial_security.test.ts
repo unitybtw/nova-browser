@@ -345,8 +345,8 @@ const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
   { needle: "else cleanVoice = 'Samantha';", desc: 'TTS falls back to Samantha for unmapped languages' },
   // Section 3.6: the flag-injection guard that is not exported.
   {
-    needle: "if (/^[a-zA-Z0-9\\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {",
-    desc: 'TTS voice names are restricted to alphanumerics, length-capped and may not start with a CLI flag dash',
+    needle: "if (/^[\\p{L}\\p{N}\\s]+$/u.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {",
+    desc: 'TTS voice names are restricted to Unicode alphanumerics/spaces, length-capped and may not start with a CLI flag dash',
   },
   // Section 3.1 / 5: MCP SSRF port block.
   {

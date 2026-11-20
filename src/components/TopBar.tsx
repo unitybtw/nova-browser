@@ -1170,6 +1170,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     window.addEventListener('keydown', dismiss);
 
     return () => {
+      clearTimeout(hoverTimeoutRef.current);
       window.removeEventListener('pointerdown', dismiss);
       window.removeEventListener('wheel', dismiss);
       window.removeEventListener('blur', dismiss);

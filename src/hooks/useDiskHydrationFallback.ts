@@ -122,8 +122,20 @@ export function useDiskHydrationFallback({
           }
         }
 
-        // Restore tabs if missing
-        if (isMissingOrEmpty(localStorage.getItem('nova_session_tabs'))) {
+        // Restore tabs only when startupBehavior is 'continue'
+        let startupBehavior = 'newTab';
+        try {
+          const rawSettings = localStorage.getItem('user_settings');
+          if (rawSettings) {
+            const parsedSettings = JSON.parse(rawSettings);
+            if (parsedSettings && typeof parsedSettings.startupBehavior === 'string') {
+              startupBehavior = parsedSettings.startupBehavior;
+            }
+          }
+        } catch {
+          // Ignore malformed settings and keep default startupBehavior
+        }
+        if (startupBehavior === 'continue' && isMissingOrEmpty(localStorage.getItem('nova_session_tabs'))) {
           const diskTabs = await electronStore.storeGet('session_tabs');
           if (diskTabs) {
             try {

@@ -412,15 +412,30 @@ export class BrowserMCPServer {
     let secret: Buffer;
     try {
       secret = fs.readFileSync(secretPath);
+      if (secret.length !== 32) {
+        throw new Error(
+          `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
+          'Rotate the MCP token or remove the corrupt secret file.'
+        );
+      }
     } catch (err: any) {
       if (err?.code === 'ENOENT') {
         secret = randomBytes(32);
         try {
-          fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+          fs.writeFileSync(secretPath, secret, { mode: 0o600, flag: 'wx' });
           if (process.platform !== 'win32') {
             fs.chmodSync(secretPath, 0o600);
           }
-        } catch (_) {}
+        } catch (wxErr: any) {
+          if (wxErr?.code === 'EEXIST') {
+            secret = fs.readFileSync(secretPath);
+            if (secret.length !== 32) {
+              throw new Error(`Corrupt .machine_secret (${secret.length} bytes, expected 32).`);
+            }
+          } else {
+            throw wxErr;
+          }
+        }
       } else {
         throw err;
       }
@@ -559,7 +574,8 @@ export class BrowserMCPServer {
       if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return;
       for (const [tool, enabled] of Object.entries(settings)) {
         if (typeof tool === 'string' && /^[a-zA-Z0-9_-]+$/.test(tool) && tool !== '__proto__' && tool !== 'constructor' && tool !== 'prototype' && typeof enabled === 'boolean') {
-          this.setToolEnabled(tool, enabled);
+          if (enabled) this.disabledTools.delete(tool);
+          else this.disabledTools.add(tool);
         }
       }
     } catch {}

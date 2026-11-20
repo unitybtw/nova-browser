@@ -1110,7 +1110,7 @@ export function mergeSettingsLastWriteWins(
       if (key === 'mcpServerEnabled' && val === true && localSettings[key] !== true) {
         val = false;
       }
-      if ((key === 'backgroundCustomUrl' || key === 'searchEngineCustomUrl' || key === 'customApiBaseUrl') && typeof val === 'string' && val.trim() !== '') {
+      if ((key === 'backgroundCustomUrl' || key === 'startupPageUrl' || key === 'aiCustomEndpoint' || key === 'searchEngineCustomUrl' || key === 'customApiBaseUrl') && typeof val === 'string' && val.trim() !== '') {
         if (!isSafeNavigationUrl(val)) {
           val = (defaultSettings as any)[key] ?? '';
         }
@@ -2019,6 +2019,14 @@ export class NovaSyncService {
           this.notify();
         } else if (event === 'SIGNED_OUT') {
           void this.unsubscribeFromRealtime();
+          this.currentUser = null;
+          this.token = null;
+          this.masterKey = null;
+          this.legacyMasterKey = null;
+          this.usedLegacyKeyThisSync = false;
+          this.isSyncing = false;
+          this.lastError = null;
+          this.notify();
         }
       });
     } catch (e) {
@@ -2486,8 +2494,17 @@ export class NovaSyncService {
 
   // --- DATA SYNC ENGINE ---
 
+  private lastSyncedItemsCount = {
+    bookmarks: 0,
+    history: 0,
+    passwords: 0,
+    workspaces: 0,
+  };
+
   public syncData(localData: SyncLocalData): Promise<SyncResult> {
-    const run = () => this.executeSyncData(localData);
+    let timedOut = false;
+    const isTimedOut = () => timedOut;
+    const run = () => this.executeSyncData(localData, isTimedOut);
     const queued = this.syncQueue.then(run, run);
     // supabase-js sets no default timeout on PostgREST calls, and a TCP stall
     // that is never closed (captive portal, VPN transition, sleep/resume) would
@@ -2496,10 +2513,13 @@ export class NovaSyncService {
     // run so a stuck request can never poison the queue.
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const guard = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(
-        () => reject(new Error('Sync timed out — check your connection and try again.')),
-        SYNC_RUN_TIMEOUT_MS
-      );
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        this.isSyncing = false;
+        this.lastError = 'Sync timed out — check your connection and try again.';
+        this.notify();
+        reject(new Error('Sync timed out — check your connection and try again.'));
+      }, SYNC_RUN_TIMEOUT_MS);
     });
     const guarded = Promise.race([queued, guard]).finally(() => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -2513,7 +2533,10 @@ export class NovaSyncService {
    * Validate the session, then run the vault round-trip, retrying the WHOLE
    * read-merge-write when it loses the race to another device.
    */
-  private async executeSyncData(localData: SyncLocalData): Promise<SyncResult> {
+  private async executeSyncData(localData: SyncLocalData, isTimedOut: () => boolean = () => false): Promise<SyncResult> {
+    if (isTimedOut()) {
+      throw new Error('Sync timed out — check your connection and try again.');
+    }
     if (!this.currentUser || !this.token) {
       throw new Error('User is not logged in');
     }
@@ -2550,14 +2573,19 @@ export class NovaSyncService {
 
     try {
       return await retryOnVaultConflict(async round => {
+        if (isTimedOut()) {
+          throw new Error('Sync timed out — check your connection and try again.');
+        }
         this.saveSettingsTimestamps(baselineSettingsTimestamps);
         return this.runSyncAttempt(localData, prefs, { userId: user.id, masterKey }, round);
       });
     } catch (err: unknown) {
-      this.saveSettingsTimestamps(baselineSettingsTimestamps);
-      this.isSyncing = false;
-      this.lastError = err instanceof Error ? (err.message || 'Sync failed') : 'Sync failed';
-      this.notify();
+      if (!isTimedOut()) {
+        this.saveSettingsTimestamps(baselineSettingsTimestamps);
+        this.isSyncing = false;
+        this.lastError = err instanceof Error ? (err.message || 'Sync failed') : 'Sync failed';
+        this.notify();
+      }
       throw err;
     }
   }
@@ -2835,6 +2863,14 @@ export class NovaSyncService {
       logger.info('SyncService:syncData', `Sync completed after ${round} attempts (lost write races were re-merged)`);
     }
 
+    const counts = {
+      bookmarks: mergedBookmarks.length,
+      history: mergedHistory.length,
+      passwords: mergedPasswords.length,
+      workspaces: mergedWorkspaces.length
+    };
+    this.lastSyncedItemsCount = counts;
+
     this.isSyncing = false;
     this.notify();
 
@@ -2847,12 +2883,7 @@ export class NovaSyncService {
         settings: mergedSettings,
         workspaces: mergedWorkspaces
       },
-      syncedItemsCount: {
-        bookmarks: mergedBookmarks.length,
-        history: mergedHistory.length,
-        passwords: mergedPasswords.length,
-        workspaces: mergedWorkspaces.length
-      }
+      syncedItemsCount: counts
     };
   }
 
@@ -2900,12 +2931,7 @@ export class NovaSyncService {
       syncError: this.lastError,
       backend: isSupabaseConfigured() ? 'supabase' : 'nova_cloud',
       syncCode: this.currentUser?.syncCode || null,
-      itemsSynced: {
-        bookmarks: 0,
-        history: 0,
-        passwords: 0,
-        workspaces: 0
-      }
+      itemsSynced: { ...this.lastSyncedItemsCount }
     };
   }
 

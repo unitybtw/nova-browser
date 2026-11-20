@@ -116,24 +116,36 @@ export function useAppSync({
 }: UseAppSyncOptions): {
   handlePerformSync: (providedMergedData?: any) => Promise<void>;
 } {
+  const bookmarkRowsRef = useRef(bookmarkRows);
+  bookmarkRowsRef.current = bookmarkRows;
+  const folderRowsRef = useRef(folderRows);
+  folderRowsRef.current = folderRows;
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const workspaceRowsRef = useRef(workspaceRows);
+  workspaceRowsRef.current = workspaceRows;
+
   // Cloud Sync Handler
   const handlePerformSync = useCallback(async (providedMergedData?: any) => {
     try {
       if (providedMergedData) {
+        const snapshotSettings = settingsRef.current;
         if (providedMergedData.bookmarks && Array.isArray(providedMergedData.bookmarks)) {
-          setBookmarks(providedMergedData.bookmarks);
+          setBookmarks(current => remergeSyncedCollection('bookmarks', current, providedMergedData.bookmarks));
         }
         if (providedMergedData.folders && Array.isArray(providedMergedData.folders)) {
-          setFolders(providedMergedData.folders);
+          setFolders(current => remergeSyncedCollection('folders', current, providedMergedData.folders));
         }
         if (providedMergedData.history && Array.isArray(providedMergedData.history)) {
-          setHistory(providedMergedData.history);
+          setHistory(current => mergeSyncedHistory(current, providedMergedData.history));
         }
         if (providedMergedData.settings && typeof providedMergedData.settings === 'object') {
-          setSettings(prev => ({ ...prev, ...providedMergedData.settings }));
+          setSettings(current => mergeSyncedSettings(current, providedMergedData.settings, snapshotSettings));
         }
         if (providedMergedData.workspaces && Array.isArray(providedMergedData.workspaces)) {
-          setWorkspaces(providedMergedData.workspaces);
+          setWorkspaces(current => remergeSyncedCollection('workspaces', current, providedMergedData.workspaces));
         }
         return;
       }
@@ -146,23 +158,24 @@ export function useAppSync({
         logger.warn('App:Sync', 'Failed to retrieve or parse secure passwords for sync', err);
       }
 
+      const pushedSettings = settingsRef.current;
       const syncResult = await syncService.syncData({
-        bookmarks: bookmarkRows,
-        folders: folderRows,
-        history,
+        bookmarks: bookmarkRowsRef.current,
+        folders: folderRowsRef.current,
+        history: historyRef.current,
         passwords: localPasswords,
-        settings,
-        workspaces: workspaceRows
+        settings: pushedSettings,
+        workspaces: workspaceRowsRef.current
       });
 
       if (syncResult && syncResult.mergedData) {
         const { mergedData } = syncResult;
-        // `settings` is the snapshot the pushed bundle was built from, so the
+        // `pushedSettings` is the snapshot the pushed bundle was built from, so the
         // settings merge can tell an untouched field from a mid-sync change.
         applySyncedData(
           mergedData,
           { setBookmarks, setFolders, setHistory, setSettings, setWorkspaces },
-          settings
+          pushedSettings
         );
 
         if (mergedData.passwords && getElectronAPI()?.secureStoreSet) {
@@ -192,7 +205,7 @@ export function useAppSync({
       console.error('[NovaSync] Sync execution failed:', err);
       throw err;
     }
-  }, [bookmarkRows, folderRows, history, settings, workspaceRows, setBookmarks, setFolders, setHistory, setSettings, setWorkspaces]);
+  }, [setBookmarks, setFolders, setHistory, setSettings, setWorkspaces]);
 
   const handlePerformSyncRef = useRef(handlePerformSync);
   handlePerformSyncRef.current = handlePerformSync;

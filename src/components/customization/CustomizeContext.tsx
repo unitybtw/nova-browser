@@ -145,6 +145,9 @@ export function useCustomizeManager({
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
 
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   const activeWorkspaceName = useMemo(() => {
     if (!activeWorkspaceId) return undefined;
     const ws = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -200,17 +203,19 @@ export function useCustomizeManager({
 
   const openCustomizeMode = useCallback(
     (initialScope?: CustomizeScope) => {
-      const baseGlobal = settings.designProfile
-        ? sanitizeDesignProfile(settings.designProfile)
+      const curSettings = settingsRef.current;
+      const curWsId = activeWorkspaceIdRef.current;
+      const baseGlobal = curSettings.designProfile
+        ? sanitizeDesignProfile(curSettings.designProfile)
         : createDefaultDesignProfile();
       setDraftGlobal(baseGlobal);
 
       const initialWsMap: Record<string, BrowserDesignProfile> = {};
-      if (activeWorkspaceId) {
-        const wsOverride = settings.workspaceDesigns?.[activeWorkspaceId];
+      if (curWsId) {
+        const wsOverride = curSettings.workspaceDesigns?.[curWsId];
         if (wsOverride && typeof wsOverride === 'object') {
-          initialWsMap[activeWorkspaceId] = sanitizeDesignProfile(
-            resolveEffectiveDesign(settings, activeWorkspaceId, false)
+          initialWsMap[curWsId] = sanitizeDesignProfile(
+            resolveEffectiveDesign(curSettings, curWsId, false)
           );
         }
       }
@@ -220,38 +225,40 @@ export function useCustomizeManager({
 
       const scopeToUse: CustomizeScope =
         initialScope ||
-        (activeWorkspaceId && settings.workspaceDesigns?.[activeWorkspaceId]
+        (curWsId && curSettings.workspaceDesigns?.[curWsId]
           ? 'workspace'
           : 'global');
 
       setEditingScope(scopeToUse);
-      setDraftTabStyle(settings.tabStyle || 'floating');
-      setDraftTabAnimation(settings.tabAnimation || 'chrome');
+      setDraftTabStyle(curSettings.tabStyle || 'floating');
+      setDraftTabAnimation(curSettings.tabAnimation || 'chrome');
       setUndoStack([]);
       setIsCustomizeMode(true);
     },
-    [settings, activeWorkspaceId]
+    []
   );
 
   const switchScope = useCallback(
     (newScope: CustomizeScope) => {
       if (newScope === editingScopeRef.current) return;
-      if (newScope === 'workspace' && activeWorkspaceId) {
+      const curWsId = activeWorkspaceIdRef.current;
+      const curSettings = settingsRef.current;
+      if (newScope === 'workspace' && curWsId) {
         setDraftWorkspaces((prev) => {
-          if (prev[activeWorkspaceId]) return prev;
-          const wsOverride = settings.workspaceDesigns?.[activeWorkspaceId];
+          if (prev[curWsId]) return prev;
+          const wsOverride = curSettings.workspaceDesigns?.[curWsId];
           const seeded =
             wsOverride &&
             typeof wsOverride === 'object' &&
-            !pendingClearWorkspaceIdsRef.current.includes(activeWorkspaceId)
-              ? sanitizeDesignProfile(resolveEffectiveDesign(settings, activeWorkspaceId, false))
+            !pendingClearWorkspaceIdsRef.current.includes(curWsId)
+              ? sanitizeDesignProfile(resolveEffectiveDesign(curSettings, curWsId, false))
               : deepCloneProfile(draftGlobalRef.current);
-          return { ...prev, [activeWorkspaceId]: seeded };
+          return { ...prev, [curWsId]: seeded };
         });
       }
       setEditingScope(newScope);
     },
-    [activeWorkspaceId, settings]
+    []
   );
 
   const updateDraft = useCallback(
@@ -261,6 +268,7 @@ export function useCustomizeManager({
     ) => {
       const now = Date.now();
       const coalesceKey = options?.coalesceKey;
+      const curSettings = settingsRef.current;
 
       setUndoStack((prevStack) => {
         const top = prevStack[prevStack.length - 1];
@@ -283,9 +291,9 @@ export function useCustomizeManager({
         setDraftWorkspaces((prev) => {
           const currentWs =
             prev[wsId] ||
-            (settings.workspaceDesigns?.[wsId] &&
+            (curSettings.workspaceDesigns?.[wsId] &&
             !pendingClearWorkspaceIdsRef.current.includes(wsId)
-              ? sanitizeDesignProfile(resolveEffectiveDesign(settings, wsId, false))
+              ? sanitizeDesignProfile(resolveEffectiveDesign(curSettings, wsId, false))
               : deepCloneProfile(draftGlobalRef.current));
           const nextWs = sanitizeDesignProfile(updater(currentWs));
           return { ...prev, [wsId]: nextWs };
@@ -296,7 +304,7 @@ export function useCustomizeManager({
         setDraftGlobal((current) => sanitizeDesignProfile(updater(current)));
       }
     },
-    [createSnapshot, settings]
+    [createSnapshot]
   );
 
   const undo = useCallback(() => {
@@ -413,8 +421,9 @@ export function useCustomizeManager({
       designProfile: sanitizeDesignProfile(currentGlobal),
     };
 
-    const existingWs: Record<string, any> = settings.workspaceDesigns
-      ? { ...settings.workspaceDesigns }
+    const curSettings = settingsRef.current;
+    const existingWs: Record<string, any> = curSettings.workspaceDesigns
+      ? { ...curSettings.workspaceDesigns }
       : {};
 
     // 1. Delete all workspace IDs marked as pending clear
@@ -439,7 +448,7 @@ export function useCustomizeManager({
     setUndoStack([]);
     setPendingClearWorkspaceIds([]);
     setModifiedWorkspaceIds([]);
-  }, [settings.workspaceDesigns, onUpdateSettings]);
+  }, [onUpdateSettings]);
 
   const discard = useCallback(() => {
     setIsCustomizeMode(false);
@@ -479,13 +488,14 @@ export function useCustomizeManager({
     return () => window.removeEventListener('nova-open-customize-mode', handleOpen);
   }, [openCustomizeMode]);
 
-  return {
+  const canUndo = undoStack.length > 0;
+  return useMemo(() => ({
     isCustomizeMode,
     editingScope,
     draftProfile: activeDraftProfile,
     draftTabStyle,
     draftTabAnimation,
-    canUndo: undoStack.length > 0,
+    canUndo,
     undo,
     activeWorkspaceId,
     activeWorkspaceName,
@@ -504,7 +514,31 @@ export function useCustomizeManager({
     updateDraftTabAnimation,
     drawerDockSide,
     setDrawerDockSide,
-  };
+  }), [
+    isCustomizeMode,
+    editingScope,
+    activeDraftProfile,
+    draftTabStyle,
+    draftTabAnimation,
+    canUndo,
+    undo,
+    activeWorkspaceId,
+    activeWorkspaceName,
+    hasActiveWorkspaceOverride,
+    openCustomizeMode,
+    commit,
+    discard,
+    resetToDefault,
+    switchScope,
+    applyStarterTemplate,
+    clearWorkspaceOverride,
+    importPack,
+    exportPack,
+    updateDraft,
+    updateDraftTabStyle,
+    updateDraftTabAnimation,
+    drawerDockSide,
+  ]);
 }
 
 export interface CustomizeProviderProps extends CustomizeManagerOptions {

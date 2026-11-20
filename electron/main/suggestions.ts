@@ -138,32 +138,35 @@ function resolveLocaleDetails(clientLocale?: string, query?: string) {
     ? clientLocale.trim()
     : '';
 
+  const hasExplicitClientLocale = rawLocale.length > 0;
   const sysLocale = (app.getLocale() || '').trim();
+  const sysLower = sysLocale.toLowerCase();
   const envLang = (process.env.LANG || '').toLowerCase();
-  const isSystemTurkish = sysLocale.toLowerCase().includes('tr') || envLang.includes('tr');
+  const isSystemTurkish = !hasExplicitClientLocale && (
+    sysLower === 'tr' || sysLower.startsWith('tr-') || sysLower.startsWith('tr_') ||
+    envLang === 'tr' || envLang.startsWith('tr_') || envLang.startsWith('tr-')
+  );
 
   if (hasTurkishChars) {
     rawLocale = 'tr-TR';
-  } else if (!rawLocale || rawLocale === 'en-US') {
+  } else if (!rawLocale) {
     if (isSystemTurkish) {
       rawLocale = 'tr-TR';
     } else if (sysLocale) {
       rawLocale = sysLocale;
     } else {
-      rawLocale = 'tr-TR';
+      rawLocale = 'en-US';
     }
   }
 
   const parts = rawLocale.replace('_', '-').split('-');
   const rawLang = (parts[0] || '').toLowerCase();
-  let lang = /^[a-z]{2,3}$/.test(rawLang) ? rawLang : 'tr';
+  let lang = /^[a-z]{2,3}$/.test(rawLang) ? rawLang : 'en';
   let country = normalizeCountry(parts[1], lang);
 
-  if (rawLocale.toLowerCase().includes('tr') || isSystemTurkish || hasTurkishChars) {
+  if (hasTurkishChars || lang === 'tr' || isSystemTurkish) {
     country = 'tr';
-    if (hasTurkishChars || isSystemTurkish) {
-      lang = 'tr';
-    }
+    lang = 'tr';
   }
 
   const ddgRegion = country === 'tr' ? 'tr-tr' : `${country}-${lang}`;

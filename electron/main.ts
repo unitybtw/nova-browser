@@ -127,8 +127,8 @@ function getMainDOMPurify(): any {
 // database/LevelDB corruption, and hostile command-line flag injection.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
-  console.warn('[Security] Another instance of Nova Browser is already running. Quitting duplicate process.');
-  app.quit();
+  console.warn('[Security] Another instance of Nova Browser is already running. Exiting duplicate process.');
+  app.exit(0);
 }
 import child_process from 'child_process';
 import crypto from 'crypto';
@@ -365,16 +365,18 @@ nativeTheme.on('updated', () => {
 
 
 function getAcceptLanguagesForLocale(localeOrLang?: string): string {
-  const raw = (typeof localeOrLang === 'string' && localeOrLang.trim())
-    ? localeOrLang.trim()
-    : (app.getLocale() || 'tr-TR');
+  const hasExplicit = typeof localeOrLang === 'string' && localeOrLang.trim().length > 0;
+  const raw = hasExplicit
+    ? localeOrLang!.trim()
+    : (app.getLocale() || 'en-US');
   const normalized = raw.replace('_', '-');
   const parts = normalized.split('-');
-  const lang = (parts[0] || 'tr').toLowerCase();
+  const lang = (parts[0] || 'en').toLowerCase();
   const country = (parts[1] || '').toUpperCase();
 
   const sys = (app.getLocale() || '').toLowerCase();
-  const isTurkish = lang === 'tr' || country === 'TR' || sys.includes('tr');
+  const sysIsTurkish = !hasExplicit && (sys === 'tr' || sys.startsWith('tr-') || sys.startsWith('tr_'));
+  const isTurkish = lang === 'tr' || country === 'TR' || sysIsTurkish;
   if (isTurkish) {
     return 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7';
   }
@@ -913,6 +915,14 @@ function createWindow() {
   const devUrl = 'http://localhost:5173';
   const distHtmlPath = path.join(__dirname, '../dist/index.html');
 
+  mainWindow.webContents.once('did-finish-load', () => {
+    if (pendingDeepLinkUrl) {
+      const queuedUrl = pendingDeepLinkUrl;
+      pendingDeepLinkUrl = null;
+      sendToMainWindow('new-tab', queuedUrl);
+    }
+  });
+
   if (app.isPackaged) {
     mainWindow.loadFile(distHtmlPath);
   } else {
@@ -1417,14 +1427,22 @@ function isValidDeepLinkUrl(targetUrl: unknown): boolean {
   }
 }
 
+let pendingDeepLinkUrl: string | null = null;
+
 // macOS deep-link handler for nova: and web URLs
 app.on('open-url', (event, url) => {
   event.preventDefault();
-  if (mainWindow && !mainWindow.isDestroyed()) {
+  if (!isValidDeepLinkUrl(url)) return;
+  const trimmedUrl = url.trim();
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
-    if (isValidDeepLinkUrl(url)) {
-      sendToMainWindow('new-tab', url.trim());
+    sendToMainWindow('new-tab', trimmedUrl);
+  } else {
+    pendingDeepLinkUrl = trimmedUrl;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   }
 });
@@ -1750,10 +1768,12 @@ app.whenReady().then(async () => {
 
   function saveRememberedPermissionsToDisk(): void {
     try {
-      const obj: Record<string, Record<string, { allow: boolean; ts: number }>> = {};
+      const obj: Record<string, Record<string, { allow: boolean; ts: number }>> = Object.create(null);
       for (const [origin, perms] of rememberedPermissions.entries()) {
-        obj[origin] = {};
+        if (!origin || origin === '__proto__' || origin === 'constructor' || origin === 'prototype') continue;
+        obj[origin] = Object.create(null);
         for (const [perm, entry] of perms.entries()) {
+          if (!perm || perm === '__proto__' || perm === 'constructor' || perm === 'prototype') continue;
           obj[origin][perm] = entry;
         }
       }
@@ -2057,12 +2077,30 @@ app.whenReady().then(async () => {
     return rememberedPermissions.size;
   });
 
+  const ALLOWED_SITE_PERMISSION_KEYS = new Set([
+    'media',
+    'media:audio',
+    'media:video',
+    'geolocation',
+    'notifications',
+    'midi',
+    'midiSysex',
+    'pointerLock',
+    'fullscreen',
+    'clipboard-read',
+    'clipboard-sanitized-write',
+    'display-capture',
+    'window-management',
+  ]);
+
   // IPC: get remembered permissions for a specific site origin (used by SiteInfoPopover)
   ipcMain.handle('get-site-permissions', (event, origin: unknown) => {
     if (!isTrustedSender(event)) return {};
     if (typeof origin !== 'string') return {};
+    const siteOrigin = origin === 'app' ? 'app' : permissionOrigin(origin);
+    if (!siteOrigin) return {};
     purgeExpiredRememberedPermissions();
-    const sitePerms = rememberedPermissions.get(origin);
+    const sitePerms = rememberedPermissions.get(siteOrigin);
     if (!sitePerms) return {};
     const result: Record<string, { allow: boolean; ts: number }> = {};
     for (const [k, v] of sitePerms.entries()) {
@@ -2075,8 +2113,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('set-site-permission', (event, origin: unknown, key: unknown, state: unknown) => {
     if (!isTrustedSender(event)) return false;
     if (typeof origin !== 'string' || typeof key !== 'string') return false;
+    if (!ALLOWED_SITE_PERMISSION_KEYS.has(key)) return false;
     const siteOrigin = permissionOrigin(origin);
     if (!siteOrigin) return false;
+    purgeExpiredRememberedPermissions();
     let sitePerms = rememberedPermissions.get(siteOrigin);
     if (state === 'ask' || state === 'reset' || state === null || state === undefined) {
       if (sitePerms) {
@@ -2088,6 +2128,10 @@ app.whenReady().then(async () => {
     }
     const allow = state === 'allow' || state === true;
     if (!sitePerms) {
+      if (rememberedPermissions.size >= 200) {
+        const oldest = rememberedPermissions.keys().next().value;
+        if (oldest) rememberedPermissions.delete(oldest);
+      }
       sitePerms = new Map();
       rememberedPermissions.set(siteOrigin, sitePerms);
     }
@@ -3113,7 +3157,7 @@ fi
 
   autoUpdater.on('error', (err) => {
     console.error('AutoUpdater error:', err);
-    sendToMainWindow('update-error', { message: err?.message || 'Update check encountered an error' });
+    sendToMainWindow('update-error', err?.message || 'Update check encountered an error');
   });
 
   ipcMain.handle('check-for-updates', async (event) => {
@@ -3160,17 +3204,26 @@ fi
     const hash = crypto.createHash('sha256');
 
     return new Promise((resolve) => {
+      let settled = false;
       let lastTime = Date.now();
       let lastBytes = 0;
       let transferred = 0;
       let total = 0;
       let speed = 0;
 
+      const failAndCleanup = (errorMsg: string) => {
+        if (settled) return;
+        settled = true;
+        fileStream.close(() => {
+          fs.promises.unlink(tempDest).catch(() => {});
+        });
+        resolve({ success: false, error: errorMsg, hashVerified: false });
+      };
+
       const followRedirectAndDownload = (currentUrl: string, maxRedirects = 6) => {
+        if (settled) return;
         if (maxRedirects <= 0) {
-          fileStream.close();
-          try { fs.unlinkSync(tempDest); } catch (_) {}
-          resolve({ success: false, error: 'Too many redirects', hashVerified: false });
+          failAndCleanup('Too many redirects');
           return;
         }
 
@@ -3178,9 +3231,7 @@ fi
         try {
           parsedCur = new URL(currentUrl);
         } catch (_) {
-          fileStream.close();
-          try { fs.unlinkSync(tempDest); } catch (_) {}
-          resolve({ success: false, error: 'Malformed redirect URL', hashVerified: false });
+          failAndCleanup('Malformed redirect URL');
           return;
         }
 
@@ -3196,9 +3247,7 @@ fi
                               isGithubS3;
 
         if (!isTrustedHost || parsedCur.protocol !== 'https:') {
-          fileStream.close();
-          try { fs.unlinkSync(tempDest); } catch (_) {}
-          resolve({ success: false, error: `Untrusted download redirect host: ${parsedCur.hostname}`, hashVerified: false });
+          failAndCleanup(`Untrusted download redirect host: ${parsedCur.hostname}`);
           return;
         }
 
@@ -3210,15 +3259,20 @@ fi
         }, (res) => {
           if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             res.resume();
-            const nextUrl = new URL(res.headers.location, currentUrl).href;
+            let nextUrl: string;
+            try {
+              nextUrl = new URL(res.headers.location, currentUrl).href;
+            } catch (_) {
+              failAndCleanup('Malformed redirect URL');
+              return;
+            }
             followRedirectAndDownload(nextUrl, maxRedirects - 1);
             return;
           }
 
           if (res.statusCode !== 200) {
-            fileStream.close();
-            try { fs.unlinkSync(tempDest); } catch (_) {}
-            resolve({ success: false, error: `HTTP ${res.statusCode}: ${res.statusMessage}`, hashVerified: false });
+            res.resume();
+            failAndCleanup(`HTTP ${res.statusCode}: ${res.statusMessage}`);
             return;
           }
 
@@ -3243,40 +3297,37 @@ fi
           res.pipe(fileStream);
 
           res.on('error', (err) => {
-            fileStream.close();
-            try { fs.unlinkSync(tempDest); } catch (_) {}
-            resolve({ success: false, error: err.message, hashVerified: false });
+            failAndCleanup(err.message);
           });
         });
 
         req.on('error', (err) => {
-          fileStream.close();
-          try { fs.unlinkSync(tempDest); } catch (_) {}
-          resolve({ success: false, error: err.message, hashVerified: false });
+          failAndCleanup(err.message);
         });
 
         req.setTimeout(45000, () => {
           req.destroy();
-          fileStream.close();
-          try { fs.unlinkSync(tempDest); } catch (_) {}
-          resolve({ success: false, error: 'Download connection timed out', hashVerified: false });
+          failAndCleanup('Download connection timed out');
         });
       };
 
       fileStream.on('finish', () => {
+        if (settled) return;
         fileStream.close(async () => {
+          if (settled) return;
+          settled = true;
           const actualSha = hash.digest('hex').toLowerCase();
           let hashVerified = false;
 
           if (!expectedSha256 || !/^[a-fA-F0-9]{64}$/.test(expectedSha256)) {
-            try { fs.unlinkSync(tempDest); } catch (_) {}
+            await fs.promises.unlink(tempDest).catch(() => {});
             console.error('[Updater] Checksum missing or invalid format! Rejecting unverified update package.');
             resolve({ success: false, error: 'Update package rejected: missing expected checksum', hashVerified: false });
             return;
           }
 
           if (actualSha !== expectedSha256.toLowerCase()) {
-            try { fs.unlinkSync(tempDest); } catch (_) {}
+            await fs.promises.unlink(tempDest).catch(() => {});
             console.error(`[Updater] Checksum mismatch! Expected ${expectedSha256}, got ${actualSha}`);
             resolve({ success: false, error: 'Update checksum mismatch', hashVerified: false });
             return;
@@ -3285,19 +3336,19 @@ fi
 
           try {
             if (fs.existsSync(destPath)) {
-              try { fs.unlinkSync(destPath); } catch (_) {}
+              await fs.promises.unlink(destPath).catch(() => {});
             }
             fs.renameSync(tempDest, destPath);
             resolve({ success: true, filePath: destPath, hashVerified });
           } catch (renameErr: any) {
+            await fs.promises.unlink(tempDest).catch(() => {});
             resolve({ success: false, error: renameErr?.message || 'Failed to save downloaded package', hashVerified: false });
           }
         });
       });
 
       fileStream.on('error', (err) => {
-        try { fs.unlinkSync(tempDest); } catch (_) {}
-        resolve({ success: false, error: err.message, hashVerified: false });
+        failAndCleanup(err.message);
       });
 
       followRedirectAndDownload(url);
@@ -3399,13 +3450,14 @@ fi
     const isDirectAsset = targetUrl.endsWith('.dmg') || targetUrl.endsWith('.zip') || targetUrl.endsWith('.exe') || targetUrl.endsWith('.AppImage') || targetUrl.endsWith('.deb');
     if (isDirectAsset || assetName) {
       try {
-        const resolvedAssetName = assetName || path.basename(new URL(targetUrl).pathname) || `Nova-Update-${targetVersion}`;
-        const tempUpdatesDir = path.join(app.getPath('temp'), 'nova_updates');
-        fs.mkdirSync(tempUpdatesDir, { recursive: true, mode: 0o700 });
+        const rawAssetName = assetName || path.basename(new URL(targetUrl).pathname) || `Nova-Update-${targetVersion}`;
+        const resolvedAssetName = path.basename(rawAssetName) || `Nova-Update-${targetVersion}`;
+        const updatesDir = path.join(app.getPath('userData'), 'updates');
+        fs.mkdirSync(updatesDir, { recursive: true, mode: 0o700 });
         if (process.platform !== 'win32') {
-          try { fs.chmodSync(tempUpdatesDir, 0o700); } catch (_) {}
+          try { fs.chmodSync(updatesDir, 0o700); } catch (_) {}
         }
-        const destPath = path.join(tempUpdatesDir, resolvedAssetName);
+        const destPath = path.join(updatesDir, resolvedAssetName);
 
         sendToMainWindow('update-download-progress', {
           percent: 0,
@@ -3438,13 +3490,14 @@ fi
         } else {
           const err = dlResult.error || 'Download failed';
           console.error('[Updater] Direct stream download failed:', err);
-          sendToMainWindow('update-error', { message: err });
+          sendToMainWindow('update-error', err);
           return { success: false, error: err };
         }
       } catch (streamErr: any) {
         console.error('[Updater] Error during direct download:', streamErr);
-        sendToMainWindow('update-error', { message: streamErr?.message || 'Download error' });
-        return { success: false, error: streamErr?.message || 'Download error' };
+        const msg = streamErr?.message || 'Download error';
+        sendToMainWindow('update-error', msg);
+        return { success: false, error: msg };
       }
     }
 
@@ -5232,6 +5285,49 @@ ipcMain.on('save-password', (event, data: { hostname: string; username: string; 
 
 // Generic Secure Storage API (for future password manager, etc.)
 const secureStoreLock = new SecureStoreKeyedRWLock();
+let machineSecretInitPromise: Promise<Buffer> | null = null;
+
+async function getOrInitMachineSecret(secretPath: string): Promise<Buffer> {
+  try {
+    const existing = await fs.promises.readFile(secretPath);
+    if (existing.length !== 32) {
+      throw new Error(
+        `Corrupt .machine_secret (${existing.length} bytes, expected 32). ` +
+        'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
+      );
+    }
+    return existing;
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') throw err;
+  }
+
+  if (!machineSecretInitPromise) {
+    machineSecretInitPromise = (async () => {
+      try {
+        const candidate = crypto.randomBytes(32);
+        try {
+          await fs.promises.writeFile(secretPath, candidate, { mode: 0o600, flag: 'wx' });
+          if (process.platform !== 'win32') {
+            try { await fs.promises.chmod(secretPath, 0o600); } catch (_) {}
+          }
+          return candidate;
+        } catch (wxErr: any) {
+          if (wxErr?.code === 'EEXIST') {
+            const existing = await fs.promises.readFile(secretPath);
+            if (existing.length !== 32) {
+              throw new Error(`Corrupt .machine_secret (${existing.length} bytes, expected 32).`);
+            }
+            return existing;
+          }
+          throw wxErr;
+        }
+      } finally {
+        machineSecretInitPromise = null;
+      }
+    })();
+  }
+  return machineSecretInitPromise;
+}
 
 ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
@@ -5267,26 +5363,7 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
         console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
         const getFallbackKey = async (): Promise<Buffer> => {
           const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-          let secret: Buffer;
-          try {
-            secret = await fs.promises.readFile(secretPath);
-            if (secret.length !== 32) {
-              throw new Error(
-                `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
-                'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
-              );
-            }
-          } catch (err: any) {
-            if (err?.code === 'ENOENT') {
-              secret = crypto.randomBytes(32);
-              await fs.promises.writeFile(secretPath, secret, { mode: 0o600 });
-              if (process.platform !== 'win32') {
-                try { await fs.promises.chmod(secretPath, 0o600); } catch (_) {}
-              }
-            } else {
-              throw err;
-            }
-          }
+          const secret = await getOrInitMachineSecret(secretPath);
           // K-3: Bind salt to machine identity so copying userData to another machine/account fails
           const machineSalt = getMachineSalt('nova-secure-salt');
           return getMemoizedScryptKey(secret, machineSalt);
@@ -6142,34 +6219,49 @@ async function loadPersistentExtensions(): Promise<void> {
   }
 }
 
-function getLocalizedManifestString(extPath: string, text: string, fallback: string = ''): string {
+async function getLocalizedManifestString(
+  extPath: string,
+  text: string,
+  fallback: string = '',
+  localeCache?: Map<string, Record<string, any> | null>
+): Promise<string> {
   if (!text || typeof text !== 'string') return fallback;
   if (!text.startsWith('__MSG_') || !text.endsWith('__')) return text;
   const key = text.slice(6, -2);
 
   const localesDir = path.join(extPath, '_locales');
-  if (!fs.existsSync(localesDir)) return fallback || text;
-
   const candidateLocales = ['en', 'en_US', 'en_GB', 'tr'];
   try {
-    const allLocales = fs.readdirSync(localesDir);
-    const searchOrder = [...candidateLocales.filter(l => allLocales.includes(l)), ...allLocales];
+    const allLocales = await fs.promises.readdir(localesDir);
+    const searchOrder = Array.from(new Set([
+      ...candidateLocales.filter(l => allLocales.includes(l)),
+      ...allLocales
+    ]));
 
     for (const loc of searchOrder) {
-      const msgFile = path.join(localesDir, loc, 'messages.json');
-      if (fs.existsSync(msgFile)) {
+      let content: Record<string, any> | null;
+      if (localeCache?.has(loc)) {
+        content = localeCache.get(loc) ?? null;
+      } else {
+        const msgFile = path.join(localesDir, loc, 'messages.json');
         try {
-          const content = JSON.parse(fs.readFileSync(msgFile, 'utf8').replace(/^\uFEFF/, ''));
-          if (content[key]?.message) {
-            return content[key].message;
-          }
-          const lowerKey = key.toLowerCase();
-          for (const k of Object.keys(content)) {
-            if (k.toLowerCase() === lowerKey && content[k]?.message) {
-              return content[k].message;
-            }
-          }
-        } catch (_) {}
+          const raw = await fs.promises.readFile(msgFile, 'utf8');
+          const parsed = JSON.parse(raw.replace(/^\uFEFF/, ''));
+          content = parsed && typeof parsed === 'object' ? parsed : null;
+        } catch {
+          content = null;
+        }
+        localeCache?.set(loc, content);
+      }
+      if (!content) continue;
+      if (content[key]?.message) {
+        return content[key].message;
+      }
+      const lowerKey = key.toLowerCase();
+      for (const k of Object.keys(content)) {
+        if (k.toLowerCase() === lowerKey && content[k]?.message) {
+          return content[k].message;
+        }
       }
     }
   } catch (_) {}
@@ -6241,7 +6333,7 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
     title: 'Review Extension Permissions',
     message: `Extension "${String(manifest.name || 'Unpacked extension').slice(0, 120)}" requests the following permissions:`,
     detail: formattedPermissions.length > 0
-      ? formattedPermissions.join('\\n\\n')
+      ? formattedPermissions.join('\n\n')
       : 'This extension does not declare browser permissions.',
     noLink: true
   });
@@ -6384,11 +6476,13 @@ ipcMain.handle('list-extensions', async (event) => {
     let localizedDesc = e.description;
     try {
       const manifestPath = path.join(e.path, 'manifest.json');
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, ''));
+      try {
+        const rawManifest = await fs.promises.readFile(manifestPath, 'utf8');
+        const manifest = JSON.parse(rawManifest.replace(/^\uFEFF/, ''));
+        const localeCache = new Map<string, Record<string, any> | null>();
 
-        localizedName = getLocalizedManifestString(e.path, manifest.name, e.name);
-        localizedDesc = getLocalizedManifestString(e.path, manifest.description, e.description);
+        localizedName = await getLocalizedManifestString(e.path, manifest.name, e.name, localeCache);
+        localizedDesc = await getLocalizedManifestString(e.path, manifest.description, e.description, localeCache);
 
         // Find popup URL (normalize leading slashes)
         const rawPopup = manifest.action?.default_popup || manifest.browser_action?.default_popup || manifest.page_action?.default_popup;
@@ -6423,23 +6517,23 @@ ipcMain.handle('list-extensions', async (event) => {
         if (typeof rawIconRel === 'string' && rawIconRel.trim()) {
           let baseDir = path.resolve(e.path);
           try {
-            baseDir = fs.realpathSync(baseDir);
+            baseDir = await fs.promises.realpath(baseDir);
           } catch (_) {}
           const resolvedIconPath = path.resolve(baseDir, rawIconRel.replace(/^\.?\//, ''));
           const normalizedBase = baseDir + path.sep;
-          if (resolvedIconPath.startsWith(normalizedBase) && fs.existsSync(resolvedIconPath)) {
+          if (resolvedIconPath.startsWith(normalizedBase)) {
             try {
-              const realIconPath = fs.realpathSync(resolvedIconPath);
+              const realIconPath = await fs.promises.realpath(resolvedIconPath);
               if (realIconPath.startsWith(normalizedBase)) {
                 const ext = path.extname(realIconPath).toLowerCase().substring(1) || 'png';
                 const mimeType = ext === 'svg' ? 'svg+xml' : ext;
-                const buffer = fs.readFileSync(realIconPath);
+                const buffer = await fs.promises.readFile(realIconPath);
                 iconData = `data:image/${mimeType};base64,${buffer.toString('base64')}`;
               }
             } catch {}
           }
         }
-      }
+      } catch (_) {}
     } catch (err) {
       console.error('Failed to load extension icon', err);
     }
@@ -7241,7 +7335,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
       let cleanVoice: string | null = null;
       if (voiceName && typeof voiceName === 'string') {
         const rawName = voiceName.split('(')[0].trim();
-        if (/^[a-zA-Z0-9\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
+        if (/^[\p{L}\p{N}\s]+$/u.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
           cleanVoice = rawName;
         }
       }

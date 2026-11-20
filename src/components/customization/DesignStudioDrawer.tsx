@@ -1731,7 +1731,7 @@ export const DesignStudioDrawer: React.FC = () => {
                         ...prev.newTabLayout,
                         greeting: { ...prev.newTabLayout.greeting, customText: e.target.value },
                       },
-                    }))
+                    }), { coalesceKey: 'greeting-text' })
                   }
                   className="w-full px-2.5 py-1.5 rounded-md bg-neutral-100 dark:bg-white/[0.06] border border-neutral-200 dark:border-white/[0.09] text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 text-[11px] focus:outline-none focus:border-neutral-400 dark:focus:border-white/30"
                 />
@@ -1961,7 +1961,7 @@ export const DesignStudioDrawer: React.FC = () => {
                       updateDraft((prev) => ({
                         ...prev,
                         customCss: { ...prev.customCss, css: e.target.value },
-                      }))
+                      }), { coalesceKey: 'custom-css' })
                     }
                     rows={5}
                     placeholder="/* Scoped CSS rules (e.g. #nova-app { ... }) */"

@@ -902,9 +902,9 @@ export function useTabOperations({
       }).catch((e: any) => {
         const msg = String(e?.message || e || '');
         if (msg.includes('No video found')) {
-          void showAlert({ title: 'Picture-in-Picture', message: "Bu sayfada oynatılabilir video bulunamadı." });
+          void showAlert({ title: 'Picture-in-Picture', message: 'No playable video was found on this page.' });
         } else if (!msg.includes('user gesture')) {
-          void showAlert({ title: 'Picture-in-Picture', message: "Picture-in-Picture hatası: " + msg });
+          void showAlert({ title: 'Picture-in-Picture', message: `Picture-in-Picture error: ${msg}` });
         }
       });
     }

@@ -1202,18 +1202,24 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     };
   }, []);
 
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  activeWorkspaceIdRef.current = activeWorkspaceId;
+
   const handleOpenContextMenu = useCallback((tab: Tab, e: React.MouseEvent) => {
-    const wsId = tab.workspaceId || activeWorkspaceId || 'default';
-    const wsTabs = tabs.filter(t => (t.workspaceId || 'default') === wsId);
+    const currentTabs = tabsRef.current;
+    const wsId = tab.workspaceId || activeWorkspaceIdRef.current || 'default';
+    const wsTabs = currentTabs.filter(t => (t.workspaceId || 'default') === wsId);
     const wsIdx = wsTabs.findIndex(t => t.id === tab.id);
     setTabContextMenu({
       isOpen: true,
       x: e.clientX,
       y: e.clientY,
       tab,
-      tabIndex: wsIdx !== -1 ? wsIdx : tabs.findIndex(t => t.id === tab.id)
+      tabIndex: wsIdx !== -1 ? wsIdx : currentTabs.findIndex(t => t.id === tab.id)
     });
-  }, [tabs, activeWorkspaceId]);
+  }, []);
 
   const isCurrentNewTab = !activeTab?.url || activeTab.url === 'nova://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab';
 

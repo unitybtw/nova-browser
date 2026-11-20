@@ -99,7 +99,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-downloaded', handler);
   },
   onUpdateError: (callback: (event: any, error: string) => void) => {
-    const handler = (_event: any, error: string) => callback(null, error);
+    const handler = (_event: any, error: unknown) => {
+      const msg = typeof error === 'string'
+        ? error
+        : (error && typeof error === 'object' && typeof (error as any).message === 'string')
+          ? (error as any).message
+          : 'Update error encountered';
+      callback(null, msg);
+    };
     ipcRenderer.on('update-error', handler);
     return () => ipcRenderer.removeListener('update-error', handler);
   },
